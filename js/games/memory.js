@@ -51,7 +51,7 @@
           on: { click: () => flip(idx, node) }
         }, [
           el("div", { class: "mem-inner" }, [
-            el("div", { class: "mem-front", text: "🐝" }),
+            el("div", { class: "mem-front", text: "💎" }),
             el("div", { class: `mem-back ${card.kind}`, text: card.face })
           ])
         ]);

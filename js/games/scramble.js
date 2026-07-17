@@ -8,7 +8,7 @@
     id: "scramble",
     name: "Satzbau",
     emoji: "🧱",
-    color: "#1982c4",
+    color: "#3b4de8",
     description: "Put the shuffled German words back into the correct order.",
     contentType: "sentences", // uses SENTENCE_TOPICS instead of words
 

@@ -1,4 +1,4 @@
-# 🐝 Skillbee Deutsch Games
+# 💎 Skillbee Deutsch Games
 
 A **gamified toolkit of German-learning games** for Skillbee teachers to use live in their
 lessons. Open it on any laptop, project it on the classroom screen, pick a game and a topic,

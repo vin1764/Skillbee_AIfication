@@ -10,9 +10,13 @@
   --ink-soft: #5a6b8c;
   --card: #ffffff;
   --line: #e6ebf4;
-  --brand: #ffb703;
+  --brand: #ffb703;         /* gold — used only for the points/score reward badge */
   --brand-ink: #7a4f00;
-  --accent: #1982c4;
+  --skb: #3b4de8;           /* Skillbee brand blue */
+  --skb-dark: #2a38c4;
+  --skb-tint: #eef0ff;
+  --accent: var(--skb);     /* primary interactive / brand color */
+  --accent-dark: var(--skb-dark);
   --good: #2ec4b6;
   --bad: #ff5964;
   --radius: 18px;
@@ -45,16 +49,18 @@ kbd {
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px clamp(14px, 4vw, 40px);
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--line);
+  background: linear-gradient(120deg, var(--skb), var(--skb-dark));
+  border-bottom: none;
+  box-shadow: 0 6px 20px rgba(42, 56, 196, 0.25);
 }
 .brand {
-  display: flex; align-items: center; gap: 10px;
-  background: none; border: 0; font-size: 1.15rem; color: var(--ink); padding: 4px;
+  display: flex; align-items: center; gap: 11px;
+  background: none; border: 0; font-size: 1.15rem; color: #fff; padding: 4px;
 }
-.brand-mark { font-size: 1.5rem; filter: drop-shadow(0 2px 3px rgba(0,0,0,.15)); }
-.brand-text b { color: var(--accent); }
+.brand-mark { display: inline-flex; }
+.skb-gem { width: 30px; height: 30px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.22)); }
+.brand-text { letter-spacing: .2px; }
+.brand-text b { color: #fff; font-weight: 800; }
 .topbar-right { display: flex; align-items: center; gap: 10px; }
 .score-badge {
   display: flex; align-items: center; gap: 6px;
@@ -66,10 +72,10 @@ kbd {
 .score-value { min-width: 1.2ch; text-align: center; display: inline-block; }
 .score-value.pulse { animation: pop 0.4s ease; }
 .icon-btn {
-  background: #fff; border: 1px solid var(--line); border-radius: 12px;
-  width: 42px; height: 42px; font-size: 1.1rem; box-shadow: var(--shadow);
+  background: rgba(255, 255, 255, 0.16); border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px; width: 42px; height: 42px; font-size: 1.1rem; color: #fff;
 }
-.icon-btn:hover { transform: translateY(-1px); }
+.icon-btn:hover { background: rgba(255, 255, 255, 0.28); transform: translateY(-1px); }
 
 /* ---------- screen ---------- */
 .screen { padding: clamp(18px, 4vw, 44px); max-width: 1100px; margin: 0 auto; }
@@ -156,7 +162,7 @@ kbd {
   box-shadow: var(--shadow); transition: transform 0.12s, box-shadow 0.12s;
 }
 .btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
-.btn.primary { background: linear-gradient(135deg, #ffd166, var(--brand)); border-color: #f0b400; color: var(--brand-ink); }
+.btn.primary { background: linear-gradient(135deg, var(--skb), var(--skb-dark)); border-color: var(--skb-dark); color: #fff; }
 .btn.ghost { background: transparent; box-shadow: none; }
 
 /* ---------- result card ---------- */
@@ -208,7 +214,7 @@ kbd {
   border-radius: 14px; display: flex; align-items: center; justify-content: center;
   padding: 8px; text-align: center; box-shadow: var(--shadow);
 }
-.mem-front { background: linear-gradient(135deg, #ffd166, var(--brand)); font-size: 2rem; border: 2px solid #f0b400; }
+.mem-front { background: linear-gradient(135deg, var(--skb), var(--skb-dark)); color: #fff; font-size: 2rem; border: 2px solid var(--skb-dark); }
 .mem-back {
   transform: rotateY(180deg); background: var(--card); border: 2px solid var(--line);
   font-weight: 800; font-size: clamp(0.85rem, 2vw, 1.15rem); word-break: break-word;
