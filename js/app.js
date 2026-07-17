@@ -142,6 +142,21 @@ const App = (function () {
         if (frame < 160) requestAnimationFrame(tick);
         else canvas.remove();
       })();
+    },
+
+    /* Friendly message shown when a topic has no content yet. */
+    notice(stage, title, message, api) {
+      stage.appendChild(
+        el("div", { class: "result-card" }, [
+          el("div", { class: "result-emoji", text: "📝" }),
+          el("h2", { text: title }),
+          el("p", { class: "result-score", text: message }),
+          el("div", { class: "result-actions" }, [
+            el("button", { class: "btn", text: "Anderes Thema", on: { click: api.backToTopics } }),
+            el("button", { class: "btn ghost", text: "Menü", on: { click: api.exit } })
+          ])
+        ])
+      );
     }
   };
 
@@ -176,6 +191,12 @@ const App = (function () {
           '<span class="brand-text"><b>Deutsch</b> Games</span>'
       }),
       el("div", { class: "topbar-right" }, [
+        el("button", {
+          class: "icon-btn",
+          attrs: { id: "admin-btn", title: "Inhalte verwalten" },
+          html: "⚙️",
+          on: { click: () => showAdmin() }
+        }),
         el("div", { class: "score-badge", attrs: { title: "Punkte in dieser Sitzung" } }, [
           el("span", { class: "score-star", html: "⭐" }),
           el("span", { class: "score-value", attrs: { id: "score-value" }, text: "0" })
@@ -235,9 +256,14 @@ const App = (function () {
 
     main.appendChild(
       el("footer", { class: "home-foot" }, [
-        el("span", {
-          html:
-            "Made for Skillbee German teachers · Tipp: press <kbd>F11</kbd> for full-screen in class"
+        el("button", {
+          class: "foot-admin",
+          html: "⚙️ Inhalte verwalten",
+          on: { click: () => showAdmin() }
+        }),
+        el("div", {
+          class: "foot-note",
+          html: "Made for Skillbee German teachers · Tipp: <kbd>F11</kbd> für Vollbild im Unterricht"
         })
       ])
     );
@@ -246,7 +272,7 @@ const App = (function () {
   /* ---- topic picker (shown before a game starts) ------------------- */
   function openTopicPicker(game) {
     const usesSentences = game.contentType === "sentences";
-    const topics = usesSentences ? window.GameData.SENTENCE_TOPICS : window.GameData.VOCAB_TOPICS;
+    const topics = usesSentences ? window.ContentStore.sentenceTopics() : window.ContentStore.vocabTopics();
     const main = document.getElementById("screen");
     main.innerHTML = "";
 
@@ -296,6 +322,23 @@ const App = (function () {
     game.mount(stage, api);
   }
 
+  /* ---- admin screen (content editor) ------------------------------- */
+  function showAdmin() {
+    window.speechSynthesis && window.speechSynthesis.cancel();
+    const main = document.getElementById("screen");
+    main.innerHTML = "";
+    const container = el("div", { class: "admin" });
+    main.appendChild(container);
+    if (window.AdminUI) {
+      window.AdminUI.mount(container, {
+        el,
+        kit,
+        store: window.ContentStore,
+        onExit: () => showHome()
+      });
+    }
+  }
+
   /* ---- public API -------------------------------------------------- */
   function register(game) {
     games.push(game);
@@ -320,7 +363,7 @@ const App = (function () {
     showHome();
   }
 
-  return { register, init, kit, state, addScore, showHome };
+  return { register, init, kit, state, addScore, showHome, showAdmin };
 })();
 
 window.App = App;

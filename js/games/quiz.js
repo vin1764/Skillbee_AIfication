@@ -14,6 +14,10 @@
 
     mount(stage, api) {
       const { kit, topic, addScore, el } = api;
+      if (!topic.words || topic.words.length === 0) {
+        kit.notice(stage, "Noch keine Wörter", "Füge über ⚙️ Inhalte verwalten Wörter zu diesem Thema hinzu.", api);
+        return;
+      }
       const words = topic.words;
       const TOTAL = Math.min(8, words.length);
       const pool = kit.sample(words, TOTAL);

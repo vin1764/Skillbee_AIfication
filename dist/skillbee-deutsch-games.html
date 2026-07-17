@@ -280,6 +280,82 @@ kbd {
 .scr-word.chosen { border-color: var(--accent); background: #eef6fc; color: var(--accent); }
 .scr-actions { display: flex; gap: 10px; justify-content: center; }
 
+/* =====================================================================
+   ADMIN  (Inhalte verwalten)
+   ===================================================================== */
+.admin { animation: fadeIn 0.25s ease; }
+.adm-head { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.adm-title { margin: 0; font-size: clamp(1.3rem, 3vw, 1.8rem); flex: 1 1 auto; }
+.adm-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn.small { padding: 8px 12px; font-size: 0.9rem; border-radius: 10px; }
+.adm-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+.adm-tab {
+  background: #fff; border: 1px solid var(--line); border-radius: 999px;
+  padding: 9px 18px; font-weight: 800; color: var(--ink-soft); box-shadow: var(--shadow);
+}
+.adm-tab.active { background: var(--skb); border-color: var(--skb); color: #fff; }
+.adm-hint {
+  background: var(--skb-tint); border: 1px solid #dbe0ff; color: #3a4488;
+  padding: 12px 16px; border-radius: 12px; font-size: 0.92rem; margin: 0 0 18px;
+}
+.adm-add { margin-bottom: 16px; }
+.adm-empty { color: var(--ink-soft); text-align: center; padding: 20px; }
+
+.adm-topic {
+  background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+  padding: 16px; margin-bottom: 16px; box-shadow: var(--shadow);
+}
+.adm-topic-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.adm-count { color: var(--accent); font-weight: 800; font-size: 0.85rem; white-space: nowrap; }
+
+.adm-input {
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+  font-size: 1rem; font-family: inherit; color: var(--ink); background: #fff; min-width: 0;
+}
+.adm-input:focus, .adm-emoji:focus { outline: 3px solid rgba(59, 77, 232, 0.25); border-color: var(--skb); }
+.adm-input.grow { flex: 1 1 180px; }
+.adm-topic-head .adm-input { flex: 1 1 140px; }
+.adm-emoji {
+  width: 58px; text-align: center; font-size: 1.3rem; border: 1px solid var(--line);
+  border-radius: 10px; padding: 8px 4px; background: #fff; font-family: inherit;
+}
+
+.adm-row {
+  display: grid; grid-template-columns: 58px 1fr 1fr 40px; gap: 8px;
+  align-items: center; margin-bottom: 8px;
+}
+.adm-row-sent { grid-template-columns: 1fr 1fr 40px; }
+.adm-row-head { font-size: 0.78rem; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.adm-row-head .adm-emoji-h { text-align: center; }
+.adm-del {
+  width: 38px; height: 38px; border: 1px solid var(--line); background: #fff;
+  border-radius: 10px; color: var(--bad); font-size: 1rem; font-weight: 800;
+}
+.adm-del:hover { background: #ffeef0; border-color: var(--bad); }
+.adm-add-row { margin-top: 6px; }
+
+.adm-toast {
+  position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px);
+  background: var(--ink); color: #fff; padding: 12px 22px; border-radius: 999px;
+  font-weight: 700; box-shadow: var(--shadow-lg); z-index: 60; opacity: 0;
+  transition: opacity 0.25s, transform 0.25s;
+}
+.adm-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+.foot-admin {
+  background: #fff; border: 1px solid var(--line); border-radius: 999px;
+  padding: 9px 18px; font-weight: 800; color: var(--accent); box-shadow: var(--shadow);
+  margin-bottom: 12px;
+}
+.foot-admin:hover { border-color: var(--accent); transform: translateY(-1px); }
+.foot-note { color: var(--ink-soft); font-size: 0.9rem; }
+
+@media (max-width: 560px) {
+  .adm-row { grid-template-columns: 48px 1fr 40px; }
+  .adm-row > .adm-input:nth-child(3) { grid-column: 2 / 4; }
+  .adm-row-head { display: none; }
+}
+
 /* ---------- confetti ---------- */
 .confetti-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 50; }
 
@@ -487,6 +563,110 @@ window.SkillbeeBrand = {
 };
 
 
+/* ==== js/store.js ==== */
+/* =====================================================================
+   ContentStore — lets teachers edit the game content from inside the app.
+   ---------------------------------------------------------------------
+   • The built-in content in data.js is the "default".
+   • Teacher edits are saved in the browser (localStorage), so they persist
+     on that computer even after closing the tab.
+   • Export/Import moves content between computers (or to the shared link).
+   The games and the topic picker read their content from here, so any edit
+   shows up immediately.
+   ===================================================================== */
+(function () {
+  var KEY = "skillbee_deutsch_content_v1";
+
+  function clone(x) {
+    return JSON.parse(JSON.stringify(x));
+  }
+
+  function defaults() {
+    return {
+      vocab: clone(window.GameData.VOCAB_TOPICS),
+      sentences: clone(window.GameData.SENTENCE_TOPICS)
+    };
+  }
+
+  var store = {
+    data: null,
+
+    load: function () {
+      try {
+        var raw = localStorage.getItem(KEY);
+        if (raw) {
+          var parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.vocab) && Array.isArray(parsed.sentences)) {
+            this.data = parsed;
+            return;
+          }
+        }
+      } catch (e) {
+        /* localStorage may be unavailable (e.g. sandboxed) — fall back to defaults */
+      }
+      this.data = defaults();
+    },
+
+    save: function () {
+      try {
+        localStorage.setItem(KEY, JSON.stringify(this.data));
+        return true;
+      } catch (e) {
+        return false; // still edited in-memory for this session
+      }
+    },
+
+    reset: function () {
+      this.data = defaults();
+      try {
+        localStorage.removeItem(KEY);
+      } catch (e) {}
+    },
+
+    isCustomized: function () {
+      try {
+        return !!localStorage.getItem(KEY);
+      } catch (e) {
+        return false;
+      }
+    },
+
+    vocabTopics: function () {
+      return this.data.vocab;
+    },
+    sentenceTopics: function () {
+      return this.data.sentences;
+    },
+
+    newId: function (prefix) {
+      return (
+        (prefix || "id") +
+        "-" +
+        Date.now().toString(36) +
+        "-" +
+        Math.floor(Math.random() * 1e4).toString(36)
+      );
+    },
+
+    exportJSON: function () {
+      return JSON.stringify(this.data, null, 2);
+    },
+
+    importJSON: function (text) {
+      var parsed = JSON.parse(text);
+      if (!parsed || !Array.isArray(parsed.vocab) || !Array.isArray(parsed.sentences)) {
+        throw new Error("Die Datei hat nicht das richtige Format.");
+      }
+      this.data = parsed;
+      this.save();
+    }
+  };
+
+  store.load();
+  window.ContentStore = store;
+})();
+
+
 /* ==== js/app.js ==== */
 /* =====================================================================
    Skillbee Deutsch Games — CORE APP
@@ -632,6 +812,21 @@ const App = (function () {
         if (frame < 160) requestAnimationFrame(tick);
         else canvas.remove();
       })();
+    },
+
+    /* Friendly message shown when a topic has no content yet. */
+    notice(stage, title, message, api) {
+      stage.appendChild(
+        el("div", { class: "result-card" }, [
+          el("div", { class: "result-emoji", text: "📝" }),
+          el("h2", { text: title }),
+          el("p", { class: "result-score", text: message }),
+          el("div", { class: "result-actions" }, [
+            el("button", { class: "btn", text: "Anderes Thema", on: { click: api.backToTopics } }),
+            el("button", { class: "btn ghost", text: "Menü", on: { click: api.exit } })
+          ])
+        ])
+      );
     }
   };
 
@@ -666,6 +861,12 @@ const App = (function () {
           '<span class="brand-text"><b>Deutsch</b> Games</span>'
       }),
       el("div", { class: "topbar-right" }, [
+        el("button", {
+          class: "icon-btn",
+          attrs: { id: "admin-btn", title: "Inhalte verwalten" },
+          html: "⚙️",
+          on: { click: () => showAdmin() }
+        }),
         el("div", { class: "score-badge", attrs: { title: "Punkte in dieser Sitzung" } }, [
           el("span", { class: "score-star", html: "⭐" }),
           el("span", { class: "score-value", attrs: { id: "score-value" }, text: "0" })
@@ -725,9 +926,14 @@ const App = (function () {
 
     main.appendChild(
       el("footer", { class: "home-foot" }, [
-        el("span", {
-          html:
-            "Made for Skillbee German teachers · Tipp: press <kbd>F11</kbd> for full-screen in class"
+        el("button", {
+          class: "foot-admin",
+          html: "⚙️ Inhalte verwalten",
+          on: { click: () => showAdmin() }
+        }),
+        el("div", {
+          class: "foot-note",
+          html: "Made for Skillbee German teachers · Tipp: <kbd>F11</kbd> für Vollbild im Unterricht"
         })
       ])
     );
@@ -736,7 +942,7 @@ const App = (function () {
   /* ---- topic picker (shown before a game starts) ------------------- */
   function openTopicPicker(game) {
     const usesSentences = game.contentType === "sentences";
-    const topics = usesSentences ? window.GameData.SENTENCE_TOPICS : window.GameData.VOCAB_TOPICS;
+    const topics = usesSentences ? window.ContentStore.sentenceTopics() : window.ContentStore.vocabTopics();
     const main = document.getElementById("screen");
     main.innerHTML = "";
 
@@ -786,6 +992,23 @@ const App = (function () {
     game.mount(stage, api);
   }
 
+  /* ---- admin screen (content editor) ------------------------------- */
+  function showAdmin() {
+    window.speechSynthesis && window.speechSynthesis.cancel();
+    const main = document.getElementById("screen");
+    main.innerHTML = "";
+    const container = el("div", { class: "admin" });
+    main.appendChild(container);
+    if (window.AdminUI) {
+      window.AdminUI.mount(container, {
+        el,
+        kit,
+        store: window.ContentStore,
+        onExit: () => showHome()
+      });
+    }
+  }
+
   /* ---- public API -------------------------------------------------- */
   function register(game) {
     games.push(game);
@@ -810,7 +1033,7 @@ const App = (function () {
     showHome();
   }
 
-  return { register, init, kit, state, addScore, showHome };
+  return { register, init, kit, state, addScore, showHome, showAdmin };
 })();
 
 window.App = App;
@@ -834,6 +1057,10 @@ document.addEventListener("DOMContentLoaded", App.init);
 
     mount(stage, api) {
       const { kit, topic, addScore, el } = api;
+      if (!topic.words || topic.words.length === 0) {
+        kit.notice(stage, "Noch keine Wörter", "Füge über ⚙️ Inhalte verwalten Wörter zu diesem Thema hinzu.", api);
+        return;
+      }
       const words = topic.words;
       const TOTAL = Math.min(8, words.length);
       const pool = kit.sample(words, TOTAL);
@@ -991,6 +1218,10 @@ document.addEventListener("DOMContentLoaded", App.init);
 
     mount(stage, api) {
       const { kit, topic, addScore, el } = api;
+      if (!topic.words || topic.words.length === 0) {
+        kit.notice(stage, "Noch keine Wörter", "Füge über ⚙️ Inhalte verwalten Wörter zu diesem Thema hinzu.", api);
+        return;
+      }
       const PAIRS = Math.min(6, topic.words.length);
       const chosen = kit.sample(topic.words, PAIRS);
 
@@ -1122,6 +1353,10 @@ document.addEventListener("DOMContentLoaded", App.init);
 
     mount(stage, api) {
       const { kit, topic, addScore, el } = api;
+      if (!topic.words || topic.words.length === 0) {
+        kit.notice(stage, "Noch keine Wörter", "Füge über ⚙️ Inhalte verwalten Wörter zu diesem Thema hinzu.", api);
+        return;
+      }
       const entry = kit.sample(topic.words, 1)[0];
       // Strip the article (der/die/das) for guessing; keep it for the reveal.
       const full = entry.de;
@@ -1271,6 +1506,10 @@ document.addEventListener("DOMContentLoaded", App.init);
 
     mount(stage, api) {
       const { kit, topic, addScore, el } = api;
+      if (!topic.sentences || topic.sentences.length === 0) {
+        kit.notice(stage, "Noch keine Sätze", "Füge über ⚙️ Inhalte verwalten Sätze zu diesem Thema hinzu.", api);
+        return;
+      }
       const TOTAL = Math.min(5, topic.sentences.length);
       const pool = kit.sample(topic.sentences, TOTAL);
       let index = 0;
@@ -1394,6 +1633,378 @@ document.addEventListener("DOMContentLoaded", App.init);
       render();
     }
   });
+})();
+
+
+/* ==== js/admin.js ==== */
+/* =====================================================================
+   AdminUI — the in-app "Inhalte verwalten" (Manage content) screen.
+   Teachers edit vocabulary topics, words and sentences here. Every change
+   is saved automatically to the browser via ContentStore.
+   ===================================================================== */
+(function () {
+  window.AdminUI = {
+    mount: function (container, api) {
+      var el = api.el;
+      var store = api.store;
+      var tab = "vocab";
+
+      /* A text input bound two-way to obj[field]; saves on every keystroke. */
+      function input(obj, field, placeholder, cls, maxlen) {
+        var attrs = { type: "text", value: obj[field] == null ? "" : obj[field], placeholder: placeholder || "" };
+        if (maxlen) attrs.maxlength = maxlen;
+        return el("input", {
+          class: cls || "adm-input",
+          attrs: attrs,
+          on: {
+            input: function (e) {
+              obj[field] = e.target.value;
+              store.save();
+              if (field === "name" || field === "de") updateCounts();
+            }
+          }
+        });
+      }
+
+      function updateCounts() {
+        // Refresh the "N Wörter / N Sätze" labels without a full re-render.
+        var cards = container.querySelectorAll(".adm-topic");
+        var list = tab === "vocab" ? store.data.vocab : store.data.sentences;
+        cards.forEach(function (card, i) {
+          var badge = card.querySelector(".adm-count");
+          if (badge && list[i]) {
+            var n = tab === "vocab" ? list[i].words.length : list[i].sentences.length;
+            badge.textContent = n + (tab === "vocab" ? " Wörter" : " Sätze");
+          }
+        });
+      }
+
+      function toast(msg) {
+        var t = el("div", { class: "adm-toast", text: msg });
+        document.body.appendChild(t);
+        setTimeout(function () {
+          t.classList.add("show");
+        }, 10);
+        setTimeout(function () {
+          t.classList.remove("show");
+          setTimeout(function () {
+            t.remove();
+          }, 300);
+        }, 1800);
+      }
+
+      /* ---------- header + tabs ---------- */
+      function render() {
+        container.innerHTML = "";
+
+        container.appendChild(
+          el("div", { class: "adm-head" }, [
+            el("button", { class: "back-link", html: "← Menü", on: { click: api.onExit } }),
+            el("h2", { class: "adm-title", html: "🛠️ Inhalte verwalten" }),
+            el("div", { class: "adm-tools" }, [
+              el("button", { class: "btn small", html: "⬇ Export", attrs: { title: "Als Datei sichern" }, on: { click: doExport } }),
+              el("button", { class: "btn small", html: "⬆ Import", attrs: { title: "Aus Datei laden" }, on: { click: doImport } }),
+              el("button", { class: "btn small ghost", html: "↺ Zurücksetzen", on: { click: doReset } })
+            ])
+          ])
+        );
+
+        container.appendChild(
+          el("div", { class: "adm-tabs" }, [
+            tabBtn("vocab", "🔤 Wörter"),
+            tabBtn("sentences", "🗣️ Sätze")
+          ])
+        );
+
+        container.appendChild(
+          el("p", {
+            class: "adm-hint",
+            html:
+              "Änderungen werden automatisch in diesem Browser gespeichert. Mit <b>Export</b> sicherst du sie als Datei oder überträgst sie auf einen anderen Computer (dort <b>Import</b>)."
+          })
+        );
+
+        var body = el("div", { class: "adm-body" });
+        container.appendChild(body);
+        if (tab === "vocab") renderVocab(body);
+        else renderSentences(body);
+      }
+
+      function tabBtn(id, label) {
+        return el("button", {
+          class: "adm-tab" + (tab === id ? " active" : ""),
+          html: label,
+          on: {
+            click: function () {
+              tab = id;
+              render();
+            }
+          }
+        });
+      }
+
+      /* ---------- vocabulary tab ---------- */
+      function renderVocab(body) {
+        body.appendChild(
+          el("button", {
+            class: "btn primary adm-add",
+            html: "+ Neues Thema",
+            on: {
+              click: function () {
+                store.data.vocab.push({
+                  id: store.newId("topic"),
+                  name: "Neues Thema",
+                  english: "",
+                  emoji: "📚",
+                  words: [{ de: "", en: "", emoji: "" }]
+                });
+                store.save();
+                render();
+              }
+            }
+          })
+        );
+        if (store.data.vocab.length === 0) body.appendChild(emptyState("Noch keine Wort-Themen. Klicke auf + Neues Thema."));
+        store.data.vocab.forEach(function (topic, ti) {
+          body.appendChild(vocabTopicCard(topic, ti));
+        });
+      }
+
+      function vocabTopicCard(topic, ti) {
+        var card = el("div", { class: "adm-topic" });
+        card.appendChild(
+          el("div", { class: "adm-topic-head" }, [
+            input(topic, "emoji", "🙂", "adm-emoji", 6),
+            input(topic, "name", "Themenname (Deutsch)", "adm-input grow"),
+            input(topic, "english", "English name", "adm-input"),
+            el("span", { class: "adm-count", text: topic.words.length + " Wörter" }),
+            el("button", {
+              class: "adm-del",
+              html: "🗑",
+              attrs: { title: "Thema löschen" },
+              on: {
+                click: function () {
+                  if (confirmDelete("Thema wirklich löschen?")) {
+                    store.data.vocab.splice(ti, 1);
+                    store.save();
+                    render();
+                  }
+                }
+              }
+            })
+          ])
+        );
+
+        card.appendChild(
+          el("div", { class: "adm-row adm-row-head" }, [
+            el("span", { class: "adm-emoji-h", text: "Bild" }),
+            el("span", { text: "Deutsch" }),
+            el("span", { text: "English" }),
+            el("span", {})
+          ])
+        );
+
+        topic.words.forEach(function (w, wi) {
+          card.appendChild(
+            el("div", { class: "adm-row" }, [
+              input(w, "emoji", "🙂", "adm-emoji", 6),
+              input(w, "de", "z. B. der Hund", "adm-input"),
+              input(w, "en", "e.g. the dog", "adm-input"),
+              el("button", {
+                class: "adm-del",
+                html: "✕",
+                attrs: { title: "Wort entfernen" },
+                on: {
+                  click: function () {
+                    topic.words.splice(wi, 1);
+                    store.save();
+                    render();
+                  }
+                }
+              })
+            ])
+          );
+        });
+
+        card.appendChild(
+          el("button", {
+            class: "btn small adm-add-row",
+            html: "+ Wort",
+            on: {
+              click: function () {
+                topic.words.push({ de: "", en: "", emoji: "" });
+                store.save();
+                render();
+              }
+            }
+          })
+        );
+        return card;
+      }
+
+      /* ---------- sentences tab ---------- */
+      function renderSentences(body) {
+        body.appendChild(
+          el("button", {
+            class: "btn primary adm-add",
+            html: "+ Neues Satz-Thema",
+            on: {
+              click: function () {
+                store.data.sentences.push({
+                  id: store.newId("stopic"),
+                  name: "Neues Thema",
+                  english: "",
+                  emoji: "🗣️",
+                  sentences: [{ de: "", en: "" }]
+                });
+                store.save();
+                render();
+              }
+            }
+          })
+        );
+        if (store.data.sentences.length === 0) body.appendChild(emptyState("Noch keine Satz-Themen."));
+        store.data.sentences.forEach(function (topic, ti) {
+          body.appendChild(sentenceTopicCard(topic, ti));
+        });
+      }
+
+      function sentenceTopicCard(topic, ti) {
+        var card = el("div", { class: "adm-topic" });
+        card.appendChild(
+          el("div", { class: "adm-topic-head" }, [
+            input(topic, "emoji", "🙂", "adm-emoji", 6),
+            input(topic, "name", "Themenname (Deutsch)", "adm-input grow"),
+            input(topic, "english", "English name", "adm-input"),
+            el("span", { class: "adm-count", text: topic.sentences.length + " Sätze" }),
+            el("button", {
+              class: "adm-del",
+              html: "🗑",
+              attrs: { title: "Thema löschen" },
+              on: {
+                click: function () {
+                  if (confirmDelete("Thema wirklich löschen?")) {
+                    store.data.sentences.splice(ti, 1);
+                    store.save();
+                    render();
+                  }
+                }
+              }
+            })
+          ])
+        );
+
+        card.appendChild(
+          el("div", { class: "adm-row adm-row-sent adm-row-head" }, [
+            el("span", { text: "Deutscher Satz" }),
+            el("span", { text: "English translation" }),
+            el("span", {})
+          ])
+        );
+
+        topic.sentences.forEach(function (s, si) {
+          card.appendChild(
+            el("div", { class: "adm-row adm-row-sent" }, [
+              input(s, "de", "z. B. Ich lerne Deutsch", "adm-input"),
+              input(s, "en", "e.g. I learn German", "adm-input"),
+              el("button", {
+                class: "adm-del",
+                html: "✕",
+                attrs: { title: "Satz entfernen" },
+                on: {
+                  click: function () {
+                    topic.sentences.splice(si, 1);
+                    store.save();
+                    render();
+                  }
+                }
+              })
+            ])
+          );
+        });
+
+        card.appendChild(
+          el("button", {
+            class: "btn small adm-add-row",
+            html: "+ Satz",
+            on: {
+              click: function () {
+                topic.sentences.push({ de: "", en: "" });
+                store.save();
+                render();
+              }
+            }
+          })
+        );
+        return card;
+      }
+
+      function emptyState(msg) {
+        return el("p", { class: "adm-empty", text: msg });
+      }
+
+      /* confirm() is blocked in some sandboxed previews; if so, allow the delete. */
+      function confirmDelete(msg) {
+        try {
+          return window.confirm(msg);
+        } catch (e) {
+          return true;
+        }
+      }
+
+      /* ---------- export / import / reset ---------- */
+      function doExport() {
+        try {
+          var blob = new Blob([store.exportJSON()], { type: "application/json" });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement("a");
+          a.href = url;
+          a.download = "skillbee-deutsch-inhalte.json";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(function () {
+            URL.revokeObjectURL(url);
+          }, 500);
+          toast("Datei heruntergeladen ✓");
+        } catch (e) {
+          alert("Export nicht möglich: " + e.message);
+        }
+      }
+
+      function doImport() {
+        var inp = document.createElement("input");
+        inp.type = "file";
+        inp.accept = "application/json,.json";
+        inp.onchange = function () {
+          var file = inp.files && inp.files[0];
+          if (!file) return;
+          var reader = new FileReader();
+          reader.onload = function () {
+            try {
+              store.importJSON(String(reader.result));
+              render();
+              toast("Inhalte importiert ✓");
+            } catch (e) {
+              alert("Import fehlgeschlagen: " + e.message);
+            }
+          };
+          reader.readAsText(file);
+        };
+        inp.click();
+      }
+
+      function doReset() {
+        if (confirmDelete("Alle Inhalte auf die Standardvorgaben zurücksetzen? Deine Änderungen gehen verloren.")) {
+          store.reset();
+          render();
+          toast("Auf Standard zurückgesetzt");
+        }
+      }
+
+      render();
+    }
+  };
 })();
 
 </script>

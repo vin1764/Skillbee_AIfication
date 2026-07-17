@@ -18,6 +18,10 @@
 
     mount(stage, api) {
       const { kit, topic, addScore, el } = api;
+      if (!topic.words || topic.words.length === 0) {
+        kit.notice(stage, "Noch keine Wörter", "Füge über ⚙️ Inhalte verwalten Wörter zu diesem Thema hinzu.", api);
+        return;
+      }
       const entry = kit.sample(topic.words, 1)[0];
       // Strip the article (der/die/das) for guessing; keep it for the reveal.
       const full = entry.de;

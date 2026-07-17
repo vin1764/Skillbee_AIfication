@@ -14,6 +14,10 @@
 
     mount(stage, api) {
       const { kit, topic, addScore, el } = api;
+      if (!topic.sentences || topic.sentences.length === 0) {
+        kit.notice(stage, "Noch keine Sätze", "Füge über ⚙️ Inhalte verwalten Sätze zu diesem Thema hinzu.", api);
+        return;
+      }
       const TOTAL = Math.min(5, topic.sentences.length);
       const pool = kit.sample(topic.sentences, TOTAL);
       let index = 0;

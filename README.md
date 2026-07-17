@@ -35,26 +35,33 @@ loud** 🔊 so students hear correct pronunciation. Win a round to get **confett
 
 ---
 
-## ✏️ Adding or changing the words (no coding needed)
+## ✏️ Adding or changing the content — no coding needed
 
-All the German content lives in **one file: `js/data.js`**. It has friendly instructions at the
-top. In short:
+Click the **⚙️ Inhalte verwalten** button (top-right, or on the home screen) to open the
+built-in **content editor**. Teachers can, without touching any code:
 
-- **Add a word** to a topic:
-  ```js
-  { de: "der Apfel", en: "the apple", emoji: "🍎" },
-  ```
-  `de` = German · `en` = English meaning · `emoji` = a small picture (optional).
+- **Add / edit / delete word topics** and each word (picture emoji, German, English)
+- **Add / edit / delete sentence topics** for the Satzbau game
+- **Export** everything to a file (to back it up or move it to another computer)
+- **Import** a file someone else exported
+- **Reset** back to the built-in defaults
 
-- **Add a whole new topic** (e.g. *Kleidung / Clothes*): copy an existing topic block, give it a
-  new `id` and `name`, and list its words.
+Changes are **saved automatically in that browser** and show up in the games immediately.
 
-- **Add a sentence** for the Satzbau game: add a line to `SENTENCE_TOPICS`:
-  ```js
-  { de: "Ich lerne gern Deutsch", en: "I like learning German" },
-  ```
+> **Sharing content between teachers/devices:** because the app has no server, edits live in the
+> browser they were made in. To share a set, use **Export** on one computer and **Import** on the
+> others. (Want edits to sync automatically for everyone? That needs a small backend — ask and we
+> can add one.)
 
-Save the file and refresh the browser — your changes appear instantly.
+### Advanced: editing the default content in code
+
+The built-in defaults live in **`js/data.js`** (friendly instructions at the top). Editing them
+changes what everyone sees before any in-app customization. Example word:
+```js
+{ de: "der Apfel", en: "the apple", emoji: "🍎" },
+```
+`de` = German · `en` = English meaning · `emoji` = a small picture (optional). After changing
+`js/data.js`, run `node build.mjs` to refresh the bundled/offline versions.
 
 ---
 

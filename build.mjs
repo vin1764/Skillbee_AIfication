@@ -16,11 +16,13 @@ const css = readFileSync("css/styles.css", "utf8");
 const jsFiles = [
   "js/data.js",
   "js/brand.js",
+  "js/store.js",
   "js/app.js",
   "js/games/quiz.js",
   "js/games/memory.js",
   "js/games/hangman.js",
-  "js/games/scramble.js"
+  "js/games/scramble.js",
+  "js/admin.js"
 ];
 const js = jsFiles.map((f) => `/* ==== ${f} ==== */\n` + readFileSync(f, "utf8")).join("\n\n");
 
