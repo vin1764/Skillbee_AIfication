@@ -293,6 +293,43 @@ kbd {
 .adm-add { margin-bottom: 16px; }
 .adm-empty { color: var(--ink-soft); text-align: center; padding: 20px; }
 
+/* mode tabs (Content bank / Games) sit above everything else */
+.adm-modes { margin-bottom: 16px; }
+.adm-modes .adm-tab { font-size: 1rem; padding: 10px 20px; }
+
+/* game chooser grid */
+.adm-game-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); margin-bottom: 8px; }
+.adm-game-card {
+  text-align: left; background: var(--card); border: 1px solid var(--line);
+  border-top: 4px solid var(--accent); border-radius: 16px; padding: 18px;
+  box-shadow: var(--shadow); transition: transform 0.15s, box-shadow 0.15s;
+}
+.adm-game-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+.adm-game-emoji { font-size: 2rem; }
+.adm-game-name { font-weight: 800; margin-top: 6px; }
+.adm-game-meta { color: var(--accent); font-weight: 700; font-size: 0.85rem; margin-top: 4px; }
+
+.adm-subhead { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.adm-game-title { margin: 0; font-size: 1.2rem; }
+
+/* include checkbox on a topic in the game view */
+.adm-include { display: inline-flex; align-items: center; }
+.adm-check { width: 22px; height: 22px; accent-color: var(--skb); cursor: pointer; }
+.adm-topic.adm-off { opacity: 0.55; }
+.adm-topic.adm-off .adm-count { color: var(--ink-soft); }
+
+.adm-toggle {
+  background: #fff; border: 1px solid var(--line); border-radius: 10px;
+  padding: 7px 12px; font-weight: 800; color: var(--accent); white-space: nowrap;
+}
+.adm-toggle:hover { border-color: var(--accent); }
+.adm-rows { margin-top: 12px; }
+
+.picker-empty {
+  max-width: 520px; margin: 20px auto; text-align: center; color: var(--ink-soft);
+  background: var(--skb-tint); border: 1px solid #dbe0ff; border-radius: 12px; padding: 18px;
+}
+
 .adm-topic {
   background: var(--card); border: 1px solid var(--line); border-radius: 16px;
   padding: 16px; margin-bottom: 16px; box-shadow: var(--shadow);

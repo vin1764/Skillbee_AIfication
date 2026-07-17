@@ -272,7 +272,7 @@ const App = (function () {
   /* ---- topic picker (shown before a game starts) ------------------- */
   function openTopicPicker(game) {
     const usesSentences = game.contentType === "sentences";
-    const topics = usesSentences ? window.ContentStore.sentenceTopics() : window.ContentStore.vocabTopics();
+    const topics = window.ContentStore.topicsForGame(game.id, usesSentences ? "sentences" : "vocab");
     const main = document.getElementById("screen");
     main.innerHTML = "";
 
@@ -283,6 +283,16 @@ const App = (function () {
         el("p", { class: "picker-sub", text: usesSentences ? "Choose a topic for the sentences:" : "Choose a vocabulary topic:" })
       ])
     );
+
+    if (!topics.length) {
+      main.appendChild(
+        el("p", {
+          class: "picker-empty",
+          html: "No topics are enabled for this game yet. Add or enable topics in <b>⚙️ Manage content → Games</b>."
+        })
+      );
+      return;
+    }
 
     const grid = el("div", { class: "topic-grid" });
     topics.forEach((topic) => {
@@ -334,6 +344,7 @@ const App = (function () {
         el,
         kit,
         store: window.ContentStore,
+        games: games.map((g) => ({ id: g.id, name: g.name, emoji: g.emoji, color: g.color, contentType: g.contentType })),
         onExit: () => showHome()
       });
     }

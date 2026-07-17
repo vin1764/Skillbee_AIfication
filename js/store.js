@@ -18,7 +18,10 @@
   function defaults() {
     return {
       vocab: clone(window.GameData.VOCAB_TOPICS),
-      sentences: clone(window.GameData.SENTENCE_TOPICS)
+      sentences: clone(window.GameData.SENTENCE_TOPICS),
+      // Per-game topic selection. Missing entry / no "topics" list = the game
+      // uses ALL topics of its type from the bank (the default).
+      games: {}
     };
   }
 
@@ -31,6 +34,7 @@
         if (raw) {
           var parsed = JSON.parse(raw);
           if (parsed && Array.isArray(parsed.vocab) && Array.isArray(parsed.sentences)) {
+            if (!parsed.games || typeof parsed.games !== "object") parsed.games = {};
             this.data = parsed;
             return;
           }
@@ -72,6 +76,65 @@
       return this.data.sentences;
     },
 
+    poolFor: function (type) {
+      return type === "sentences" ? this.data.sentences : this.data.vocab;
+    },
+
+    /* Topics a given game should offer (its selected subset, or all by default). */
+    topicsForGame: function (gameId, type) {
+      var pool = this.poolFor(type);
+      var cfg = this.data.games && this.data.games[gameId];
+      if (!cfg || !cfg.topics) return pool;
+      var set = {};
+      cfg.topics.forEach(function (id) { set[id] = true; });
+      return pool.filter(function (t) { return set[t.id]; });
+    },
+
+    isTopicInGame: function (gameId, topicId) {
+      var cfg = this.data.games && this.data.games[gameId];
+      if (!cfg || !cfg.topics) return true; // "all" by default
+      return cfg.topics.indexOf(topicId) !== -1;
+    },
+
+    setTopicInGame: function (gameId, topicId, type, on) {
+      if (!this.data.games) this.data.games = {};
+      var cfg = this.data.games[gameId];
+      if (!cfg || !cfg.topics) {
+        // Was "all" — materialize the full list so unchecking one keeps the rest.
+        cfg = { topics: this.poolFor(type).map(function (t) { return t.id; }) };
+        this.data.games[gameId] = cfg;
+      }
+      var i = cfg.topics.indexOf(topicId);
+      if (on && i === -1) cfg.topics.push(topicId);
+      if (!on && i !== -1) cfg.topics.splice(i, 1);
+      this.save();
+    },
+
+    /* When a new topic is added from a game view, include it there if that
+       game already has an explicit selection (otherwise "all" already covers it). */
+    includeTopicIfConfigured: function (gameId, topicId) {
+      var cfg = this.data.games && this.data.games[gameId];
+      if (cfg && cfg.topics && cfg.topics.indexOf(topicId) === -1) cfg.topics.push(topicId);
+    },
+
+    /* Drop a deleted topic id from every game's selection. */
+    pruneTopic: function (topicId) {
+      var games = this.data.games || {};
+      Object.keys(games).forEach(function (gid) {
+        var cfg = games[gid];
+        if (cfg && cfg.topics) {
+          var i = cfg.topics.indexOf(topicId);
+          if (i !== -1) cfg.topics.splice(i, 1);
+        }
+      });
+    },
+
+    enabledCount: function (gameId, type) {
+      var pool = this.poolFor(type);
+      var self = this;
+      return pool.filter(function (t) { return self.isTopicInGame(gameId, t.id); }).length;
+    },
+
     newId: function (prefix) {
       return (
         (prefix || "id") +
@@ -91,6 +154,7 @@
       if (!parsed || !Array.isArray(parsed.vocab) || !Array.isArray(parsed.sentences)) {
         throw new Error("The file is not in the right format.");
       }
+      if (!parsed.games || typeof parsed.games !== "object") parsed.games = {};
       this.data = parsed;
       this.save();
     }

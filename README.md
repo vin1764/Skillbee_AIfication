@@ -37,16 +37,21 @@ loud** 🔊 so students hear correct pronunciation. Win a round to get **confett
 
 ## ✏️ Adding or changing the content — no coding needed
 
-Click the **⚙️ Inhalte verwalten** button (top-right, or on the home screen) to open the
-built-in **content editor**. Teachers can, without touching any code:
+Click the **⚙️ Manage content** button (top-right, or on the home screen) to open the built-in
+**content editor**. It has two modes:
 
-- **Add / edit / delete word topics** and each word (picture emoji, German, English)
-- **Add / edit / delete sentence topics** for the Satzbau game
-- **Export** everything to a file (to back it up or move it to another computer)
-- **Import** a file someone else exported
-- **Reset** back to the built-in defaults
+**📚 Content bank** — the shared master content that feeds every game:
+- **Add / edit / delete word topics** and each word (icon emoji, German, English). Words are used
+  by *Vocabulary Quiz*, *Memory* and *Hangman*.
+- **Add / edit / delete sentence topics** for *Sentence Scramble*.
 
-Changes are **saved automatically in that browser** and show up in the games immediately.
+**🎮 Games** — configure each game individually:
+- Pick a game, then **tick exactly which topics that game offers** (e.g. give Hangman only a few
+  easy topics). Edits pull from the shared bank.
+- You can also **edit or add content right here** — those changes update the shared bank too.
+
+Common toolbar: **Export** (save everything to a file), **Import** (load a file), **Reset**
+(back to defaults). Changes are **saved automatically in that browser** and show up immediately.
 
 > **Sharing content between teachers/devices:** because the app has no server, edits live in the
 > browser they were made in. To share a set, use **Export** on one computer and **Import** on the
