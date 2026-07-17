@@ -28,14 +28,14 @@
       }
 
       function updateCounts() {
-        // Refresh the "N Wörter / N Sätze" labels without a full re-render.
+        // Refresh the "N words / N sentences" labels without a full re-render.
         var cards = container.querySelectorAll(".adm-topic");
         var list = tab === "vocab" ? store.data.vocab : store.data.sentences;
         cards.forEach(function (card, i) {
           var badge = card.querySelector(".adm-count");
           if (badge && list[i]) {
             var n = tab === "vocab" ? list[i].words.length : list[i].sentences.length;
-            badge.textContent = n + (tab === "vocab" ? " Wörter" : " Sätze");
+            badge.textContent = n + (tab === "vocab" ? " words" : " sentences");
           }
         });
       }
@@ -60,20 +60,20 @@
 
         container.appendChild(
           el("div", { class: "adm-head" }, [
-            el("button", { class: "back-link", html: "← Menü", on: { click: api.onExit } }),
-            el("h2", { class: "adm-title", html: "🛠️ Inhalte verwalten" }),
+            el("button", { class: "back-link", html: "← Menu", on: { click: api.onExit } }),
+            el("h2", { class: "adm-title", html: "🛠️ Manage content" }),
             el("div", { class: "adm-tools" }, [
-              el("button", { class: "btn small", html: "⬇ Export", attrs: { title: "Als Datei sichern" }, on: { click: doExport } }),
-              el("button", { class: "btn small", html: "⬆ Import", attrs: { title: "Aus Datei laden" }, on: { click: doImport } }),
-              el("button", { class: "btn small ghost", html: "↺ Zurücksetzen", on: { click: doReset } })
+              el("button", { class: "btn small", html: "⬇ Export", attrs: { title: "Save to a file" }, on: { click: doExport } }),
+              el("button", { class: "btn small", html: "⬆ Import", attrs: { title: "Load from a file" }, on: { click: doImport } }),
+              el("button", { class: "btn small ghost", html: "↺ Reset", on: { click: doReset } })
             ])
           ])
         );
 
         container.appendChild(
           el("div", { class: "adm-tabs" }, [
-            tabBtn("vocab", "🔤 Wörter"),
-            tabBtn("sentences", "🗣️ Sätze")
+            tabBtn("vocab", "🔤 Words"),
+            tabBtn("sentences", "🗣️ Sentences")
           ])
         );
 
@@ -81,7 +81,7 @@
           el("p", {
             class: "adm-hint",
             html:
-              "Änderungen werden automatisch in diesem Browser gespeichert. Mit <b>Export</b> sicherst du sie als Datei oder überträgst sie auf einen anderen Computer (dort <b>Import</b>)."
+              "Changes are saved automatically in this browser. Use <b>Export</b> to save them as a file or move them to another computer (there, use <b>Import</b>)."
           })
         );
 
@@ -109,12 +109,12 @@
         body.appendChild(
           el("button", {
             class: "btn primary adm-add",
-            html: "+ Neues Thema",
+            html: "+ New topic",
             on: {
               click: function () {
                 store.data.vocab.push({
                   id: store.newId("topic"),
-                  name: "Neues Thema",
+                  name: "New topic",
                   english: "",
                   emoji: "📚",
                   words: [{ de: "", en: "", emoji: "" }]
@@ -125,7 +125,7 @@
             }
           })
         );
-        if (store.data.vocab.length === 0) body.appendChild(emptyState("Noch keine Wort-Themen. Klicke auf + Neues Thema."));
+        if (store.data.vocab.length === 0) body.appendChild(emptyState("No word topics yet. Click + New topic."));
         store.data.vocab.forEach(function (topic, ti) {
           body.appendChild(vocabTopicCard(topic, ti));
         });
@@ -136,16 +136,16 @@
         card.appendChild(
           el("div", { class: "adm-topic-head" }, [
             input(topic, "emoji", "🙂", "adm-emoji", 6),
-            input(topic, "name", "Themenname (Deutsch)", "adm-input grow"),
+            input(topic, "name", "Topic name (German)", "adm-input grow"),
             input(topic, "english", "English name", "adm-input"),
-            el("span", { class: "adm-count", text: topic.words.length + " Wörter" }),
+            el("span", { class: "adm-count", text: topic.words.length + " words" }),
             el("button", {
               class: "adm-del",
               html: "🗑",
-              attrs: { title: "Thema löschen" },
+              attrs: { title: "Delete topic" },
               on: {
                 click: function () {
-                  if (confirmDelete("Thema wirklich löschen?")) {
+                  if (confirmDelete("Delete this topic?")) {
                     store.data.vocab.splice(ti, 1);
                     store.save();
                     render();
@@ -158,8 +158,8 @@
 
         card.appendChild(
           el("div", { class: "adm-row adm-row-head" }, [
-            el("span", { class: "adm-emoji-h", text: "Bild" }),
-            el("span", { text: "Deutsch" }),
+            el("span", { class: "adm-emoji-h", text: "Icon" }),
+            el("span", { text: "German" }),
             el("span", { text: "English" }),
             el("span", {})
           ])
@@ -169,12 +169,12 @@
           card.appendChild(
             el("div", { class: "adm-row" }, [
               input(w, "emoji", "🙂", "adm-emoji", 6),
-              input(w, "de", "z. B. der Hund", "adm-input"),
+              input(w, "de", "e.g. der Hund", "adm-input"),
               input(w, "en", "e.g. the dog", "adm-input"),
               el("button", {
                 class: "adm-del",
                 html: "✕",
-                attrs: { title: "Wort entfernen" },
+                attrs: { title: "Remove word" },
                 on: {
                   click: function () {
                     topic.words.splice(wi, 1);
@@ -190,7 +190,7 @@
         card.appendChild(
           el("button", {
             class: "btn small adm-add-row",
-            html: "+ Wort",
+            html: "+ Word",
             on: {
               click: function () {
                 topic.words.push({ de: "", en: "", emoji: "" });
@@ -208,12 +208,12 @@
         body.appendChild(
           el("button", {
             class: "btn primary adm-add",
-            html: "+ Neues Satz-Thema",
+            html: "+ New sentence topic",
             on: {
               click: function () {
                 store.data.sentences.push({
                   id: store.newId("stopic"),
-                  name: "Neues Thema",
+                  name: "New topic",
                   english: "",
                   emoji: "🗣️",
                   sentences: [{ de: "", en: "" }]
@@ -224,7 +224,7 @@
             }
           })
         );
-        if (store.data.sentences.length === 0) body.appendChild(emptyState("Noch keine Satz-Themen."));
+        if (store.data.sentences.length === 0) body.appendChild(emptyState("No sentence topics yet."));
         store.data.sentences.forEach(function (topic, ti) {
           body.appendChild(sentenceTopicCard(topic, ti));
         });
@@ -235,16 +235,16 @@
         card.appendChild(
           el("div", { class: "adm-topic-head" }, [
             input(topic, "emoji", "🙂", "adm-emoji", 6),
-            input(topic, "name", "Themenname (Deutsch)", "adm-input grow"),
+            input(topic, "name", "Topic name (German)", "adm-input grow"),
             input(topic, "english", "English name", "adm-input"),
-            el("span", { class: "adm-count", text: topic.sentences.length + " Sätze" }),
+            el("span", { class: "adm-count", text: topic.sentences.length + " sentences" }),
             el("button", {
               class: "adm-del",
               html: "🗑",
-              attrs: { title: "Thema löschen" },
+              attrs: { title: "Delete topic" },
               on: {
                 click: function () {
-                  if (confirmDelete("Thema wirklich löschen?")) {
+                  if (confirmDelete("Delete this topic?")) {
                     store.data.sentences.splice(ti, 1);
                     store.save();
                     render();
@@ -257,7 +257,7 @@
 
         card.appendChild(
           el("div", { class: "adm-row adm-row-sent adm-row-head" }, [
-            el("span", { text: "Deutscher Satz" }),
+            el("span", { text: "German sentence" }),
             el("span", { text: "English translation" }),
             el("span", {})
           ])
@@ -266,12 +266,12 @@
         topic.sentences.forEach(function (s, si) {
           card.appendChild(
             el("div", { class: "adm-row adm-row-sent" }, [
-              input(s, "de", "z. B. Ich lerne Deutsch", "adm-input"),
+              input(s, "de", "e.g. Ich lerne Deutsch", "adm-input"),
               input(s, "en", "e.g. I learn German", "adm-input"),
               el("button", {
                 class: "adm-del",
                 html: "✕",
-                attrs: { title: "Satz entfernen" },
+                attrs: { title: "Remove sentence" },
                 on: {
                   click: function () {
                     topic.sentences.splice(si, 1);
@@ -287,7 +287,7 @@
         card.appendChild(
           el("button", {
             class: "btn small adm-add-row",
-            html: "+ Satz",
+            html: "+ Sentence",
             on: {
               click: function () {
                 topic.sentences.push({ de: "", en: "" });
@@ -327,9 +327,9 @@
           setTimeout(function () {
             URL.revokeObjectURL(url);
           }, 500);
-          toast("Datei heruntergeladen ✓");
+          toast("File downloaded ✓");
         } catch (e) {
-          alert("Export nicht möglich: " + e.message);
+          alert("Export not possible: " + e.message);
         }
       }
 
@@ -345,9 +345,9 @@
             try {
               store.importJSON(String(reader.result));
               render();
-              toast("Inhalte importiert ✓");
+              toast("Content imported ✓");
             } catch (e) {
-              alert("Import fehlgeschlagen: " + e.message);
+              alert("Import failed: " + e.message);
             }
           };
           reader.readAsText(file);
@@ -356,10 +356,10 @@
       }
 
       function doReset() {
-        if (confirmDelete("Alle Inhalte auf die Standardvorgaben zurücksetzen? Deine Änderungen gehen verloren.")) {
+        if (confirmDelete("Reset all content back to the defaults? Your changes will be lost.")) {
           store.reset();
           render();
-          toast("Auf Standard zurückgesetzt");
+          toast("Reset to defaults");
         }
       }
 

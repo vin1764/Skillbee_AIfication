@@ -6,7 +6,7 @@
 (function () {
   App.register({
     id: "scramble",
-    name: "Satzbau",
+    name: "Sentence Scramble",
     emoji: "🧱",
     color: "#3b4de8",
     description: "Put the shuffled German words back into the correct order.",
@@ -15,7 +15,7 @@
     mount(stage, api) {
       const { kit, topic, addScore, el } = api;
       if (!topic.sentences || topic.sentences.length === 0) {
-        kit.notice(stage, "Noch keine Sätze", "Füge über ⚙️ Inhalte verwalten Sätze zu diesem Thema hinzu.", api);
+        kit.notice(stage, "No sentences yet", "Add sentences to this topic via ⚙️ Manage content.", api);
         return;
       }
       const TOTAL = Math.min(5, topic.sentences.length);
@@ -35,8 +35,8 @@
         wrap.innerHTML = "";
         wrap.appendChild(
           el("div", { class: "game-head" }, [
-            el("button", { class: "back-link small", html: "← Menü", on: { click: api.exit } }),
-            el("div", { class: "head-title", text: `Satz ${index + 1} / ${TOTAL}` }),
+            el("button", { class: "back-link small", html: "← Menu", on: { click: api.exit } }),
+            el("div", { class: "head-title", text: `Sentence ${index + 1} / ${TOTAL}` }),
             el("div", { class: "moves", text: topic.emoji + " " + topic.name })
           ])
         );
@@ -65,8 +65,8 @@
           bankRow.appendChild(btn);
         });
 
-        const checkBtn = el("button", { class: "btn primary scr-check", text: "Prüfen ✓", attrs: { disabled: "true" }, on: { click: check } });
-        const clearBtn = el("button", { class: "btn ghost", text: "Zurücksetzen", on: { click: render } });
+        const checkBtn = el("button", { class: "btn primary scr-check", text: "Check ✓", attrs: { disabled: "true" }, on: { click: check } });
+        const clearBtn = el("button", { class: "btn ghost", text: "Reset", on: { click: render } });
         wrap.appendChild(el("div", { class: "scr-actions" }, [clearBtn, checkBtn]));
 
         function pick(pos) {
@@ -127,12 +127,12 @@
         wrap.appendChild(
           el("div", { class: "result-card" }, [
             el("div", { class: "result-emoji", text: "🏗️" }),
-            el("h2", { text: "Alle Sätze gebaut!" }),
-            el("p", { class: "result-score", html: `<b>${solvedCount}</b> von <b>${TOTAL}</b> Sätzen` }),
+            el("h2", { text: "All sentences built!" }),
+            el("p", { class: "result-score", html: `<b>${solvedCount}</b> of <b>${TOTAL}</b> sentences` }),
             el("div", { class: "result-actions" }, [
-              el("button", { class: "btn primary", text: "Nochmal", on: { click: api.restart } }),
-              el("button", { class: "btn", text: "Anderes Thema", on: { click: api.backToTopics } }),
-              el("button", { class: "btn ghost", text: "Menü", on: { click: api.exit } })
+              el("button", { class: "btn primary", text: "Play again", on: { click: api.restart } }),
+              el("button", { class: "btn", text: "Other topic", on: { click: api.backToTopics } }),
+              el("button", { class: "btn ghost", text: "Menu", on: { click: api.exit } })
             ])
           ])
         );

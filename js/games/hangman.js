@@ -10,7 +10,7 @@
 
   App.register({
     id: "hangman",
-    name: "Galgenmännchen",
+    name: "Hangman",
     emoji: "🔤",
     color: "#6a4c93",
     description: "Guess the German word letter by letter before the timer runs out.",
@@ -19,7 +19,7 @@
     mount(stage, api) {
       const { kit, topic, addScore, el } = api;
       if (!topic.words || topic.words.length === 0) {
-        kit.notice(stage, "Noch keine Wörter", "Füge über ⚙️ Inhalte verwalten Wörter zu diesem Thema hinzu.", api);
+        kit.notice(stage, "No words yet", "Add words to this topic via ⚙️ Manage content.", api);
         return;
       }
       const entry = kit.sample(topic.words, 1)[0];
@@ -42,7 +42,7 @@
         wrap.innerHTML = "";
         wrap.appendChild(
           el("div", { class: "game-head" }, [
-            el("button", { class: "back-link small", html: "← Menü", on: { click: api.exit } }),
+            el("button", { class: "back-link small", html: "← Menu", on: { click: api.exit } }),
             el("div", { class: "head-title", text: `${topic.emoji} ${topic.name}` }),
             el("div", { class: "moves", text: `${MAX_WRONG - wrong} ❤️` })
           ])
@@ -51,7 +51,7 @@
         wrap.appendChild(el("div", { class: "hang-face", text: STAGES[wrong] }));
         wrap.appendChild(
           el("div", { class: "hang-hint" }, [
-            document.createTextNode(`Tipp: ${entry.en} `),
+            document.createTextNode(`Hint: ${entry.en} `),
             entry.emoji ? el("span", { text: entry.emoji }) : null
           ])
         );
@@ -122,12 +122,12 @@
         wrap.appendChild(
           el("div", { class: "result-card inline" }, [
             el("div", { class: "result-emoji", text: won ? "🎉" : "😅" }),
-            el("h2", { html: won ? `Richtig! <b>${full}</b>` : `Das Wort war: <b>${full}</b>` }),
-            won ? el("p", { class: "result-score", html: `+${points} Punkte` }) : null,
+            el("h2", { html: won ? `Correct! <b>${full}</b>` : `The word was: <b>${full}</b>` }),
+            won ? el("p", { class: "result-score", html: `+${points} points` }) : null,
             el("div", { class: "result-actions" }, [
-              el("button", { class: "btn primary", text: "Neues Wort", on: { click: api.restart } }),
-              el("button", { class: "btn", text: "Anderes Thema", on: { click: api.backToTopics } }),
-              el("button", { class: "btn ghost", text: "Menü", on: { click: api.exit } })
+              el("button", { class: "btn primary", text: "New word", on: { click: api.restart } }),
+              el("button", { class: "btn", text: "Other topic", on: { click: api.backToTopics } }),
+              el("button", { class: "btn ghost", text: "Menu", on: { click: api.exit } })
             ])
           ])
         );

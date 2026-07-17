@@ -6,7 +6,7 @@
 (function () {
   App.register({
     id: "quiz",
-    name: "Vokabel-Quiz",
+    name: "Vocabulary Quiz",
     emoji: "🎯",
     color: "#ff595e",
     description: "Multiple-choice quiz with a timer. Answer fast for bonus points!",
@@ -15,7 +15,7 @@
     mount(stage, api) {
       const { kit, topic, addScore, el } = api;
       if (!topic.words || topic.words.length === 0) {
-        kit.notice(stage, "Noch keine Wörter", "Füge über ⚙️ Inhalte verwalten Wörter zu diesem Thema hinzu.", api);
+        kit.notice(stage, "No words yet", "Add words to this topic via ⚙️ Manage content.", api);
         return;
       }
       const words = topic.words;
@@ -47,9 +47,9 @@
         wrap.innerHTML = "";
         wrap.appendChild(
           el("div", { class: "quiz-head" }, [
-            el("button", { class: "back-link small", html: "← Menü", on: { click: api.exit } }),
-            el("div", { class: "quiz-progress", text: `Frage ${index + 1} / ${TOTAL}` }),
-            el("div", { class: "quiz-streak", text: streak > 1 ? `🔥 ${streak}er-Serie` : "" })
+            el("button", { class: "back-link small", html: "← Menu", on: { click: api.exit } }),
+            el("div", { class: "quiz-progress", text: `Question ${index + 1} / ${TOTAL}` }),
+            el("div", { class: "quiz-streak", text: streak > 1 ? `🔥 ${streak} streak` : "" })
           ])
         );
 
@@ -58,7 +58,7 @@
 
         wrap.appendChild(
           el("div", { class: "quiz-question" }, [
-            el("div", { class: "quiz-lang-tag", text: askGermanToEnglish ? "Was bedeutet…" : "Wie heißt auf Deutsch…" }),
+            el("div", { class: "quiz-lang-tag", text: askGermanToEnglish ? "What does this mean?" : "What's the German word?" }),
             el("div", { class: "quiz-word" }, [
               document.createTextNode(prompt + " "),
               askGermanToEnglish ? kit.speakerButton(q.de) : null
@@ -141,12 +141,12 @@
         wrap.appendChild(
           el("div", { class: "result-card" }, [
             el("div", { class: "result-emoji", text: pct >= 80 ? "🏆" : pct >= 60 ? "🎉" : "💪" }),
-            el("h2", { text: pct >= 60 ? "Super gemacht!" : "Weiter üben!" }),
-            el("p", { class: "result-score", html: `<b>${correct}</b> von <b>${TOTAL}</b> richtig · ${pct}%` }),
+            el("h2", { text: pct >= 60 ? "Well done!" : "Keep practising!" }),
+            el("p", { class: "result-score", html: `<b>${correct}</b> of <b>${TOTAL}</b> correct · ${pct}%` }),
             el("div", { class: "result-actions" }, [
-              el("button", { class: "btn primary", text: "Nochmal spielen", on: { click: api.restart } }),
-              el("button", { class: "btn", text: "Anderes Thema", on: { click: api.backToTopics } }),
-              el("button", { class: "btn ghost", text: "Menü", on: { click: api.exit } })
+              el("button", { class: "btn primary", text: "Play again", on: { click: api.restart } }),
+              el("button", { class: "btn", text: "Other topic", on: { click: api.backToTopics } }),
+              el("button", { class: "btn ghost", text: "Menu", on: { click: api.exit } })
             ])
           ])
         );

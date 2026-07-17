@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -655,7 +655,7 @@ window.SkillbeeBrand = {
     importJSON: function (text) {
       var parsed = JSON.parse(text);
       if (!parsed || !Array.isArray(parsed.vocab) || !Array.isArray(parsed.sentences)) {
-        throw new Error("Die Datei hat nicht das richtige Format.");
+        throw new Error("The file is not in the right format.");
       }
       this.data = parsed;
       this.save();
@@ -822,8 +822,8 @@ const App = (function () {
           el("h2", { text: title }),
           el("p", { class: "result-score", text: message }),
           el("div", { class: "result-actions" }, [
-            el("button", { class: "btn", text: "Anderes Thema", on: { click: api.backToTopics } }),
-            el("button", { class: "btn ghost", text: "Menü", on: { click: api.exit } })
+            el("button", { class: "btn", text: "Other topic", on: { click: api.backToTopics } }),
+            el("button", { class: "btn ghost", text: "Menu", on: { click: api.exit } })
           ])
         ])
       );
@@ -852,7 +852,7 @@ const App = (function () {
     const bar = el("header", { class: "topbar" }, [
       el("button", {
         class: "brand",
-        attrs: { title: "Zurück zur Startseite" },
+        attrs: { title: "Back to home" },
         on: { click: () => showHome() },
         html:
           '<img class="skb-logo" src="' +
@@ -863,17 +863,17 @@ const App = (function () {
       el("div", { class: "topbar-right" }, [
         el("button", {
           class: "icon-btn",
-          attrs: { id: "admin-btn", title: "Inhalte verwalten" },
+          attrs: { id: "admin-btn", title: "Manage content" },
           html: "⚙️",
           on: { click: () => showAdmin() }
         }),
-        el("div", { class: "score-badge", attrs: { title: "Punkte in dieser Sitzung" } }, [
+        el("div", { class: "score-badge", attrs: { title: "Points this session" } }, [
           el("span", { class: "score-star", html: "⭐" }),
           el("span", { class: "score-value", attrs: { id: "score-value" }, text: "0" })
         ]),
         el("button", {
           class: "icon-btn",
-          attrs: { id: "mute-btn", title: "Ton an/aus" },
+          attrs: { id: "mute-btn", title: "Sound on/off" },
           html: "🔊",
           on: {
             click: (e) => {
@@ -895,7 +895,7 @@ const App = (function () {
 
     main.appendChild(
       el("section", { class: "hero" }, [
-        el("h1", { class: "hero-title", html: 'Willkommen! Wähle ein <span>Spiel</span> 🎲' }),
+        el("h1", { class: "hero-title", html: 'Welcome! Pick a <span>game</span> 🎲' }),
         el("p", {
           class: "hero-sub",
           text: "Gamify your German lessons — pick a game, choose a topic, and play with the class."
@@ -928,12 +928,12 @@ const App = (function () {
       el("footer", { class: "home-foot" }, [
         el("button", {
           class: "foot-admin",
-          html: "⚙️ Inhalte verwalten",
+          html: "⚙️ Manage content",
           on: { click: () => showAdmin() }
         }),
         el("div", {
           class: "foot-note",
-          html: "Made for Skillbee German teachers · Tipp: <kbd>F11</kbd> für Vollbild im Unterricht"
+          html: "Made for Skillbee German teachers · Tip: press <kbd>F11</kbd> for full-screen in class"
         })
       ])
     );
@@ -948,9 +948,9 @@ const App = (function () {
 
     main.appendChild(
       el("div", { class: "picker" }, [
-        el("button", { class: "back-link", html: "← Zurück", on: { click: () => showHome() } }),
+        el("button", { class: "back-link", html: "← Back", on: { click: () => showHome() } }),
         el("h2", { class: "picker-title", html: `${game.emoji} ${game.name}` }),
-        el("p", { class: "picker-sub", text: usesSentences ? "Wähle ein Thema für die Sätze:" : "Wähle ein Wort-Thema:" })
+        el("p", { class: "picker-sub", text: usesSentences ? "Choose a topic for the sentences:" : "Choose a vocabulary topic:" })
       ])
     );
 
@@ -965,7 +965,7 @@ const App = (function () {
             el("div", { class: "topic-emoji", text: topic.emoji }),
             el("div", { class: "topic-name", text: topic.name }),
             el("div", { class: "topic-en", text: topic.english }),
-            el("div", { class: "topic-count", text: `${count} ${usesSentences ? "Sätze" : "Wörter"}` })
+            el("div", { class: "topic-count", text: `${count} ${usesSentences ? "sentences" : "words"}` })
           ]
         )
       );
@@ -1049,7 +1049,7 @@ document.addEventListener("DOMContentLoaded", App.init);
 (function () {
   App.register({
     id: "quiz",
-    name: "Vokabel-Quiz",
+    name: "Vocabulary Quiz",
     emoji: "🎯",
     color: "#ff595e",
     description: "Multiple-choice quiz with a timer. Answer fast for bonus points!",
@@ -1058,7 +1058,7 @@ document.addEventListener("DOMContentLoaded", App.init);
     mount(stage, api) {
       const { kit, topic, addScore, el } = api;
       if (!topic.words || topic.words.length === 0) {
-        kit.notice(stage, "Noch keine Wörter", "Füge über ⚙️ Inhalte verwalten Wörter zu diesem Thema hinzu.", api);
+        kit.notice(stage, "No words yet", "Add words to this topic via ⚙️ Manage content.", api);
         return;
       }
       const words = topic.words;
@@ -1090,9 +1090,9 @@ document.addEventListener("DOMContentLoaded", App.init);
         wrap.innerHTML = "";
         wrap.appendChild(
           el("div", { class: "quiz-head" }, [
-            el("button", { class: "back-link small", html: "← Menü", on: { click: api.exit } }),
-            el("div", { class: "quiz-progress", text: `Frage ${index + 1} / ${TOTAL}` }),
-            el("div", { class: "quiz-streak", text: streak > 1 ? `🔥 ${streak}er-Serie` : "" })
+            el("button", { class: "back-link small", html: "← Menu", on: { click: api.exit } }),
+            el("div", { class: "quiz-progress", text: `Question ${index + 1} / ${TOTAL}` }),
+            el("div", { class: "quiz-streak", text: streak > 1 ? `🔥 ${streak} streak` : "" })
           ])
         );
 
@@ -1101,7 +1101,7 @@ document.addEventListener("DOMContentLoaded", App.init);
 
         wrap.appendChild(
           el("div", { class: "quiz-question" }, [
-            el("div", { class: "quiz-lang-tag", text: askGermanToEnglish ? "Was bedeutet…" : "Wie heißt auf Deutsch…" }),
+            el("div", { class: "quiz-lang-tag", text: askGermanToEnglish ? "What does this mean?" : "What's the German word?" }),
             el("div", { class: "quiz-word" }, [
               document.createTextNode(prompt + " "),
               askGermanToEnglish ? kit.speakerButton(q.de) : null
@@ -1184,12 +1184,12 @@ document.addEventListener("DOMContentLoaded", App.init);
         wrap.appendChild(
           el("div", { class: "result-card" }, [
             el("div", { class: "result-emoji", text: pct >= 80 ? "🏆" : pct >= 60 ? "🎉" : "💪" }),
-            el("h2", { text: pct >= 60 ? "Super gemacht!" : "Weiter üben!" }),
-            el("p", { class: "result-score", html: `<b>${correct}</b> von <b>${TOTAL}</b> richtig · ${pct}%` }),
+            el("h2", { text: pct >= 60 ? "Well done!" : "Keep practising!" }),
+            el("p", { class: "result-score", html: `<b>${correct}</b> of <b>${TOTAL}</b> correct · ${pct}%` }),
             el("div", { class: "result-actions" }, [
-              el("button", { class: "btn primary", text: "Nochmal spielen", on: { click: api.restart } }),
-              el("button", { class: "btn", text: "Anderes Thema", on: { click: api.backToTopics } }),
-              el("button", { class: "btn ghost", text: "Menü", on: { click: api.exit } })
+              el("button", { class: "btn primary", text: "Play again", on: { click: api.restart } }),
+              el("button", { class: "btn", text: "Other topic", on: { click: api.backToTopics } }),
+              el("button", { class: "btn ghost", text: "Menu", on: { click: api.exit } })
             ])
           ])
         );
@@ -1219,7 +1219,7 @@ document.addEventListener("DOMContentLoaded", App.init);
     mount(stage, api) {
       const { kit, topic, addScore, el } = api;
       if (!topic.words || topic.words.length === 0) {
-        kit.notice(stage, "Noch keine Wörter", "Füge über ⚙️ Inhalte verwalten Wörter zu diesem Thema hinzu.", api);
+        kit.notice(stage, "No words yet", "Add words to this topic via ⚙️ Manage content.", api);
         return;
       }
       const PAIRS = Math.min(6, topic.words.length);
@@ -1243,9 +1243,9 @@ document.addEventListener("DOMContentLoaded", App.init);
 
       wrap.appendChild(
         el("div", { class: "game-head" }, [
-          el("button", { class: "back-link small", html: "← Menü", on: { click: api.exit } }),
+          el("button", { class: "back-link small", html: "← Menu", on: { click: api.exit } }),
           el("div", { class: "head-title", text: `${topic.emoji} ${topic.name}` }),
-          el("div", { class: "moves", attrs: { id: "moves" }, text: "0 Züge" })
+          el("div", { class: "moves", attrs: { id: "moves" }, text: "0 moves" })
         ])
       );
 
@@ -1279,7 +1279,7 @@ document.addEventListener("DOMContentLoaded", App.init);
         if (flipped.length === 2) {
           busy = true;
           moves++;
-          document.getElementById("moves").textContent = moves + (moves === 1 ? " Zug" : " Züge");
+          document.getElementById("moves").textContent = moves + (moves === 1 ? " move" : " moves");
           const [a, b] = flipped;
           if (cards[a].pair === cards[b].pair) {
             kit.beep("good");
@@ -1316,12 +1316,12 @@ document.addEventListener("DOMContentLoaded", App.init);
           wrap.appendChild(
             el("div", { class: "result-card" }, [
               el("div", { class: "result-emoji", text: "🎉" }),
-              el("h2", { text: "Alle Paare gefunden!" }),
-              el("p", { class: "result-score", html: `In <b>${moves}</b> Zügen · Bonus: <b>${bonus}</b>` }),
+              el("h2", { text: "All pairs found!" }),
+              el("p", { class: "result-score", html: `In <b>${moves}</b> moves · Bonus: <b>${bonus}</b>` }),
               el("div", { class: "result-actions" }, [
-                el("button", { class: "btn primary", text: "Nochmal", on: { click: api.restart } }),
-                el("button", { class: "btn", text: "Anderes Thema", on: { click: api.backToTopics } }),
-                el("button", { class: "btn ghost", text: "Menü", on: { click: api.exit } })
+                el("button", { class: "btn primary", text: "Play again", on: { click: api.restart } }),
+                el("button", { class: "btn", text: "Other topic", on: { click: api.backToTopics } }),
+                el("button", { class: "btn ghost", text: "Menu", on: { click: api.exit } })
               ])
             ])
           );
@@ -1345,7 +1345,7 @@ document.addEventListener("DOMContentLoaded", App.init);
 
   App.register({
     id: "hangman",
-    name: "Galgenmännchen",
+    name: "Hangman",
     emoji: "🔤",
     color: "#6a4c93",
     description: "Guess the German word letter by letter before the timer runs out.",
@@ -1354,7 +1354,7 @@ document.addEventListener("DOMContentLoaded", App.init);
     mount(stage, api) {
       const { kit, topic, addScore, el } = api;
       if (!topic.words || topic.words.length === 0) {
-        kit.notice(stage, "Noch keine Wörter", "Füge über ⚙️ Inhalte verwalten Wörter zu diesem Thema hinzu.", api);
+        kit.notice(stage, "No words yet", "Add words to this topic via ⚙️ Manage content.", api);
         return;
       }
       const entry = kit.sample(topic.words, 1)[0];
@@ -1377,7 +1377,7 @@ document.addEventListener("DOMContentLoaded", App.init);
         wrap.innerHTML = "";
         wrap.appendChild(
           el("div", { class: "game-head" }, [
-            el("button", { class: "back-link small", html: "← Menü", on: { click: api.exit } }),
+            el("button", { class: "back-link small", html: "← Menu", on: { click: api.exit } }),
             el("div", { class: "head-title", text: `${topic.emoji} ${topic.name}` }),
             el("div", { class: "moves", text: `${MAX_WRONG - wrong} ❤️` })
           ])
@@ -1386,7 +1386,7 @@ document.addEventListener("DOMContentLoaded", App.init);
         wrap.appendChild(el("div", { class: "hang-face", text: STAGES[wrong] }));
         wrap.appendChild(
           el("div", { class: "hang-hint" }, [
-            document.createTextNode(`Tipp: ${entry.en} `),
+            document.createTextNode(`Hint: ${entry.en} `),
             entry.emoji ? el("span", { text: entry.emoji }) : null
           ])
         );
@@ -1457,12 +1457,12 @@ document.addEventListener("DOMContentLoaded", App.init);
         wrap.appendChild(
           el("div", { class: "result-card inline" }, [
             el("div", { class: "result-emoji", text: won ? "🎉" : "😅" }),
-            el("h2", { html: won ? `Richtig! <b>${full}</b>` : `Das Wort war: <b>${full}</b>` }),
-            won ? el("p", { class: "result-score", html: `+${points} Punkte` }) : null,
+            el("h2", { html: won ? `Correct! <b>${full}</b>` : `The word was: <b>${full}</b>` }),
+            won ? el("p", { class: "result-score", html: `+${points} points` }) : null,
             el("div", { class: "result-actions" }, [
-              el("button", { class: "btn primary", text: "Neues Wort", on: { click: api.restart } }),
-              el("button", { class: "btn", text: "Anderes Thema", on: { click: api.backToTopics } }),
-              el("button", { class: "btn ghost", text: "Menü", on: { click: api.exit } })
+              el("button", { class: "btn primary", text: "New word", on: { click: api.restart } }),
+              el("button", { class: "btn", text: "Other topic", on: { click: api.backToTopics } }),
+              el("button", { class: "btn ghost", text: "Menu", on: { click: api.exit } })
             ])
           ])
         );
@@ -1498,7 +1498,7 @@ document.addEventListener("DOMContentLoaded", App.init);
 (function () {
   App.register({
     id: "scramble",
-    name: "Satzbau",
+    name: "Sentence Scramble",
     emoji: "🧱",
     color: "#3b4de8",
     description: "Put the shuffled German words back into the correct order.",
@@ -1507,7 +1507,7 @@ document.addEventListener("DOMContentLoaded", App.init);
     mount(stage, api) {
       const { kit, topic, addScore, el } = api;
       if (!topic.sentences || topic.sentences.length === 0) {
-        kit.notice(stage, "Noch keine Sätze", "Füge über ⚙️ Inhalte verwalten Sätze zu diesem Thema hinzu.", api);
+        kit.notice(stage, "No sentences yet", "Add sentences to this topic via ⚙️ Manage content.", api);
         return;
       }
       const TOTAL = Math.min(5, topic.sentences.length);
@@ -1527,8 +1527,8 @@ document.addEventListener("DOMContentLoaded", App.init);
         wrap.innerHTML = "";
         wrap.appendChild(
           el("div", { class: "game-head" }, [
-            el("button", { class: "back-link small", html: "← Menü", on: { click: api.exit } }),
-            el("div", { class: "head-title", text: `Satz ${index + 1} / ${TOTAL}` }),
+            el("button", { class: "back-link small", html: "← Menu", on: { click: api.exit } }),
+            el("div", { class: "head-title", text: `Sentence ${index + 1} / ${TOTAL}` }),
             el("div", { class: "moves", text: topic.emoji + " " + topic.name })
           ])
         );
@@ -1557,8 +1557,8 @@ document.addEventListener("DOMContentLoaded", App.init);
           bankRow.appendChild(btn);
         });
 
-        const checkBtn = el("button", { class: "btn primary scr-check", text: "Prüfen ✓", attrs: { disabled: "true" }, on: { click: check } });
-        const clearBtn = el("button", { class: "btn ghost", text: "Zurücksetzen", on: { click: render } });
+        const checkBtn = el("button", { class: "btn primary scr-check", text: "Check ✓", attrs: { disabled: "true" }, on: { click: check } });
+        const clearBtn = el("button", { class: "btn ghost", text: "Reset", on: { click: render } });
         wrap.appendChild(el("div", { class: "scr-actions" }, [clearBtn, checkBtn]));
 
         function pick(pos) {
@@ -1619,12 +1619,12 @@ document.addEventListener("DOMContentLoaded", App.init);
         wrap.appendChild(
           el("div", { class: "result-card" }, [
             el("div", { class: "result-emoji", text: "🏗️" }),
-            el("h2", { text: "Alle Sätze gebaut!" }),
-            el("p", { class: "result-score", html: `<b>${solvedCount}</b> von <b>${TOTAL}</b> Sätzen` }),
+            el("h2", { text: "All sentences built!" }),
+            el("p", { class: "result-score", html: `<b>${solvedCount}</b> of <b>${TOTAL}</b> sentences` }),
             el("div", { class: "result-actions" }, [
-              el("button", { class: "btn primary", text: "Nochmal", on: { click: api.restart } }),
-              el("button", { class: "btn", text: "Anderes Thema", on: { click: api.backToTopics } }),
-              el("button", { class: "btn ghost", text: "Menü", on: { click: api.exit } })
+              el("button", { class: "btn primary", text: "Play again", on: { click: api.restart } }),
+              el("button", { class: "btn", text: "Other topic", on: { click: api.backToTopics } }),
+              el("button", { class: "btn ghost", text: "Menu", on: { click: api.exit } })
             ])
           ])
         );
@@ -1667,14 +1667,14 @@ document.addEventListener("DOMContentLoaded", App.init);
       }
 
       function updateCounts() {
-        // Refresh the "N Wörter / N Sätze" labels without a full re-render.
+        // Refresh the "N words / N sentences" labels without a full re-render.
         var cards = container.querySelectorAll(".adm-topic");
         var list = tab === "vocab" ? store.data.vocab : store.data.sentences;
         cards.forEach(function (card, i) {
           var badge = card.querySelector(".adm-count");
           if (badge && list[i]) {
             var n = tab === "vocab" ? list[i].words.length : list[i].sentences.length;
-            badge.textContent = n + (tab === "vocab" ? " Wörter" : " Sätze");
+            badge.textContent = n + (tab === "vocab" ? " words" : " sentences");
           }
         });
       }
@@ -1699,20 +1699,20 @@ document.addEventListener("DOMContentLoaded", App.init);
 
         container.appendChild(
           el("div", { class: "adm-head" }, [
-            el("button", { class: "back-link", html: "← Menü", on: { click: api.onExit } }),
-            el("h2", { class: "adm-title", html: "🛠️ Inhalte verwalten" }),
+            el("button", { class: "back-link", html: "← Menu", on: { click: api.onExit } }),
+            el("h2", { class: "adm-title", html: "🛠️ Manage content" }),
             el("div", { class: "adm-tools" }, [
-              el("button", { class: "btn small", html: "⬇ Export", attrs: { title: "Als Datei sichern" }, on: { click: doExport } }),
-              el("button", { class: "btn small", html: "⬆ Import", attrs: { title: "Aus Datei laden" }, on: { click: doImport } }),
-              el("button", { class: "btn small ghost", html: "↺ Zurücksetzen", on: { click: doReset } })
+              el("button", { class: "btn small", html: "⬇ Export", attrs: { title: "Save to a file" }, on: { click: doExport } }),
+              el("button", { class: "btn small", html: "⬆ Import", attrs: { title: "Load from a file" }, on: { click: doImport } }),
+              el("button", { class: "btn small ghost", html: "↺ Reset", on: { click: doReset } })
             ])
           ])
         );
 
         container.appendChild(
           el("div", { class: "adm-tabs" }, [
-            tabBtn("vocab", "🔤 Wörter"),
-            tabBtn("sentences", "🗣️ Sätze")
+            tabBtn("vocab", "🔤 Words"),
+            tabBtn("sentences", "🗣️ Sentences")
           ])
         );
 
@@ -1720,7 +1720,7 @@ document.addEventListener("DOMContentLoaded", App.init);
           el("p", {
             class: "adm-hint",
             html:
-              "Änderungen werden automatisch in diesem Browser gespeichert. Mit <b>Export</b> sicherst du sie als Datei oder überträgst sie auf einen anderen Computer (dort <b>Import</b>)."
+              "Changes are saved automatically in this browser. Use <b>Export</b> to save them as a file or move them to another computer (there, use <b>Import</b>)."
           })
         );
 
@@ -1748,12 +1748,12 @@ document.addEventListener("DOMContentLoaded", App.init);
         body.appendChild(
           el("button", {
             class: "btn primary adm-add",
-            html: "+ Neues Thema",
+            html: "+ New topic",
             on: {
               click: function () {
                 store.data.vocab.push({
                   id: store.newId("topic"),
-                  name: "Neues Thema",
+                  name: "New topic",
                   english: "",
                   emoji: "📚",
                   words: [{ de: "", en: "", emoji: "" }]
@@ -1764,7 +1764,7 @@ document.addEventListener("DOMContentLoaded", App.init);
             }
           })
         );
-        if (store.data.vocab.length === 0) body.appendChild(emptyState("Noch keine Wort-Themen. Klicke auf + Neues Thema."));
+        if (store.data.vocab.length === 0) body.appendChild(emptyState("No word topics yet. Click + New topic."));
         store.data.vocab.forEach(function (topic, ti) {
           body.appendChild(vocabTopicCard(topic, ti));
         });
@@ -1775,16 +1775,16 @@ document.addEventListener("DOMContentLoaded", App.init);
         card.appendChild(
           el("div", { class: "adm-topic-head" }, [
             input(topic, "emoji", "🙂", "adm-emoji", 6),
-            input(topic, "name", "Themenname (Deutsch)", "adm-input grow"),
+            input(topic, "name", "Topic name (German)", "adm-input grow"),
             input(topic, "english", "English name", "adm-input"),
-            el("span", { class: "adm-count", text: topic.words.length + " Wörter" }),
+            el("span", { class: "adm-count", text: topic.words.length + " words" }),
             el("button", {
               class: "adm-del",
               html: "🗑",
-              attrs: { title: "Thema löschen" },
+              attrs: { title: "Delete topic" },
               on: {
                 click: function () {
-                  if (confirmDelete("Thema wirklich löschen?")) {
+                  if (confirmDelete("Delete this topic?")) {
                     store.data.vocab.splice(ti, 1);
                     store.save();
                     render();
@@ -1797,8 +1797,8 @@ document.addEventListener("DOMContentLoaded", App.init);
 
         card.appendChild(
           el("div", { class: "adm-row adm-row-head" }, [
-            el("span", { class: "adm-emoji-h", text: "Bild" }),
-            el("span", { text: "Deutsch" }),
+            el("span", { class: "adm-emoji-h", text: "Icon" }),
+            el("span", { text: "German" }),
             el("span", { text: "English" }),
             el("span", {})
           ])
@@ -1808,12 +1808,12 @@ document.addEventListener("DOMContentLoaded", App.init);
           card.appendChild(
             el("div", { class: "adm-row" }, [
               input(w, "emoji", "🙂", "adm-emoji", 6),
-              input(w, "de", "z. B. der Hund", "adm-input"),
+              input(w, "de", "e.g. der Hund", "adm-input"),
               input(w, "en", "e.g. the dog", "adm-input"),
               el("button", {
                 class: "adm-del",
                 html: "✕",
-                attrs: { title: "Wort entfernen" },
+                attrs: { title: "Remove word" },
                 on: {
                   click: function () {
                     topic.words.splice(wi, 1);
@@ -1829,7 +1829,7 @@ document.addEventListener("DOMContentLoaded", App.init);
         card.appendChild(
           el("button", {
             class: "btn small adm-add-row",
-            html: "+ Wort",
+            html: "+ Word",
             on: {
               click: function () {
                 topic.words.push({ de: "", en: "", emoji: "" });
@@ -1847,12 +1847,12 @@ document.addEventListener("DOMContentLoaded", App.init);
         body.appendChild(
           el("button", {
             class: "btn primary adm-add",
-            html: "+ Neues Satz-Thema",
+            html: "+ New sentence topic",
             on: {
               click: function () {
                 store.data.sentences.push({
                   id: store.newId("stopic"),
-                  name: "Neues Thema",
+                  name: "New topic",
                   english: "",
                   emoji: "🗣️",
                   sentences: [{ de: "", en: "" }]
@@ -1863,7 +1863,7 @@ document.addEventListener("DOMContentLoaded", App.init);
             }
           })
         );
-        if (store.data.sentences.length === 0) body.appendChild(emptyState("Noch keine Satz-Themen."));
+        if (store.data.sentences.length === 0) body.appendChild(emptyState("No sentence topics yet."));
         store.data.sentences.forEach(function (topic, ti) {
           body.appendChild(sentenceTopicCard(topic, ti));
         });
@@ -1874,16 +1874,16 @@ document.addEventListener("DOMContentLoaded", App.init);
         card.appendChild(
           el("div", { class: "adm-topic-head" }, [
             input(topic, "emoji", "🙂", "adm-emoji", 6),
-            input(topic, "name", "Themenname (Deutsch)", "adm-input grow"),
+            input(topic, "name", "Topic name (German)", "adm-input grow"),
             input(topic, "english", "English name", "adm-input"),
-            el("span", { class: "adm-count", text: topic.sentences.length + " Sätze" }),
+            el("span", { class: "adm-count", text: topic.sentences.length + " sentences" }),
             el("button", {
               class: "adm-del",
               html: "🗑",
-              attrs: { title: "Thema löschen" },
+              attrs: { title: "Delete topic" },
               on: {
                 click: function () {
-                  if (confirmDelete("Thema wirklich löschen?")) {
+                  if (confirmDelete("Delete this topic?")) {
                     store.data.sentences.splice(ti, 1);
                     store.save();
                     render();
@@ -1896,7 +1896,7 @@ document.addEventListener("DOMContentLoaded", App.init);
 
         card.appendChild(
           el("div", { class: "adm-row adm-row-sent adm-row-head" }, [
-            el("span", { text: "Deutscher Satz" }),
+            el("span", { text: "German sentence" }),
             el("span", { text: "English translation" }),
             el("span", {})
           ])
@@ -1905,12 +1905,12 @@ document.addEventListener("DOMContentLoaded", App.init);
         topic.sentences.forEach(function (s, si) {
           card.appendChild(
             el("div", { class: "adm-row adm-row-sent" }, [
-              input(s, "de", "z. B. Ich lerne Deutsch", "adm-input"),
+              input(s, "de", "e.g. Ich lerne Deutsch", "adm-input"),
               input(s, "en", "e.g. I learn German", "adm-input"),
               el("button", {
                 class: "adm-del",
                 html: "✕",
-                attrs: { title: "Satz entfernen" },
+                attrs: { title: "Remove sentence" },
                 on: {
                   click: function () {
                     topic.sentences.splice(si, 1);
@@ -1926,7 +1926,7 @@ document.addEventListener("DOMContentLoaded", App.init);
         card.appendChild(
           el("button", {
             class: "btn small adm-add-row",
-            html: "+ Satz",
+            html: "+ Sentence",
             on: {
               click: function () {
                 topic.sentences.push({ de: "", en: "" });
@@ -1966,9 +1966,9 @@ document.addEventListener("DOMContentLoaded", App.init);
           setTimeout(function () {
             URL.revokeObjectURL(url);
           }, 500);
-          toast("Datei heruntergeladen ✓");
+          toast("File downloaded ✓");
         } catch (e) {
-          alert("Export nicht möglich: " + e.message);
+          alert("Export not possible: " + e.message);
         }
       }
 
@@ -1984,9 +1984,9 @@ document.addEventListener("DOMContentLoaded", App.init);
             try {
               store.importJSON(String(reader.result));
               render();
-              toast("Inhalte importiert ✓");
+              toast("Content imported ✓");
             } catch (e) {
-              alert("Import fehlgeschlagen: " + e.message);
+              alert("Import failed: " + e.message);
             }
           };
           reader.readAsText(file);
@@ -1995,10 +1995,10 @@ document.addEventListener("DOMContentLoaded", App.init);
       }
 
       function doReset() {
-        if (confirmDelete("Alle Inhalte auf die Standardvorgaben zurücksetzen? Deine Änderungen gehen verloren.")) {
+        if (confirmDelete("Reset all content back to the defaults? Your changes will be lost.")) {
           store.reset();
           render();
-          toast("Auf Standard zurückgesetzt");
+          toast("Reset to defaults");
         }
       }
 

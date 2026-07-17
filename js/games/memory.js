@@ -15,7 +15,7 @@
     mount(stage, api) {
       const { kit, topic, addScore, el } = api;
       if (!topic.words || topic.words.length === 0) {
-        kit.notice(stage, "Noch keine Wörter", "Füge über ⚙️ Inhalte verwalten Wörter zu diesem Thema hinzu.", api);
+        kit.notice(stage, "No words yet", "Add words to this topic via ⚙️ Manage content.", api);
         return;
       }
       const PAIRS = Math.min(6, topic.words.length);
@@ -39,9 +39,9 @@
 
       wrap.appendChild(
         el("div", { class: "game-head" }, [
-          el("button", { class: "back-link small", html: "← Menü", on: { click: api.exit } }),
+          el("button", { class: "back-link small", html: "← Menu", on: { click: api.exit } }),
           el("div", { class: "head-title", text: `${topic.emoji} ${topic.name}` }),
-          el("div", { class: "moves", attrs: { id: "moves" }, text: "0 Züge" })
+          el("div", { class: "moves", attrs: { id: "moves" }, text: "0 moves" })
         ])
       );
 
@@ -75,7 +75,7 @@
         if (flipped.length === 2) {
           busy = true;
           moves++;
-          document.getElementById("moves").textContent = moves + (moves === 1 ? " Zug" : " Züge");
+          document.getElementById("moves").textContent = moves + (moves === 1 ? " move" : " moves");
           const [a, b] = flipped;
           if (cards[a].pair === cards[b].pair) {
             kit.beep("good");
@@ -112,12 +112,12 @@
           wrap.appendChild(
             el("div", { class: "result-card" }, [
               el("div", { class: "result-emoji", text: "🎉" }),
-              el("h2", { text: "Alle Paare gefunden!" }),
-              el("p", { class: "result-score", html: `In <b>${moves}</b> Zügen · Bonus: <b>${bonus}</b>` }),
+              el("h2", { text: "All pairs found!" }),
+              el("p", { class: "result-score", html: `In <b>${moves}</b> moves · Bonus: <b>${bonus}</b>` }),
               el("div", { class: "result-actions" }, [
-                el("button", { class: "btn primary", text: "Nochmal", on: { click: api.restart } }),
-                el("button", { class: "btn", text: "Anderes Thema", on: { click: api.backToTopics } }),
-                el("button", { class: "btn ghost", text: "Menü", on: { click: api.exit } })
+                el("button", { class: "btn primary", text: "Play again", on: { click: api.restart } }),
+                el("button", { class: "btn", text: "Other topic", on: { click: api.backToTopics } }),
+                el("button", { class: "btn ghost", text: "Menu", on: { click: api.exit } })
               ])
             ])
           );

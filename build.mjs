@@ -32,7 +32,7 @@ mkdirSync("dist", { recursive: true });
 writeFileSync(
   "dist/skillbee-deutsch-games.html",
   `<!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />

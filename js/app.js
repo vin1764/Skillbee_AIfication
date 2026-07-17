@@ -152,8 +152,8 @@ const App = (function () {
           el("h2", { text: title }),
           el("p", { class: "result-score", text: message }),
           el("div", { class: "result-actions" }, [
-            el("button", { class: "btn", text: "Anderes Thema", on: { click: api.backToTopics } }),
-            el("button", { class: "btn ghost", text: "Menü", on: { click: api.exit } })
+            el("button", { class: "btn", text: "Other topic", on: { click: api.backToTopics } }),
+            el("button", { class: "btn ghost", text: "Menu", on: { click: api.exit } })
           ])
         ])
       );
@@ -182,7 +182,7 @@ const App = (function () {
     const bar = el("header", { class: "topbar" }, [
       el("button", {
         class: "brand",
-        attrs: { title: "Zurück zur Startseite" },
+        attrs: { title: "Back to home" },
         on: { click: () => showHome() },
         html:
           '<img class="skb-logo" src="' +
@@ -193,17 +193,17 @@ const App = (function () {
       el("div", { class: "topbar-right" }, [
         el("button", {
           class: "icon-btn",
-          attrs: { id: "admin-btn", title: "Inhalte verwalten" },
+          attrs: { id: "admin-btn", title: "Manage content" },
           html: "⚙️",
           on: { click: () => showAdmin() }
         }),
-        el("div", { class: "score-badge", attrs: { title: "Punkte in dieser Sitzung" } }, [
+        el("div", { class: "score-badge", attrs: { title: "Points this session" } }, [
           el("span", { class: "score-star", html: "⭐" }),
           el("span", { class: "score-value", attrs: { id: "score-value" }, text: "0" })
         ]),
         el("button", {
           class: "icon-btn",
-          attrs: { id: "mute-btn", title: "Ton an/aus" },
+          attrs: { id: "mute-btn", title: "Sound on/off" },
           html: "🔊",
           on: {
             click: (e) => {
@@ -225,7 +225,7 @@ const App = (function () {
 
     main.appendChild(
       el("section", { class: "hero" }, [
-        el("h1", { class: "hero-title", html: 'Willkommen! Wähle ein <span>Spiel</span> 🎲' }),
+        el("h1", { class: "hero-title", html: 'Welcome! Pick a <span>game</span> 🎲' }),
         el("p", {
           class: "hero-sub",
           text: "Gamify your German lessons — pick a game, choose a topic, and play with the class."
@@ -258,12 +258,12 @@ const App = (function () {
       el("footer", { class: "home-foot" }, [
         el("button", {
           class: "foot-admin",
-          html: "⚙️ Inhalte verwalten",
+          html: "⚙️ Manage content",
           on: { click: () => showAdmin() }
         }),
         el("div", {
           class: "foot-note",
-          html: "Made for Skillbee German teachers · Tipp: <kbd>F11</kbd> für Vollbild im Unterricht"
+          html: "Made for Skillbee German teachers · Tip: press <kbd>F11</kbd> for full-screen in class"
         })
       ])
     );
@@ -278,9 +278,9 @@ const App = (function () {
 
     main.appendChild(
       el("div", { class: "picker" }, [
-        el("button", { class: "back-link", html: "← Zurück", on: { click: () => showHome() } }),
+        el("button", { class: "back-link", html: "← Back", on: { click: () => showHome() } }),
         el("h2", { class: "picker-title", html: `${game.emoji} ${game.name}` }),
-        el("p", { class: "picker-sub", text: usesSentences ? "Wähle ein Thema für die Sätze:" : "Wähle ein Wort-Thema:" })
+        el("p", { class: "picker-sub", text: usesSentences ? "Choose a topic for the sentences:" : "Choose a vocabulary topic:" })
       ])
     );
 
@@ -295,7 +295,7 @@ const App = (function () {
             el("div", { class: "topic-emoji", text: topic.emoji }),
             el("div", { class: "topic-name", text: topic.name }),
             el("div", { class: "topic-en", text: topic.english }),
-            el("div", { class: "topic-count", text: `${count} ${usesSentences ? "Sätze" : "Wörter"}` })
+            el("div", { class: "topic-count", text: `${count} ${usesSentences ? "sentences" : "words"}` })
           ]
         )
       );

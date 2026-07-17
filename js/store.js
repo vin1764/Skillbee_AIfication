@@ -89,7 +89,7 @@
     importJSON: function (text) {
       var parsed = JSON.parse(text);
       if (!parsed || !Array.isArray(parsed.vocab) || !Array.isArray(parsed.sentences)) {
-        throw new Error("Die Datei hat nicht das richtige Format.");
+        throw new Error("The file is not in the right format.");
       }
       this.data = parsed;
       this.save();
