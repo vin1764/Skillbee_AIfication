@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Skillbee Deutsch Games — Gamify your German lessons</title>
+<meta name="description" content="A gamified toolkit of German language games for Skillbee teachers to use in class." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐝</text></svg>" />
+<style>
+/* =====================================================================
+   Skillbee Deutsch Games — STYLES
+   Bright, friendly, high-contrast for classroom projectors.
+   ===================================================================== */
+:root {
+  --bg: #f4f7fb;
+  --bg-grad-1: #eef2ff;
+  --bg-grad-2: #fef6f0;
+  --ink: #1f2a44;
+  --ink-soft: #5a6b8c;
+  --card: #ffffff;
+  --line: #e6ebf4;
+  --brand: #ffb703;
+  --brand-ink: #7a4f00;
+  --accent: #1982c4;
+  --good: #2ec4b6;
+  --bad: #ff5964;
+  --radius: 18px;
+  --shadow: 0 10px 30px rgba(31, 42, 68, 0.09);
+  --shadow-lg: 0 20px 50px rgba(31, 42, 68, 0.16);
+  --font: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, var(--bg-grad-1), transparent 60%),
+    radial-gradient(1000px 600px at 110% 0%, var(--bg-grad-2), transparent 55%),
+    var(--bg);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font-family: inherit; cursor: pointer; }
+kbd {
+  background: #fff; border: 1px solid var(--line); border-bottom-width: 2px;
+  border-radius: 6px; padding: 1px 6px; font-size: 0.85em; color: var(--ink);
+}
+
+/* ---------- top bar ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px clamp(14px, 4vw, 40px);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.brand {
+  display: flex; align-items: center; gap: 10px;
+  background: none; border: 0; font-size: 1.15rem; color: var(--ink); padding: 4px;
+}
+.brand-mark { font-size: 1.5rem; filter: drop-shadow(0 2px 3px rgba(0,0,0,.15)); }
+.brand-text b { color: var(--accent); }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.score-badge {
+  display: flex; align-items: center; gap: 6px;
+  background: linear-gradient(135deg, #fff3cf, #ffe08a);
+  color: var(--brand-ink); font-weight: 800;
+  padding: 8px 14px; border-radius: 999px; border: 1px solid #f3d98a;
+  box-shadow: var(--shadow);
+}
+.score-value { min-width: 1.2ch; text-align: center; display: inline-block; }
+.score-value.pulse { animation: pop 0.4s ease; }
+.icon-btn {
+  background: #fff; border: 1px solid var(--line); border-radius: 12px;
+  width: 42px; height: 42px; font-size: 1.1rem; box-shadow: var(--shadow);
+}
+.icon-btn:hover { transform: translateY(-1px); }
+
+/* ---------- screen ---------- */
+.screen { padding: clamp(18px, 4vw, 44px); max-width: 1100px; margin: 0 auto; }
+
+/* ---------- hero ---------- */
+.hero { text-align: center; margin: 10px 0 26px; }
+.hero-title { font-size: clamp(1.8rem, 4.5vw, 3rem); margin: 0 0 8px; letter-spacing: -0.5px; }
+.hero-title span { color: var(--accent); }
+.hero-sub { color: var(--ink-soft); font-size: clamp(1rem, 2vw, 1.2rem); margin: 0 auto; max-width: 640px; }
+
+/* ---------- game grid (lobby) ---------- */
+.game-grid {
+  display: grid; gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+}
+.game-card {
+  position: relative; text-align: left;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s;
+  border-top: 5px solid var(--accent);
+  overflow: hidden;
+}
+.game-card::after {
+  content: ""; position: absolute; right: -30px; top: -30px;
+  width: 120px; height: 120px; border-radius: 50%;
+  background: var(--accent); opacity: 0.07;
+}
+.game-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+.game-emoji { font-size: 2.6rem; line-height: 1; margin-bottom: 12px; }
+.game-name { font-size: 1.3rem; font-weight: 800; margin-bottom: 6px; }
+.game-desc { color: var(--ink-soft); font-size: 0.95rem; min-height: 2.6em; }
+.game-play { margin-top: 14px; font-weight: 800; color: var(--accent); }
+
+.home-foot { text-align: center; color: var(--ink-soft); margin-top: 34px; font-size: 0.9rem; }
+
+/* ---------- topic picker ---------- */
+.picker { text-align: center; margin-bottom: 22px; }
+.picker-title { font-size: clamp(1.5rem, 4vw, 2.2rem); margin: 6px 0; }
+.picker-sub { color: var(--ink-soft); margin: 0; }
+.back-link {
+  background: #fff; border: 1px solid var(--line); border-radius: 10px;
+  padding: 8px 14px; font-weight: 700; color: var(--ink); box-shadow: var(--shadow);
+}
+.back-link.small { padding: 6px 10px; font-size: 0.9rem; }
+.back-link:hover { border-color: var(--accent); color: var(--accent); }
+
+.topic-grid {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.topic-card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+  padding: 18px 12px; text-align: center; box-shadow: var(--shadow);
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+.topic-card:hover { transform: translateY(-3px); border-color: var(--brand); box-shadow: var(--shadow-lg); }
+.topic-emoji { font-size: 2.2rem; }
+.topic-name { font-weight: 800; margin-top: 6px; }
+.topic-en { color: var(--ink-soft); font-size: 0.85rem; }
+.topic-count { margin-top: 8px; font-size: 0.8rem; color: var(--accent); font-weight: 700; }
+
+/* ---------- generic game head ---------- */
+.stage { animation: fadeIn 0.25s ease; }
+.game-head, .quiz-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-bottom: 18px;
+}
+.head-title { font-weight: 800; font-size: 1.1rem; }
+.moves { color: var(--ink-soft); font-weight: 700; }
+
+/* ---------- speaker button ---------- */
+.speaker-btn {
+  background: #eef6fc; border: 1px solid #d4e8f7; color: var(--accent);
+  border-radius: 10px; width: 40px; height: 40px; font-size: 1.05rem;
+  vertical-align: middle;
+}
+.speaker-btn:hover { background: var(--accent); color: #fff; }
+
+/* ---------- buttons ---------- */
+.btn {
+  border: 1px solid var(--line); background: #fff; color: var(--ink);
+  padding: 12px 20px; border-radius: 12px; font-weight: 800; font-size: 1rem;
+  box-shadow: var(--shadow); transition: transform 0.12s, box-shadow 0.12s;
+}
+.btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.btn.primary { background: linear-gradient(135deg, #ffd166, var(--brand)); border-color: #f0b400; color: var(--brand-ink); }
+.btn.ghost { background: transparent; box-shadow: none; }
+
+/* ---------- result card ---------- */
+.result-card {
+  text-align: center; background: var(--card); border: 1px solid var(--line);
+  border-radius: 22px; padding: 40px 24px; box-shadow: var(--shadow-lg);
+  max-width: 520px; margin: 30px auto; animation: pop 0.35s ease;
+}
+.result-card.inline { margin: 20px auto 0; padding: 26px 20px; }
+.result-emoji { font-size: 3.6rem; }
+.result-card h2 { margin: 8px 0; font-size: 1.6rem; }
+.result-score { color: var(--ink-soft); font-size: 1.15rem; }
+.result-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 20px; }
+
+/* =====================================================================
+   QUIZ
+   ===================================================================== */
+.quiz-progress { font-weight: 800; }
+.quiz-streak { color: var(--bad); font-weight: 800; min-height: 1.2em; }
+.timer-bar { height: 10px; background: #e9eef7; border-radius: 999px; overflow: hidden; margin-bottom: 20px; }
+.timer-fill { height: 100%; width: 100%; background: linear-gradient(90deg, var(--good), var(--brand), var(--bad)); transition: width 0.06s linear; }
+.quiz-question { text-align: center; margin-bottom: 22px; }
+.quiz-lang-tag { color: var(--ink-soft); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; font-size: 0.8rem; }
+.quiz-word { font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 900; margin: 6px 0; }
+.quiz-emoji { font-size: 3rem; }
+.quiz-options { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.quiz-opt {
+  display: flex; align-items: center; gap: 12px; text-align: left;
+  background: var(--card); border: 2px solid var(--line); border-radius: 16px;
+  padding: 18px 20px; font-size: clamp(1rem, 2.2vw, 1.35rem); font-weight: 700;
+  box-shadow: var(--shadow); transition: transform 0.12s, border-color 0.12s;
+  animation: rise 0.3s backwards; animation-delay: calc(var(--i) * 0.05s);
+}
+.quiz-opt:hover:not(:disabled) { transform: translateY(-2px); border-color: var(--accent); }
+.quiz-opt:disabled { cursor: default; }
+.opt-shape { font-size: 1.2rem; }
+.quiz-opt.correct { border-color: var(--good); background: #eafaf7; }
+.quiz-opt.wrong { border-color: var(--bad); background: #ffeef0; }
+
+/* =====================================================================
+   MEMORY
+   ===================================================================== */
+.memory-board { display: grid; grid-template-columns: repeat(var(--cols), 1fr); gap: 12px; max-width: 720px; margin: 0 auto; }
+.mem-card { background: none; border: 0; padding: 0; perspective: 800px; aspect-ratio: 3 / 4; }
+.mem-inner { position: relative; width: 100%; height: 100%; transition: transform 0.45s; transform-style: preserve-3d; }
+.mem-card.flipped .mem-inner, .mem-card.done .mem-inner { transform: rotateY(180deg); }
+.mem-front, .mem-back {
+  position: absolute; inset: 0; backface-visibility: hidden;
+  border-radius: 14px; display: flex; align-items: center; justify-content: center;
+  padding: 8px; text-align: center; box-shadow: var(--shadow);
+}
+.mem-front { background: linear-gradient(135deg, #ffd166, var(--brand)); font-size: 2rem; border: 2px solid #f0b400; }
+.mem-back {
+  transform: rotateY(180deg); background: var(--card); border: 2px solid var(--line);
+  font-weight: 800; font-size: clamp(0.85rem, 2vw, 1.15rem); word-break: break-word;
+}
+.mem-back.de { color: var(--accent); }
+.mem-back.en { color: var(--ink); }
+.mem-card.done .mem-back { border-color: var(--good); background: #eafaf7; box-shadow: 0 0 0 3px rgba(46,196,182,0.25); }
+.mem-card:not(.done):not(.flipped):hover .mem-front { transform: translateY(-3px); }
+
+/* =====================================================================
+   HANGMAN
+   ===================================================================== */
+.hangman { text-align: center; }
+.hang-face { font-size: 4.5rem; line-height: 1; margin: 6px 0; }
+.hang-hint { color: var(--ink-soft); font-weight: 700; font-size: 1.15rem; margin-bottom: 16px; }
+.hang-word { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 24px; }
+.hang-slot {
+  width: 40px; height: 52px; border-bottom: 4px solid var(--accent);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 1.8rem; font-weight: 900;
+}
+.hang-slot.filled { animation: pop 0.25s ease; }
+.hang-space { width: 22px; color: var(--ink-soft); align-self: flex-end; }
+.keyboard { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 640px; margin: 0 auto; }
+.key {
+  width: 46px; height: 52px; border-radius: 10px; border: 1px solid var(--line);
+  background: #fff; font-weight: 800; font-size: 1.1rem; box-shadow: var(--shadow);
+  transition: transform 0.1s;
+}
+.key:hover:not(:disabled) { transform: translateY(-2px); border-color: var(--accent); }
+.key.right { background: #eafaf7; border-color: var(--good); color: var(--good); }
+.key.miss { background: #ffeef0; border-color: var(--bad); color: var(--bad); opacity: 0.7; }
+
+/* =====================================================================
+   SCRAMBLE
+   ===================================================================== */
+.scramble { text-align: center; }
+.scr-hint { color: var(--ink-soft); font-style: italic; font-size: 1.2rem; margin-bottom: 18px; }
+.scr-answer {
+  min-height: 64px; border: 2px dashed var(--line); border-radius: 14px;
+  padding: 12px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center;
+  background: #fbfcfe; margin-bottom: 18px;
+}
+.scr-answer.ok { border-color: var(--good); background: #eafaf7; }
+.scr-answer.shake { animation: shake 0.4s; border-color: var(--bad); }
+.scr-bank { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 18px; }
+.scr-word {
+  background: #fff; border: 2px solid var(--line); border-radius: 12px;
+  padding: 12px 16px; font-size: clamp(1rem, 2.2vw, 1.3rem); font-weight: 800;
+  box-shadow: var(--shadow); transition: transform 0.1s;
+  animation: rise 0.3s backwards; animation-delay: calc(var(--i) * 0.04s);
+}
+.scr-word:hover:not(.used) { transform: translateY(-2px); border-color: var(--accent); }
+.scr-word.used { opacity: 0.25; cursor: default; }
+.scr-word.chosen { border-color: var(--accent); background: #eef6fc; color: var(--accent); }
+.scr-actions { display: flex; gap: 10px; justify-content: center; }
+
+/* ---------- confetti ---------- */
+.confetti-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 50; }
+
+/* ---------- animations ---------- */
+@keyframes pop { 0% { transform: scale(0.7); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(6px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+/* ---------- small screens ---------- */
+@media (max-width: 560px) {
+  .quiz-options { grid-template-columns: 1fr; }
+  .key { width: 40px; height: 46px; }
+  .brand-text { font-size: 0.95rem; }
+}
+
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+/* ==== js/data.js ==== */
+/* =====================================================================
+   Skillbee Deutsch Games — VOCABULARY DATA
+   ---------------------------------------------------------------------
+   👋 NON-TECHNICAL FRIENDLY: This is the file you edit to change what
+   students learn. You do NOT need to touch any other file.
+
+   HOW TO ADD A WORD:
+     Copy one line inside a topic's "words" list and change it, e.g.
+        { de: "der Apfel", en: "the apple", emoji: "🍎" },
+     - de    = the German word (add der/die/das for nouns if you like)
+     - en    = the English meaning
+     - emoji = a small picture (optional — leave "" if none fits)
+
+   HOW TO ADD A WHOLE NEW TOPIC:
+     Copy a whole { ... } topic block, give it a new "id" (no spaces),
+     a "name", an "emoji", and its own list of words.
+
+   HOW TO ADD A SENTENCE (used by the "Satzbau" game):
+     Add a line to SENTENCE_TOPICS below, e.g.
+        { de: "Ich lerne gern Deutsch", en: "I like learning German" },
+   ===================================================================== */
+
+const VOCAB_TOPICS = [
+  {
+    id: "zahlen",
+    name: "Zahlen",
+    english: "Numbers",
+    emoji: "🔢",
+    words: [
+      { de: "eins", en: "one", emoji: "1️⃣" },
+      { de: "zwei", en: "two", emoji: "2️⃣" },
+      { de: "drei", en: "three", emoji: "3️⃣" },
+      { de: "vier", en: "four", emoji: "4️⃣" },
+      { de: "fünf", en: "five", emoji: "5️⃣" },
+      { de: "sechs", en: "six", emoji: "6️⃣" },
+      { de: "sieben", en: "seven", emoji: "7️⃣" },
+      { de: "acht", en: "eight", emoji: "8️⃣" },
+      { de: "neun", en: "nine", emoji: "9️⃣" },
+      { de: "zehn", en: "ten", emoji: "🔟" },
+      { de: "elf", en: "eleven", emoji: "" },
+      { de: "zwölf", en: "twelve", emoji: "" }
+    ]
+  },
+  {
+    id: "farben",
+    name: "Farben",
+    english: "Colors",
+    emoji: "🎨",
+    words: [
+      { de: "rot", en: "red", emoji: "🟥" },
+      { de: "blau", en: "blue", emoji: "🟦" },
+      { de: "grün", en: "green", emoji: "🟩" },
+      { de: "gelb", en: "yellow", emoji: "🟨" },
+      { de: "orange", en: "orange", emoji: "🟧" },
+      { de: "lila", en: "purple", emoji: "🟪" },
+      { de: "schwarz", en: "black", emoji: "⬛" },
+      { de: "weiß", en: "white", emoji: "⬜" },
+      { de: "braun", en: "brown", emoji: "🟫" },
+      { de: "rosa", en: "pink", emoji: "🌸" }
+    ]
+  },
+  {
+    id: "tiere",
+    name: "Tiere",
+    english: "Animals",
+    emoji: "🐾",
+    words: [
+      { de: "der Hund", en: "the dog", emoji: "🐶" },
+      { de: "die Katze", en: "the cat", emoji: "🐱" },
+      { de: "das Pferd", en: "the horse", emoji: "🐴" },
+      { de: "der Vogel", en: "the bird", emoji: "🐦" },
+      { de: "der Fisch", en: "the fish", emoji: "🐟" },
+      { de: "die Kuh", en: "the cow", emoji: "🐮" },
+      { de: "das Schwein", en: "the pig", emoji: "🐷" },
+      { de: "der Bär", en: "the bear", emoji: "🐻" },
+      { de: "der Löwe", en: "the lion", emoji: "🦁" },
+      { de: "der Elefant", en: "the elephant", emoji: "🐘" }
+    ]
+  },
+  {
+    id: "essen",
+    name: "Essen & Trinken",
+    english: "Food & Drink",
+    emoji: "🍽️",
+    words: [
+      { de: "das Brot", en: "the bread", emoji: "🍞" },
+      { de: "der Apfel", en: "the apple", emoji: "🍎" },
+      { de: "der Käse", en: "the cheese", emoji: "🧀" },
+      { de: "das Ei", en: "the egg", emoji: "🥚" },
+      { de: "die Milch", en: "the milk", emoji: "🥛" },
+      { de: "der Kaffee", en: "the coffee", emoji: "☕" },
+      { de: "das Wasser", en: "the water", emoji: "💧" },
+      { de: "der Fisch", en: "the fish", emoji: "🐟" },
+      { de: "die Banane", en: "the banana", emoji: "🍌" },
+      { de: "der Kuchen", en: "the cake", emoji: "🍰" }
+    ]
+  },
+  {
+    id: "familie",
+    name: "Familie",
+    english: "Family",
+    emoji: "👪",
+    words: [
+      { de: "die Mutter", en: "the mother", emoji: "👩" },
+      { de: "der Vater", en: "the father", emoji: "👨" },
+      { de: "die Schwester", en: "the sister", emoji: "👧" },
+      { de: "der Bruder", en: "the brother", emoji: "👦" },
+      { de: "die Oma", en: "the grandma", emoji: "👵" },
+      { de: "der Opa", en: "the grandpa", emoji: "👴" },
+      { de: "das Kind", en: "the child", emoji: "🧒" },
+      { de: "das Baby", en: "the baby", emoji: "👶" }
+    ]
+  },
+  {
+    id: "verben",
+    name: "Verben",
+    english: "Verbs",
+    emoji: "🏃",
+    words: [
+      { de: "gehen", en: "to go", emoji: "🚶" },
+      { de: "essen", en: "to eat", emoji: "🍴" },
+      { de: "trinken", en: "to drink", emoji: "🥤" },
+      { de: "schlafen", en: "to sleep", emoji: "😴" },
+      { de: "lesen", en: "to read", emoji: "📖" },
+      { de: "spielen", en: "to play", emoji: "🎮" },
+      { de: "sprechen", en: "to speak", emoji: "💬" },
+      { de: "lernen", en: "to learn", emoji: "🧠" },
+      { de: "arbeiten", en: "to work", emoji: "💼" },
+      { de: "kaufen", en: "to buy", emoji: "🛒" }
+    ]
+  }
+];
+
+/* Sentences are used by the "Satzbau" (Sentence Scramble) game.
+   Keep them short (A1/A2 level) so students can rebuild them. */
+const SENTENCE_TOPICS = [
+  {
+    id: "alltag",
+    name: "Alltag",
+    english: "Everyday",
+    emoji: "🗣️",
+    sentences: [
+      { de: "Ich lerne gern Deutsch", en: "I like learning German" },
+      { de: "Wie heißt du?", en: "What is your name?" },
+      { de: "Ich komme aus Deutschland", en: "I come from Germany" },
+      { de: "Das Wetter ist heute schön", en: "The weather is nice today" },
+      { de: "Wir spielen am Wochenende Fußball", en: "We play football on the weekend" },
+      { de: "Kannst du mir bitte helfen?", en: "Can you please help me?" },
+      { de: "Ich trinke morgens einen Kaffee", en: "I drink a coffee in the morning" },
+      { de: "Meine Familie wohnt in Berlin", en: "My family lives in Berlin" }
+    ]
+  },
+  {
+    id: "schule",
+    name: "Schule",
+    english: "School",
+    emoji: "🏫",
+    sentences: [
+      { de: "Der Lehrer erklärt die Aufgabe", en: "The teacher explains the task" },
+      { de: "Wir schreiben morgen einen Test", en: "We write a test tomorrow" },
+      { de: "Ich habe meine Hausaufgaben gemacht", en: "I did my homework" },
+      { de: "Die Schüler lernen neue Wörter", en: "The students learn new words" },
+      { de: "Bitte öffnet euer Buch auf Seite zehn", en: "Please open your book to page ten" },
+      { de: "Wer kennt die richtige Antwort?", en: "Who knows the correct answer?" }
+    ]
+  }
+];
+
+/* Make the data available to the rest of the app. */
+window.GameData = { VOCAB_TOPICS, SENTENCE_TOPICS };
+
+
+/* ==== js/app.js ==== */
+/* =====================================================================
+   Skillbee Deutsch Games — CORE APP
+   ---------------------------------------------------------------------
+   This runs the lobby (home screen), moves between screens, keeps the
+   score, and gives every game a shared toolkit (App.kit): shuffling,
+   German pronunciation, sounds and confetti.
+   (You normally don't need to edit this file to add vocabulary.)
+   ===================================================================== */
+
+const App = (function () {
+  const games = [];
+  let root = null;
+
+  /* ---- tiny helpers to build HTML elements ------------------------- */
+  function el(tag, opts = {}, children = []) {
+    const node = document.createElement(tag);
+    if (opts.class) node.className = opts.class;
+    if (opts.html != null) node.innerHTML = opts.html;
+    if (opts.text != null) node.textContent = opts.text;
+    if (opts.attrs) for (const k in opts.attrs) node.setAttribute(k, opts.attrs[k]);
+    if (opts.on) for (const evt in opts.on) node.addEventListener(evt, opts.on[evt]);
+    (Array.isArray(children) ? children : [children]).forEach((c) => {
+      if (c == null) return;
+      node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+    });
+    return node;
+  }
+
+  /* ---- shared game toolkit ----------------------------------------- */
+  const kit = {
+    shuffle(arr) {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    },
+    sample(arr, n) {
+      return kit.shuffle(arr).slice(0, n);
+    },
+    randInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    },
+    el,
+
+    /* Speak German out loud (browser text-to-speech). */
+    speak(text, lang = "de-DE") {
+      try {
+        if (!("speechSynthesis" in window)) return;
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = lang;
+        u.rate = 0.95;
+        const voices = window.speechSynthesis.getVoices();
+        const de = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith("de"));
+        if (de) u.voice = de;
+        window.speechSynthesis.speak(u);
+      } catch (e) {
+        /* ignore — pronunciation is a nice-to-have */
+      }
+    },
+
+    /* A small "speaker" button that pronounces a German word. */
+    speakerButton(text) {
+      return el("button", {
+        class: "speaker-btn",
+        attrs: { "aria-label": "Aussprache anhören", title: "Aussprache anhören" },
+        html: "🔊",
+        on: {
+          click: (e) => {
+            e.stopPropagation();
+            kit.speak(text);
+          }
+        }
+      });
+    },
+
+    /* Simple beeps via the Web Audio API (no sound files needed). */
+    beep(type = "good") {
+      try {
+        if (App.state.muted) return;
+        const ctx = (kit._audio = kit._audio || new (window.AudioContext || window.webkitAudioContext)());
+        const now = ctx.currentTime;
+        const notes =
+          type === "good" ? [660, 880] : type === "win" ? [523, 659, 784, 1046] : [220, 160];
+        notes.forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = type === "bad" ? "sawtooth" : "sine";
+          osc.frequency.value = freq;
+          const t = now + i * 0.09;
+          gain.gain.setValueAtTime(0.0001, t);
+          gain.gain.exponentialRampToValueAtTime(0.18, t + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.2);
+        });
+      } catch (e) {
+        /* ignore */
+      }
+    },
+
+    /* Confetti burst on a big win. Pure canvas — no libraries. */
+    confetti() {
+      if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      const canvas = el("canvas", { class: "confetti-canvas" });
+      document.body.appendChild(canvas);
+      const ctx = canvas.getContext("2d");
+      const resize = () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      };
+      resize();
+      const colors = ["#ffd60a", "#ff595e", "#1982c4", "#8ac926", "#6a4c93", "#ff924c"];
+      const pieces = Array.from({ length: 140 }, () => ({
+        x: Math.random() * canvas.width,
+        y: -20 - Math.random() * canvas.height,
+        r: 4 + Math.random() * 6,
+        c: colors[Math.floor(Math.random() * colors.length)],
+        vx: -2 + Math.random() * 4,
+        vy: 2 + Math.random() * 4,
+        rot: Math.random() * Math.PI,
+        vr: -0.2 + Math.random() * 0.4
+      }));
+      let frame = 0;
+      (function tick() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        pieces.forEach((p) => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.rot += p.vr;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rot);
+          ctx.fillStyle = p.c;
+          ctx.fillRect(-p.r / 2, -p.r / 2, p.r, p.r * 0.6);
+          ctx.restore();
+        });
+        frame++;
+        if (frame < 160) requestAnimationFrame(tick);
+        else canvas.remove();
+      })();
+    }
+  };
+
+  /* ---- score / session state --------------------------------------- */
+  const state = {
+    score: 0,
+    muted: false
+  };
+
+  function addScore(points) {
+    state.score += points;
+    const badge = document.getElementById("score-value");
+    if (badge) {
+      badge.textContent = state.score;
+      badge.classList.remove("pulse");
+      void badge.offsetWidth; // restart animation
+      badge.classList.add("pulse");
+    }
+  }
+
+  /* ---- top bar (persistent) ---------------------------------------- */
+  function renderTopBar() {
+    const bar = el("header", { class: "topbar" }, [
+      el("button", {
+        class: "brand",
+        attrs: { title: "Zurück zur Startseite" },
+        on: { click: () => showHome() },
+        html:
+          '<span class="brand-mark">🐝</span><span class="brand-text">Skillbee <b>Deutsch</b> Games</span>'
+      }),
+      el("div", { class: "topbar-right" }, [
+        el("div", { class: "score-badge", attrs: { title: "Punkte in dieser Sitzung" } }, [
+          el("span", { class: "score-star", html: "⭐" }),
+          el("span", { class: "score-value", attrs: { id: "score-value" }, text: "0" })
+        ]),
+        el("button", {
+          class: "icon-btn",
+          attrs: { id: "mute-btn", title: "Ton an/aus" },
+          html: "🔊",
+          on: {
+            click: (e) => {
+              state.muted = !state.muted;
+              e.currentTarget.innerHTML = state.muted ? "🔇" : "🔊";
+            }
+          }
+        })
+      ])
+    ]);
+    return bar;
+  }
+
+  /* ---- home screen (the lobby) ------------------------------------- */
+  function showHome() {
+    window.speechSynthesis && window.speechSynthesis.cancel();
+    const main = document.getElementById("screen");
+    main.innerHTML = "";
+
+    main.appendChild(
+      el("section", { class: "hero" }, [
+        el("h1", { class: "hero-title", html: 'Willkommen! Wähle ein <span>Spiel</span> 🎲' }),
+        el("p", {
+          class: "hero-sub",
+          text: "Gamify your German lessons — pick a game, choose a topic, and play with the class."
+        })
+      ])
+    );
+
+    const grid = el("div", { class: "game-grid" });
+    games.forEach((game) => {
+      grid.appendChild(
+        el(
+          "button",
+          {
+            class: "game-card",
+            attrs: { style: `--accent:${game.color || "#1982c4"}` },
+            on: { click: () => openTopicPicker(game) }
+          },
+          [
+            el("div", { class: "game-emoji", text: game.emoji }),
+            el("div", { class: "game-name", text: game.name }),
+            el("div", { class: "game-desc", text: game.description }),
+            el("div", { class: "game-play", html: "Spielen →" })
+          ]
+        )
+      );
+    });
+    main.appendChild(grid);
+
+    main.appendChild(
+      el("footer", { class: "home-foot" }, [
+        el("span", {
+          html:
+            "Made for Skillbee German teachers · Tipp: press <kbd>F11</kbd> for full-screen in class"
+        })
+      ])
+    );
+  }
+
+  /* ---- topic picker (shown before a game starts) ------------------- */
+  function openTopicPicker(game) {
+    const usesSentences = game.contentType === "sentences";
+    const topics = usesSentences ? window.GameData.SENTENCE_TOPICS : window.GameData.VOCAB_TOPICS;
+    const main = document.getElementById("screen");
+    main.innerHTML = "";
+
+    main.appendChild(
+      el("div", { class: "picker" }, [
+        el("button", { class: "back-link", html: "← Zurück", on: { click: () => showHome() } }),
+        el("h2", { class: "picker-title", html: `${game.emoji} ${game.name}` }),
+        el("p", { class: "picker-sub", text: usesSentences ? "Wähle ein Thema für die Sätze:" : "Wähle ein Wort-Thema:" })
+      ])
+    );
+
+    const grid = el("div", { class: "topic-grid" });
+    topics.forEach((topic) => {
+      const count = usesSentences ? topic.sentences.length : topic.words.length;
+      grid.appendChild(
+        el(
+          "button",
+          { class: "topic-card", on: { click: () => launch(game, topic) } },
+          [
+            el("div", { class: "topic-emoji", text: topic.emoji }),
+            el("div", { class: "topic-name", text: topic.name }),
+            el("div", { class: "topic-en", text: topic.english }),
+            el("div", { class: "topic-count", text: `${count} ${usesSentences ? "Sätze" : "Wörter"}` })
+          ]
+        )
+      );
+    });
+    main.appendChild(grid);
+  }
+
+  /* ---- launch a game with a chosen topic --------------------------- */
+  function launch(game, topic) {
+    const main = document.getElementById("screen");
+    main.innerHTML = "";
+    const stage = el("div", { class: "stage" });
+    main.appendChild(stage);
+
+    const api = {
+      kit,
+      topic,
+      addScore,
+      el,
+      exit: () => showHome(),
+      restart: () => launch(game, topic),
+      backToTopics: () => openTopicPicker(game)
+    };
+    game.mount(stage, api);
+  }
+
+  /* ---- public API -------------------------------------------------- */
+  function register(game) {
+    games.push(game);
+  }
+
+  function init() {
+    root = document.getElementById("app");
+    root.appendChild(renderTopBar());
+    root.appendChild(el("main", { class: "screen", attrs: { id: "screen" } }));
+    // Warm up voices list for speech synthesis.
+    if ("speechSynthesis" in window) window.speechSynthesis.getVoices();
+    showHome();
+  }
+
+  return { register, init, kit, state, addScore, showHome };
+})();
+
+window.App = App;
+document.addEventListener("DOMContentLoaded", App.init);
+
+
+/* ==== js/games/quiz.js ==== */
+/* =====================================================================
+   GAME: Vokabel-Quiz  (Kahoot-style multiple choice)
+   Show a German word (or English word) and 4 answer options with a
+   timer. Right answer = points + streak bonus. Great for the whole class.
+   ===================================================================== */
+(function () {
+  App.register({
+    id: "quiz",
+    name: "Vokabel-Quiz",
+    emoji: "🎯",
+    color: "#ff595e",
+    description: "Multiple-choice quiz with a timer. Answer fast for bonus points!",
+    contentType: "words",
+
+    mount(stage, api) {
+      const { kit, topic, addScore, el } = api;
+      const words = topic.words;
+      const TOTAL = Math.min(8, words.length);
+      const pool = kit.sample(words, TOTAL);
+      let index = 0;
+      let correct = 0;
+      let streak = 0;
+      let timer = null;
+      let timeLeft = 0;
+      // Ask German -> English half the time, English -> German the other half.
+      let askGermanToEnglish = true;
+
+      const wrap = el("div", { class: "quiz" });
+      stage.appendChild(wrap);
+
+      function render() {
+        clearInterval(timer);
+        const q = pool[index];
+        askGermanToEnglish = index % 2 === 0;
+        const prompt = askGermanToEnglish ? q.de : q.en;
+        const answer = askGermanToEnglish ? q.en : q.de;
+
+        // Build 3 wrong options from the same topic.
+        const others = words.filter((w) => (askGermanToEnglish ? w.en : w.de) !== answer);
+        const distractors = kit.sample(others, 3).map((w) => (askGermanToEnglish ? w.en : w.de));
+        const options = kit.shuffle([answer, ...distractors]);
+
+        wrap.innerHTML = "";
+        wrap.appendChild(
+          el("div", { class: "quiz-head" }, [
+            el("button", { class: "back-link small", html: "← Menü", on: { click: api.exit } }),
+            el("div", { class: "quiz-progress", text: `Frage ${index + 1} / ${TOTAL}` }),
+            el("div", { class: "quiz-streak", text: streak > 1 ? `🔥 ${streak}er-Serie` : "" })
+          ])
+        );
+
+        const bar = el("div", { class: "timer-bar" }, [el("div", { class: "timer-fill", attrs: { id: "tfill" } })]);
+        wrap.appendChild(bar);
+
+        wrap.appendChild(
+          el("div", { class: "quiz-question" }, [
+            el("div", { class: "quiz-lang-tag", text: askGermanToEnglish ? "Was bedeutet…" : "Wie heißt auf Deutsch…" }),
+            el("div", { class: "quiz-word" }, [
+              document.createTextNode(prompt + " "),
+              askGermanToEnglish ? kit.speakerButton(q.de) : null
+            ]),
+            q.emoji ? el("div", { class: "quiz-emoji", text: q.emoji }) : null
+          ])
+        );
+
+        const optWrap = el("div", { class: "quiz-options" });
+        const shapes = ["🔺", "🔷", "⬤", "⬛"];
+        options.forEach((opt, i) => {
+          optWrap.appendChild(
+            el("button", {
+              class: "quiz-opt",
+              attrs: { style: `--i:${i}` },
+              on: { click: (e) => choose(e.currentTarget, opt, answer, q) }
+            }, [
+              el("span", { class: "opt-shape", text: shapes[i] }),
+              el("span", { class: "opt-text", text: opt })
+            ])
+          );
+        });
+        wrap.appendChild(optWrap);
+
+        // start timer
+        timeLeft = 100;
+        const fill = document.getElementById("tfill");
+        timer = setInterval(() => {
+          timeLeft -= 1.5;
+          if (fill) fill.style.width = Math.max(0, timeLeft) + "%";
+          if (timeLeft <= 0) {
+            clearInterval(timer);
+            reveal(null, answer, q);
+          }
+        }, 60);
+      }
+
+      function choose(btn, opt, answer, q) {
+        clearInterval(timer);
+        reveal(btn, answer, q, opt);
+      }
+
+      function reveal(btn, answer, q, chosen) {
+        const buttons = wrap.querySelectorAll(".quiz-opt");
+        buttons.forEach((b) => {
+          b.disabled = true;
+          const txt = b.querySelector(".opt-text").textContent;
+          if (txt === answer) b.classList.add("correct");
+          else if (b === btn) b.classList.add("wrong");
+        });
+
+        const wasRight = chosen === answer;
+        if (wasRight) {
+          const bonus = Math.round(timeLeft / 10); // faster = more
+          const points = 10 + bonus;
+          correct++;
+          streak++;
+          addScore(points);
+          kit.beep("good");
+        } else {
+          streak = 0;
+          kit.beep("bad");
+          // Speak the correct German word so students hear it.
+          kit.speak(q.de);
+        }
+
+        setTimeout(() => {
+          index++;
+          if (index < TOTAL) render();
+          else finish();
+        }, 1200);
+      }
+
+      function finish() {
+        clearInterval(timer);
+        const pct = Math.round((correct / TOTAL) * 100);
+        if (pct >= 60) kit.confetti();
+        kit.beep(pct >= 60 ? "win" : "bad");
+        wrap.innerHTML = "";
+        wrap.appendChild(
+          el("div", { class: "result-card" }, [
+            el("div", { class: "result-emoji", text: pct >= 80 ? "🏆" : pct >= 60 ? "🎉" : "💪" }),
+            el("h2", { text: pct >= 60 ? "Super gemacht!" : "Weiter üben!" }),
+            el("p", { class: "result-score", html: `<b>${correct}</b> von <b>${TOTAL}</b> richtig · ${pct}%` }),
+            el("div", { class: "result-actions" }, [
+              el("button", { class: "btn primary", text: "Nochmal spielen", on: { click: api.restart } }),
+              el("button", { class: "btn", text: "Anderes Thema", on: { click: api.backToTopics } }),
+              el("button", { class: "btn ghost", text: "Menü", on: { click: api.exit } })
+            ])
+          ])
+        );
+      }
+
+      render();
+    }
+  });
+})();
+
+
+/* ==== js/games/memory.js ==== */
+/* =====================================================================
+   GAME: Memory  (Paare finden)
+   Flip cards to match a German word with its English meaning (with a
+   helpful emoji). Fewer moves = more points. Good for small groups/pairs.
+   ===================================================================== */
+(function () {
+  App.register({
+    id: "memory",
+    name: "Memory",
+    emoji: "🧩",
+    color: "#8ac926",
+    description: "Flip cards to match German words with their meaning.",
+    contentType: "words",
+
+    mount(stage, api) {
+      const { kit, topic, addScore, el } = api;
+      const PAIRS = Math.min(6, topic.words.length);
+      const chosen = kit.sample(topic.words, PAIRS);
+
+      // Build two cards per word: a German side and an English (+emoji) side.
+      let cards = [];
+      chosen.forEach((w, i) => {
+        cards.push({ pair: i, face: w.de, kind: "de", speak: w.de });
+        cards.push({ pair: i, face: (w.emoji ? w.emoji + " " : "") + w.en, kind: "en", speak: w.de });
+      });
+      cards = kit.shuffle(cards);
+
+      let flipped = [];
+      let matched = 0;
+      let moves = 0;
+      let busy = false;
+
+      const wrap = el("div", { class: "memory" });
+      stage.appendChild(wrap);
+
+      wrap.appendChild(
+        el("div", { class: "game-head" }, [
+          el("button", { class: "back-link small", html: "← Menü", on: { click: api.exit } }),
+          el("div", { class: "head-title", text: `${topic.emoji} ${topic.name}` }),
+          el("div", { class: "moves", attrs: { id: "moves" }, text: "0 Züge" })
+        ])
+      );
+
+      const board = el("div", { class: "memory-board", attrs: { style: `--cols:${cards.length > 8 ? 4 : 3}` } });
+      wrap.appendChild(board);
+
+      cards.forEach((card, idx) => {
+        const node = el("button", {
+          class: "mem-card",
+          attrs: { "data-idx": idx },
+          on: { click: () => flip(idx, node) }
+        }, [
+          el("div", { class: "mem-inner" }, [
+            el("div", { class: "mem-front", text: "🐝" }),
+            el("div", { class: `mem-back ${card.kind}`, text: card.face })
+          ])
+        ]);
+        board.appendChild(node);
+        card.node = node;
+      });
+
+      function flip(idx, node) {
+        if (busy || node.classList.contains("flipped") || node.classList.contains("done")) return;
+        node.classList.add("flipped");
+        flipped.push(idx);
+        if (flipped.length === 2) {
+          busy = true;
+          moves++;
+          document.getElementById("moves").textContent = moves + (moves === 1 ? " Zug" : " Züge");
+          const [a, b] = flipped;
+          if (cards[a].pair === cards[b].pair) {
+            kit.beep("good");
+            kit.speak(cards[a].speak);
+            setTimeout(() => {
+              cards[a].node.classList.add("done");
+              cards[b].node.classList.add("done");
+              flipped = [];
+              busy = false;
+              matched++;
+              addScore(15);
+              if (matched === PAIRS) finish();
+            }, 550);
+          } else {
+            kit.beep("bad");
+            setTimeout(() => {
+              cards[a].node.classList.remove("flipped");
+              cards[b].node.classList.remove("flipped");
+              flipped = [];
+              busy = false;
+            }, 900);
+          }
+        }
+      }
+
+      function finish() {
+        // Bonus for efficiency: perfect game is `PAIRS` moves.
+        const bonus = Math.max(0, (PAIRS * 2 - moves)) * 5;
+        if (bonus > 0) addScore(bonus);
+        kit.confetti();
+        kit.beep("win");
+        setTimeout(() => {
+          wrap.innerHTML = "";
+          wrap.appendChild(
+            el("div", { class: "result-card" }, [
+              el("div", { class: "result-emoji", text: "🎉" }),
+              el("h2", { text: "Alle Paare gefunden!" }),
+              el("p", { class: "result-score", html: `In <b>${moves}</b> Zügen · Bonus: <b>${bonus}</b>` }),
+              el("div", { class: "result-actions" }, [
+                el("button", { class: "btn primary", text: "Nochmal", on: { click: api.restart } }),
+                el("button", { class: "btn", text: "Anderes Thema", on: { click: api.backToTopics } }),
+                el("button", { class: "btn ghost", text: "Menü", on: { click: api.exit } })
+              ])
+            ])
+          );
+        }, 700);
+      }
+    }
+  });
+})();
+
+
+/* ==== js/games/hangman.js ==== */
+/* =====================================================================
+   GAME: Galgenmännchen  (Hangman)
+   Guess the German word letter by letter. An English hint + emoji is
+   shown. 6 wrong guesses allowed. Nice as a warm-up with the class.
+   ===================================================================== */
+(function () {
+  const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜ".split("");
+  const MAX_WRONG = 6;
+  const STAGES = ["😀", "🙂", "😐", "😟", "😧", "😨", "💀"];
+
+  App.register({
+    id: "hangman",
+    name: "Galgenmännchen",
+    emoji: "🔤",
+    color: "#6a4c93",
+    description: "Guess the German word letter by letter before the timer runs out.",
+    contentType: "words",
+
+    mount(stage, api) {
+      const { kit, topic, addScore, el } = api;
+      const entry = kit.sample(topic.words, 1)[0];
+      // Strip the article (der/die/das) for guessing; keep it for the reveal.
+      const full = entry.de;
+      const guessWord = full.replace(/^(der|die|das)\s+/i, "");
+      const letters = guessWord.toUpperCase().split("");
+      const guessed = new Set();
+      let wrong = 0;
+      let solved = false;
+
+      const wrap = el("div", { class: "hangman" });
+      stage.appendChild(wrap);
+
+      function isLetter(ch) {
+        return /[A-ZÄÖÜ]/.test(ch);
+      }
+
+      function render() {
+        wrap.innerHTML = "";
+        wrap.appendChild(
+          el("div", { class: "game-head" }, [
+            el("button", { class: "back-link small", html: "← Menü", on: { click: api.exit } }),
+            el("div", { class: "head-title", text: `${topic.emoji} ${topic.name}` }),
+            el("div", { class: "moves", text: `${MAX_WRONG - wrong} ❤️` })
+          ])
+        );
+
+        wrap.appendChild(el("div", { class: "hang-face", text: STAGES[wrong] }));
+        wrap.appendChild(
+          el("div", { class: "hang-hint" }, [
+            document.createTextNode(`Tipp: ${entry.en} `),
+            entry.emoji ? el("span", { text: entry.emoji }) : null
+          ])
+        );
+
+        // The word with blanks
+        const wordRow = el("div", { class: "hang-word" });
+        letters.forEach((ch) => {
+          if (!isLetter(ch)) {
+            wordRow.appendChild(el("span", { class: "hang-space", text: ch === " " ? "·" : ch }));
+          } else {
+            const show = guessed.has(ch) || solved;
+            wordRow.appendChild(el("span", { class: "hang-slot" + (show ? " filled" : ""), text: show ? ch : "" }));
+          }
+        });
+        wrap.appendChild(wordRow);
+
+        // Keyboard
+        const kb = el("div", { class: "keyboard" });
+        ALPHABET.forEach((L) => {
+          const used = guessed.has(L);
+          const inWord = letters.includes(L);
+          kb.appendChild(
+            el("button", {
+              class: "key" + (used ? (inWord ? " right" : " miss") : ""),
+              attrs: used ? { disabled: "true" } : {},
+              text: L,
+              on: { click: () => guess(L) }
+            })
+          );
+        });
+        wrap.appendChild(kb);
+      }
+
+      function guess(L) {
+        if (guessed.has(L) || solved) return;
+        guessed.add(L);
+        if (letters.includes(L)) {
+          kit.beep("good");
+          if (letters.filter(isLetter).every((c) => guessed.has(c))) return win();
+        } else {
+          wrong++;
+          kit.beep("bad");
+          if (wrong >= MAX_WRONG) return lose();
+        }
+        render();
+      }
+
+      function win() {
+        solved = true;
+        const points = 20 + (MAX_WRONG - wrong) * 5;
+        addScore(points);
+        render();
+        kit.confetti();
+        kit.beep("win");
+        kit.speak(full);
+        banner(true, points);
+      }
+
+      function lose() {
+        solved = true;
+        render();
+        kit.beep("bad");
+        kit.speak(full);
+        banner(false, 0);
+      }
+
+      function banner(won, points) {
+        wrap.appendChild(
+          el("div", { class: "result-card inline" }, [
+            el("div", { class: "result-emoji", text: won ? "🎉" : "😅" }),
+            el("h2", { html: won ? `Richtig! <b>${full}</b>` : `Das Wort war: <b>${full}</b>` }),
+            won ? el("p", { class: "result-score", html: `+${points} Punkte` }) : null,
+            el("div", { class: "result-actions" }, [
+              el("button", { class: "btn primary", text: "Neues Wort", on: { click: api.restart } }),
+              el("button", { class: "btn", text: "Anderes Thema", on: { click: api.backToTopics } }),
+              el("button", { class: "btn ghost", text: "Menü", on: { click: api.exit } })
+            ])
+          ])
+        );
+      }
+
+      // Allow physical keyboard typing too.
+      function onKey(e) {
+        const L = (e.key || "").toUpperCase();
+        if (ALPHABET.includes(L)) guess(L);
+      }
+      document.addEventListener("keydown", onKey);
+      // Clean up the listener when leaving via any button that clears the stage.
+      const cleanup = new MutationObserver(() => {
+        if (!document.body.contains(wrap)) {
+          document.removeEventListener("keydown", onKey);
+          cleanup.disconnect();
+        }
+      });
+      cleanup.observe(document.body, { childList: true, subtree: true });
+
+      render();
+    }
+  });
+})();
+
+
+/* ==== js/games/scramble.js ==== */
+/* =====================================================================
+   GAME: Satzbau  (Sentence Scramble)
+   The words of a German sentence are shuffled. Click them in the right
+   order to rebuild the sentence. Teaches word order (great for A1–A2).
+   ===================================================================== */
+(function () {
+  App.register({
+    id: "scramble",
+    name: "Satzbau",
+    emoji: "🧱",
+    color: "#1982c4",
+    description: "Put the shuffled German words back into the correct order.",
+    contentType: "sentences", // uses SENTENCE_TOPICS instead of words
+
+    mount(stage, api) {
+      const { kit, topic, addScore, el } = api;
+      const TOTAL = Math.min(5, topic.sentences.length);
+      const pool = kit.sample(topic.sentences, TOTAL);
+      let index = 0;
+      let solvedCount = 0;
+
+      const wrap = el("div", { class: "scramble" });
+      stage.appendChild(wrap);
+
+      function render() {
+        const item = pool[index];
+        const target = item.de.replace(/\s+/g, " ").trim();
+        const targetWords = target.split(" ");
+        let build = []; // chosen words (indexes into bank)
+
+        wrap.innerHTML = "";
+        wrap.appendChild(
+          el("div", { class: "game-head" }, [
+            el("button", { class: "back-link small", html: "← Menü", on: { click: api.exit } }),
+            el("div", { class: "head-title", text: `Satz ${index + 1} / ${TOTAL}` }),
+            el("div", { class: "moves", text: topic.emoji + " " + topic.name })
+          ])
+        );
+
+        wrap.appendChild(el("div", { class: "scr-hint", text: `„${item.en}"` }));
+
+        const answerRow = el("div", { class: "scr-answer", attrs: { id: "answer" } });
+        wrap.appendChild(answerRow);
+
+        const bankRow = el("div", { class: "scr-bank", attrs: { id: "bank" } });
+        wrap.appendChild(bankRow);
+
+        // Build a shuffled bank; reshuffle if it happens to match the answer.
+        let order = kit.shuffle(targetWords.map((_, i) => i));
+        if (targetWords.length > 1 && order.every((v, i) => v === i)) order = order.reverse();
+
+        const bankButtons = [];
+        order.forEach((wordIdx, pos) => {
+          const btn = el("button", {
+            class: "scr-word",
+            attrs: { style: `--i:${pos}` },
+            text: targetWords[wordIdx],
+            on: { click: () => pick(pos) }
+          });
+          bankButtons.push(btn);
+          bankRow.appendChild(btn);
+        });
+
+        const checkBtn = el("button", { class: "btn primary scr-check", text: "Prüfen ✓", attrs: { disabled: "true" }, on: { click: check } });
+        const clearBtn = el("button", { class: "btn ghost", text: "Zurücksetzen", on: { click: render } });
+        wrap.appendChild(el("div", { class: "scr-actions" }, [clearBtn, checkBtn]));
+
+        function pick(pos) {
+          const btn = bankButtons[pos];
+          if (btn.classList.contains("used")) return;
+          btn.classList.add("used");
+          build.push(pos);
+          kit.beep("good");
+          renderAnswer();
+        }
+
+        function unpick(buildPos) {
+          const pos = build[buildPos];
+          bankButtons[pos].classList.remove("used");
+          build.splice(buildPos, 1);
+          renderAnswer();
+        }
+
+        function renderAnswer() {
+          answerRow.innerHTML = "";
+          build.forEach((pos, i) => {
+            answerRow.appendChild(
+              el("button", { class: "scr-word chosen", text: bankButtons[pos].textContent, on: { click: () => unpick(i) } })
+            );
+          });
+          checkBtn.disabled = build.length !== targetWords.length;
+          answerRow.classList.remove("shake", "ok");
+        }
+
+        function check() {
+          const attempt = build.map((pos) => bankButtons[pos].textContent);
+          const correct = attempt.join(" ") === targetWords.join(" ");
+          if (correct) {
+            answerRow.classList.add("ok");
+            addScore(20);
+            solvedCount++;
+            kit.beep("win");
+            kit.speak(target);
+            checkBtn.disabled = true;
+            setTimeout(next, 1300);
+          } else {
+            answerRow.classList.add("shake");
+            kit.beep("bad");
+          }
+        }
+      }
+
+      function next() {
+        index++;
+        if (index < TOTAL) render();
+        else finish();
+      }
+
+      function finish() {
+        kit.confetti();
+        kit.beep("win");
+        wrap.innerHTML = "";
+        wrap.appendChild(
+          el("div", { class: "result-card" }, [
+            el("div", { class: "result-emoji", text: "🏗️" }),
+            el("h2", { text: "Alle Sätze gebaut!" }),
+            el("p", { class: "result-score", html: `<b>${solvedCount}</b> von <b>${TOTAL}</b> Sätzen` }),
+            el("div", { class: "result-actions" }, [
+              el("button", { class: "btn primary", text: "Nochmal", on: { click: api.restart } }),
+              el("button", { class: "btn", text: "Anderes Thema", on: { click: api.backToTopics } }),
+              el("button", { class: "btn ghost", text: "Menü", on: { click: api.exit } })
+            ])
+          ])
+        );
+      }
+
+      render();
+    }
+  });
+})();
+
+</script>
+</body>
+</html>
