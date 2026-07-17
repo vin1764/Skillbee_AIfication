@@ -170,16 +170,10 @@ const App = (function () {
         attrs: { title: "Zurück zur Startseite" },
         on: { click: () => showHome() },
         html:
-          '<span class="brand-mark">' +
-          '<svg class="skb-gem" viewBox="0 0 64 64" aria-hidden="true">' +
-          '<path d="M18 10 L46 10 L56 25 L32 56 L8 25 Z" fill="#fff"/>' +
-          '<g stroke="#2a38c4" stroke-width="1.5" fill="none" opacity="0.4" stroke-linejoin="round">' +
-          '<path d="M8 25 H56"/>' +
-          '<path d="M18 10 L24 25 M46 10 L40 25"/>' +
-          '<path d="M8 25 L32 56 M56 25 L32 56 M24 25 L32 56 M40 25 L32 56"/>' +
-          '</g></svg>' +
-          '</span>' +
-          '<span class="brand-text">Skillbee <b>Deutsch</b> Games</span>'
+          '<img class="skb-logo" src="' +
+          (window.SkillbeeBrand ? window.SkillbeeBrand.logoWhite : "") +
+          '" alt="Skillbee" />' +
+          '<span class="brand-text"><b>Deutsch</b> Games</span>'
       }),
       el("div", { class: "topbar-right" }, [
         el("div", { class: "score-badge", attrs: { title: "Punkte in dieser Sitzung" } }, [
@@ -309,6 +303,16 @@ const App = (function () {
 
   function init() {
     root = document.getElementById("app");
+    // Set the browser-tab icon to the official Skillbee badge.
+    if (window.SkillbeeBrand && window.SkillbeeBrand.favicon) {
+      let link = document.querySelector('link[rel="icon"]');
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = "icon";
+        document.head.appendChild(link);
+      }
+      link.href = window.SkillbeeBrand.favicon;
+    }
     root.appendChild(renderTopBar());
     root.appendChild(el("main", { class: "screen", attrs: { id: "screen" } }));
     // Warm up voices list for speech synthesis.

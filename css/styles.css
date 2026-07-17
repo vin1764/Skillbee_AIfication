@@ -54,12 +54,11 @@ kbd {
   box-shadow: 0 6px 20px rgba(42, 56, 196, 0.25);
 }
 .brand {
-  display: flex; align-items: center; gap: 11px;
+  display: flex; align-items: center; gap: 10px;
   background: none; border: 0; font-size: 1.15rem; color: #fff; padding: 4px;
 }
-.brand-mark { display: inline-flex; }
-.skb-gem { width: 30px; height: 30px; filter: drop-shadow(0 2px 4px rgba(0,0,0,.22)); }
-.brand-text { letter-spacing: .2px; }
+.skb-logo { height: 30px; width: auto; display: block; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.18)); }
+.brand-text { letter-spacing: .2px; font-weight: 600; }
 .brand-text b { color: #fff; font-weight: 800; }
 .topbar-right { display: flex; align-items: center; gap: 10px; }
 .score-badge {
@@ -214,7 +213,8 @@ kbd {
   border-radius: 14px; display: flex; align-items: center; justify-content: center;
   padding: 8px; text-align: center; box-shadow: var(--shadow);
 }
-.mem-front { background: linear-gradient(135deg, var(--skb), var(--skb-dark)); color: #fff; font-size: 2rem; border: 2px solid var(--skb-dark); }
+.mem-front { background: var(--skb-tint); color: var(--ink); font-size: 2rem; border: 2px solid #d7dcff; }
+.mem-logo { width: 56%; height: auto; }
 .mem-back {
   transform: rotateY(180deg); background: var(--card); border: 2px solid var(--line);
   font-weight: 800; font-size: clamp(0.85rem, 2vw, 1.15rem); word-break: break-word;

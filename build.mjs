@@ -8,12 +8,14 @@
    ===================================================================== */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 
+// Neutral fallback; app.js swaps in the official Skillbee badge (from brand.js) at runtime.
 const FAVICON =
-  "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%233b4de8'/><path d='M20 13 H44 L54 27 L32 53 L10 27 Z' fill='white'/></svg>";
+  "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%233b4de8'/></svg>";
 
 const css = readFileSync("css/styles.css", "utf8");
 const jsFiles = [
   "js/data.js",
+  "js/brand.js",
   "js/app.js",
   "js/games/quiz.js",
   "js/games/memory.js",

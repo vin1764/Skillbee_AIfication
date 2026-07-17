@@ -51,7 +51,12 @@
           on: { click: () => flip(idx, node) }
         }, [
           el("div", { class: "mem-inner" }, [
-            el("div", { class: "mem-front", text: "💎" }),
+            el("div", { class: "mem-front" }, [
+              el("img", {
+                class: "mem-logo",
+                attrs: { src: window.SkillbeeBrand ? window.SkillbeeBrand.favicon : "", alt: "" }
+              })
+            ]),
             el("div", { class: `mem-back ${card.kind}`, text: card.face })
           ])
         ]);
