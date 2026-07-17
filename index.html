@@ -15,6 +15,11 @@
          1) data.js   — the vocabulary (edit this to change content)
          2) app.js    — the core app + shared toolkit
          3) games/*   — each game registers itself into the lobby -->
+    <!-- Firebase (Live Class Mode only). Loaded from the CDN; the offline
+         bundle omits these, so Live Mode there shows an "online only" note. -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+
     <script src="js/data.js"></script>
     <script src="js/brand.js"></script>
     <script src="js/store.js"></script>
@@ -24,5 +29,10 @@
     <script src="js/games/hangman.js"></script>
     <script src="js/games/scramble.js"></script>
     <script src="js/admin.js"></script>
+
+    <!-- Live Class Mode -->
+    <script src="js/live/firebase.js"></script>
+    <script src="js/live/liveGames.js"></script>
+    <script src="js/live/live.js"></script>
   </body>
 </html>

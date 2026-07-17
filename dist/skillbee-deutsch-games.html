@@ -393,6 +393,156 @@ kbd {
   .adm-row-head { display: none; }
 }
 
+/* =====================================================================
+   MODE SELECT (Solo vs Live)
+   ===================================================================== */
+.hero-back { position: absolute; }
+.mode-grid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); max-width: 760px; margin: 10px auto; }
+.mode-card {
+  text-align: left; background: var(--card); border: 1px solid var(--line);
+  border-top: 6px solid var(--accent); border-radius: 20px; padding: 28px;
+  box-shadow: var(--shadow); transition: transform 0.15s, box-shadow 0.15s;
+}
+.mode-card.live { border-top-color: #ff924c; }
+.mode-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+.mode-emoji { font-size: 3rem; }
+.mode-name { font-size: 1.5rem; font-weight: 900; margin: 10px 0 6px; }
+.mode-desc { color: var(--ink-soft); }
+
+/* =====================================================================
+   LIVE CLASS MODE — shared
+   ===================================================================== */
+.live { animation: fadeIn 0.25s ease; }
+.live-center { max-width: 640px; margin: 0 auto; text-align: center; }
+.live-title { font-size: clamp(1.5rem, 4vw, 2.2rem); margin: 8px 0; text-align: center; }
+.live-sub { color: var(--ink-soft); text-align: center; margin: 4px 0 18px; }
+.live-muted { color: var(--ink-soft); text-align: center; padding: 14px; }
+.live-label { font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.8rem; margin: 18px 0 8px; display: block; }
+.live-big-emoji { font-size: 3.4rem; line-height: 1; }
+.live-card { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 34px 24px; box-shadow: var(--shadow-lg); max-width: 480px; margin: 24px auto; }
+.btn.big { font-size: 1.2rem; padding: 16px 28px; margin-top: 10px; }
+
+/* landing: Host / Join */
+.live-choice { display: grid; gap: 18px; grid-template-columns: 1fr 1fr; margin-top: 20px; }
+.live-choice-card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 30px 18px; box-shadow: var(--shadow); transition: transform 0.15s; }
+.live-choice-card.host { border-top: 6px solid var(--skb); }
+.live-choice-card.join { border-top: 6px solid #ff924c; }
+.live-choice-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+.live-choice-name { font-weight: 900; font-size: 1.3rem; margin-top: 10px; }
+.live-choice-sub { color: var(--ink-soft); font-size: 0.9rem; margin-top: 4px; }
+
+/* rosters */
+.roster-list { display: flex; flex-direction: column; gap: 10px; margin: 14px 0 18px; }
+.roster-row { display: flex; gap: 8px; }
+.roster-main { flex: 1; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; box-shadow: var(--shadow); }
+.roster-main:hover { border-color: var(--accent); }
+.roster-name { font-weight: 800; }
+.roster-count { color: var(--ink-soft); font-size: 0.85rem; }
+.roster-edit { width: 52px; background: #fff; border: 1px solid var(--line); border-radius: 14px; font-size: 1.1rem; }
+.roster-form { display: flex; flex-direction: column; gap: 8px; max-width: 520px; }
+.roster-textarea { min-height: 200px; border: 1px solid var(--line); border-radius: 12px; padding: 12px; font-size: 1rem; font-family: inherit; resize: vertical; }
+.roster-actions { display: flex; gap: 10px; margin-top: 8px; }
+
+/* host setup */
+.setup-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+.setup-card { background: var(--card); border: 2px solid var(--line); border-radius: 14px; padding: 16px 10px; text-align: center; font-weight: 700; box-shadow: var(--shadow); }
+.setup-card.sel { border-color: var(--skb); background: var(--skb-tint); }
+.setup-emoji { font-size: 1.8rem; }
+.setup-modes { display: flex; gap: 10px; flex-wrap: wrap; }
+.mode-pill { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; background: #fff; border: 2px solid var(--line); border-radius: 12px; padding: 12px 18px; box-shadow: var(--shadow); }
+.mode-pill.sel { border-color: var(--skb); background: var(--skb-tint); }
+.mode-pill span { color: var(--ink-soft); font-size: 0.82rem; font-weight: 600; }
+
+/* host lobby / room code */
+.live.host { max-width: 960px; margin: 0 auto; text-align: center; }
+.roomcode-wrap { margin: 10px auto 6px; }
+.roomcode-label { color: var(--ink-soft); font-weight: 700; }
+.roomcode { font-size: clamp(3.5rem, 14vw, 8rem); font-weight: 900; letter-spacing: 0.12em; color: var(--skb); line-height: 1.1; }
+.join-count { font-weight: 800; color: var(--ink-soft); margin-bottom: 12px; }
+.join-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 22px; }
+.join-chip { background: var(--skb-tint); border: 1px solid #dbe0ff; color: var(--skb-dark); border-radius: 999px; padding: 6px 14px; font-weight: 700; animation: pop 0.3s ease; }
+
+/* host question */
+.host-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.host-q-num { font-weight: 800; font-size: 1.2rem; }
+.host-answered { font-weight: 800; color: var(--accent); font-size: 1.2rem; }
+.host-controls { margin-top: 18px; }
+.live-q { text-align: center; }
+.live-q-tag { color: var(--ink-soft); text-transform: uppercase; letter-spacing: 1px; font-weight: 800; font-size: 0.9rem; }
+.live-q-word { font-size: clamp(2rem, 6vw, 4rem); font-weight: 900; margin: 8px 0; }
+.live-q-emoji { font-size: 3.5rem; margin-bottom: 10px; }
+.live-q-options.board { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
+.live-opt { display: flex; align-items: center; gap: 12px; border-radius: 16px; padding: 18px 20px; font-weight: 800; color: #fff; background: var(--c); box-shadow: var(--shadow); }
+.live-opt .opt-shape { font-size: 1.1rem; }
+.live-opt.board { font-size: clamp(1.1rem, 2.4vw, 1.6rem); }
+
+/* reveal */
+.reveal-answer { background: #eafaf7; border: 2px solid var(--good); border-radius: 18px; padding: 22px; margin: 10px auto; max-width: 560px; }
+.reveal-label { color: var(--ink-soft); font-weight: 800; text-transform: uppercase; letter-spacing: 1px; font-size: 0.85rem; }
+.reveal-value { font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 900; }
+.reveal-stat { font-weight: 800; color: var(--ink-soft); margin: 12px 0; }
+.reveal-fast { max-width: 460px; margin: 0 auto 18px; display: flex; flex-direction: column; gap: 8px; }
+.reveal-fast-row { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; box-shadow: var(--shadow); }
+.rf-rank { font-weight: 900; color: var(--accent); }
+.rf-name { flex: 1; text-align: left; font-weight: 700; }
+.rf-pts { font-weight: 900; color: var(--good); }
+
+/* leaderboard */
+.board-list { max-width: 560px; margin: 10px auto 20px; display: flex; flex-direction: column; gap: 8px; }
+.board-row { display: flex; align-items: center; gap: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 18px; box-shadow: var(--shadow); }
+.board-row.top { border-color: var(--brand); background: #fff9e9; }
+.board-rank { font-weight: 900; width: 28px; color: var(--accent); }
+.board-name { flex: 1; text-align: left; font-weight: 700; font-size: 1.1rem; }
+.board-pts { font-weight: 900; font-variant-numeric: tabular-nums; }
+
+/* podium */
+.podium { display: flex; justify-content: center; align-items: flex-end; gap: 14px; margin: 20px 0; }
+.podium-col { display: flex; flex-direction: column; align-items: center; }
+.podium-medal { font-size: 2.4rem; }
+.podium-name { font-weight: 800; }
+.podium-pts { color: var(--ink-soft); font-weight: 700; }
+.podium-block { width: 92px; border-radius: 12px 12px 0 0; color: #fff; font-weight: 900; font-size: 1.6rem; display: flex; align-items: flex-start; justify-content: center; padding-top: 10px; }
+.podium-col.p1 .podium-block { height: 150px; background: linear-gradient(180deg, #ffd166, #f0b400); }
+.podium-col.p2 .podium-block { height: 110px; background: linear-gradient(180deg, #cfd6e6, #9fb0c9); }
+.podium-col.p3 .podium-block { height: 80px; background: linear-gradient(180deg, #e6b98f, #cd9b6a); }
+
+/* =====================================================================
+   PLAYER (phone)
+   ===================================================================== */
+.live.player { max-width: 480px; margin: 0 auto; }
+.player-join { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.code-input {
+  font-size: 2.6rem; font-weight: 900; letter-spacing: 0.3em; text-align: center;
+  text-transform: uppercase; width: 100%; max-width: 300px; padding: 14px;
+  border: 2px solid var(--line); border-radius: 14px;
+}
+.code-input:focus { outline: 3px solid rgba(59,77,232,0.25); border-color: var(--skb); }
+.code-err { color: var(--bad); font-weight: 700; min-height: 1.2em; }
+.name-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.name-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  background: var(--card); border: 2px solid var(--line); border-radius: 14px;
+  padding: 18px 10px; font-weight: 800; font-size: 1.1rem; box-shadow: var(--shadow);
+  min-height: 60px;
+}
+.name-btn:hover { border-color: var(--skb); }
+.name-btn.taken { opacity: 0.45; }
+.name-taken { color: var(--good); }
+.player-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.player-name-tag { font-weight: 800; background: var(--skb-tint); color: var(--skb-dark); padding: 6px 14px; border-radius: 999px; display: inline-block; }
+.player-qnum { font-weight: 800; color: var(--ink-soft); }
+.player-prompt-hint { text-align: center; color: var(--ink-soft); font-weight: 700; margin-bottom: 12px; }
+.live-q-options.phone { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.live-opt.phone { min-height: 96px; justify-content: center; text-align: center; font-size: 1.15rem; flex-direction: column; gap: 6px; }
+.player-points { font-size: 1.8rem; font-weight: 900; color: var(--skb); margin-top: 8px; }
+.res-good .live-card { border-color: var(--good); }
+.res-bad .live-card { border-color: var(--bad); }
+
+@media (max-width: 560px) {
+  .live-choice { grid-template-columns: 1fr; }
+  .live-q-options.board { grid-template-columns: 1fr; }
+}
+
 /* ---------- confetti ---------- */
 .confetti-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 50; }
 
@@ -954,7 +1104,7 @@ const App = (function () {
       el("button", {
         class: "brand",
         attrs: { title: "Back to home" },
-        on: { click: () => showHome() },
+        on: { click: () => showModeSelect() },
         html:
           '<img class="skb-logo" src="' +
           (window.SkillbeeBrand ? window.SkillbeeBrand.logoWhite : "") +
@@ -989,13 +1139,52 @@ const App = (function () {
   }
 
   /* ---- home screen (the lobby) ------------------------------------- */
+  function showModeSelect() {
+    if (window.LiveMode) window.LiveMode.stop();
+    window.speechSynthesis && window.speechSynthesis.cancel();
+    const main = document.getElementById("screen");
+    main.innerHTML = "";
+    main.appendChild(
+      el("section", { class: "hero" }, [
+        el("h1", { class: "hero-title", html: 'Skillbee <span>Deutsch</span> Games' }),
+        el("p", { class: "hero-sub", text: "Choose how you want to play." })
+      ])
+    );
+    const modeGrid = el("div", { class: "mode-grid" });
+    modeGrid.appendChild(
+      el("button", { class: "mode-card solo", on: { click: () => showHome() } }, [
+        el("div", { class: "mode-emoji", text: "🎮" }),
+        el("div", { class: "mode-name", text: "Solo / Offline" }),
+        el("div", { class: "mode-desc", text: "Practice on one device — works without internet. Great for a single learner or a station." })
+      ])
+    );
+    modeGrid.appendChild(
+      el("button", { class: "mode-card live", on: { click: () => showLive() } }, [
+        el("div", { class: "mode-emoji", text: "📡" }),
+        el("div", { class: "mode-name", text: "Live Class Mode" }),
+        el("div", { class: "mode-desc", text: "Teacher hosts on the smartboard, students play on their phones — room code, live scoring, leaderboard." })
+      ])
+    );
+    main.appendChild(modeGrid);
+  }
+
+  function showLive() {
+    const main = document.getElementById("screen");
+    main.innerHTML = "";
+    if (window.LiveMode) {
+      window.LiveMode.start(main, { el, kit, store: window.ContentStore, back: () => showModeSelect() });
+    }
+  }
+
   function showHome() {
+    if (window.LiveMode) window.LiveMode.stop();
     window.speechSynthesis && window.speechSynthesis.cancel();
     const main = document.getElementById("screen");
     main.innerHTML = "";
 
     main.appendChild(
       el("section", { class: "hero" }, [
+        el("button", { class: "back-link hero-back", html: "← Modes", on: { click: () => showModeSelect() } }),
         el("h1", { class: "hero-title", html: 'Welcome! Pick a <span>game</span> 🎲' }),
         el("p", {
           class: "hero-sub",
@@ -1105,6 +1294,7 @@ const App = (function () {
 
   /* ---- admin screen (content editor) ------------------------------- */
   function showAdmin() {
+    if (window.LiveMode) window.LiveMode.stop();
     window.speechSynthesis && window.speechSynthesis.cancel();
     const main = document.getElementById("screen");
     main.innerHTML = "";
@@ -1142,10 +1332,10 @@ const App = (function () {
     root.appendChild(el("main", { class: "screen", attrs: { id: "screen" } }));
     // Warm up voices list for speech synthesis.
     if ("speechSynthesis" in window) window.speechSynthesis.getVoices();
-    showHome();
+    showModeSelect();
   }
 
-  return { register, init, kit, state, addScore, showHome, showAdmin };
+  return { register, init, kit, state, addScore, showHome, showAdmin, showModeSelect, showLive };
 })();
 
 window.App = App;
@@ -2124,6 +2314,845 @@ document.addEventListener("DOMContentLoaded", App.init);
       render();
     }
   };
+})();
+
+
+/* ==== js/live/firebase.js ==== */
+/* =====================================================================
+   LiveDB — thin wrapper around Firebase Firestore for Live Class Mode.
+   Loaded only in the hosted (online) app; the offline file has no
+   Firebase, so LiveDB.available() returns false and Live Mode shows a
+   friendly "online only" message instead of breaking.
+   ===================================================================== */
+(function () {
+  var firebaseConfig = {
+    apiKey: "AIzaSyB6cUPKYzxb_HFpyISG5k5yok_zUWbmgDw",
+    authDomain: "skillbee-gamification.firebaseapp.com",
+    projectId: "skillbee-gamification",
+    storageBucket: "skillbee-gamification.firebasestorage.app",
+    messagingSenderId: "826364816558",
+    appId: "1:826364816558:web:59abca483a808e52f6513f"
+  };
+
+  var db = null;
+  var initError = null;
+
+  (function init() {
+    try {
+      if (typeof firebase === "undefined" || !firebase.initializeApp) {
+        initError = "no-sdk";
+        return;
+      }
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.firestore();
+      if (window.__FIRESTORE_EMULATOR__) {
+        // Test-only: point at a local Firestore emulator. Never set in production.
+        try { db.useEmulator(window.__FIRESTORE_EMULATOR__.host, window.__FIRESTORE_EMULATOR__.port); } catch (e) {}
+      } else {
+        // Long-polling is more reliable behind corporate/school proxies than
+        // the default streaming transport.
+        try {
+          db.settings({ experimentalForceLongPolling: true, useFetchStreams: false });
+        } catch (e) {}
+      }
+    } catch (e) {
+      initError = e;
+    }
+  })();
+
+  function serverTs() {
+    return firebase.firestore.FieldValue.serverTimestamp();
+  }
+
+  var ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no I/O/0/1 to avoid confusion
+  function genCode() {
+    var c = "";
+    for (var i = 0; i < 4; i++) c += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+    return c;
+  }
+
+  var LiveDB = {
+    available: function () {
+      return !!db;
+    },
+    error: function () {
+      return initError;
+    },
+    serverTs: serverTs,
+
+    /* ---------------- rosters ---------------- */
+    createRoster: function (name, students) {
+      var ref = db.collection("rosters").doc();
+      return ref.set({ name: name, students: students, createdAt: serverTs() }).then(function () {
+        return ref.id;
+      });
+    },
+    updateRoster: function (id, data) {
+      return db.collection("rosters").doc(id).set(data, { merge: true });
+    },
+    deleteRoster: function (id) {
+      return db.collection("rosters").doc(id).delete();
+    },
+    getRoster: function (id) {
+      return db.collection("rosters").doc(id).get().then(function (d) {
+        return d.exists ? Object.assign({ id: d.id }, d.data()) : null;
+      });
+    },
+
+    /* ---------------- sessions ---------------- */
+    createSession: function (data) {
+      function attempt(tries) {
+        var code = genCode();
+        var ref = db.collection("sessions").doc(code);
+        return ref.get().then(function (d) {
+          if (d.exists && tries < 10) return attempt(tries + 1);
+          return ref.set(Object.assign({ createdAt: serverTs() }, data)).then(function () {
+            return code;
+          });
+        });
+      }
+      return attempt(0);
+    },
+    getSession: function (code) {
+      return db.collection("sessions").doc(code).get().then(function (d) {
+        return d.exists ? Object.assign({ code: d.id }, d.data()) : null;
+      });
+    },
+    listenSession: function (code, cb) {
+      return db.collection("sessions").doc(code).onSnapshot(
+        function (d) {
+          cb(d.exists ? Object.assign({ code: d.id }, d.data()) : null, null);
+        },
+        function (e) {
+          cb(null, e);
+        }
+      );
+    },
+    updateSession: function (code, data) {
+      return db.collection("sessions").doc(code).set(data, { merge: true });
+    },
+    joinSession: function (code, studentId, studentName) {
+      var patch = { joined: {} };
+      patch.joined[studentId] = { name: studentName, at: Date.now() };
+      return db.collection("sessions").doc(code).set(patch, { merge: true });
+    },
+
+    /* ---------------- answers ---------------- */
+    submitAnswer: function (code, qIndex, studentId, payload) {
+      var id = qIndex + "_" + studentId; // one answer per student per question
+      var ref = db.collection("sessions").doc(code).collection("answers").doc(id);
+      return ref.set(Object.assign({ questionIndex: qIndex, studentId: studentId, ts: serverTs() }, payload));
+    },
+    listenAnswers: function (code, qIndex, cb) {
+      return db
+        .collection("sessions").doc(code).collection("answers")
+        .where("questionIndex", "==", qIndex)
+        .onSnapshot(
+          function (snap) {
+            var arr = [];
+            snap.forEach(function (d) { arr.push(d.data()); });
+            cb(arr);
+          },
+          function (e) { cb([], e); }
+        );
+    },
+    getAnswers: function (code, qIndex) {
+      return db
+        .collection("sessions").doc(code).collection("answers")
+        .where("questionIndex", "==", qIndex)
+        .get()
+        .then(function (snap) {
+          var arr = [];
+          snap.forEach(function (d) { arr.push(d.data()); });
+          return arr;
+        });
+    },
+
+    /* ---------------- cumulative leaderboards ---------------- */
+    getLeaderboard: function (rosterId) {
+      return db.collection("leaderboards").doc(rosterId).get().then(function (d) {
+        return d.exists ? d.data() : { scores: {} };
+      });
+    },
+    saveLeaderboard: function (rosterId, scores) {
+      return db.collection("leaderboards").doc(rosterId).set(
+        { scores: scores, updatedAt: serverTs() },
+        { merge: true }
+      );
+    }
+  };
+
+  window.LiveDB = LiveDB;
+})();
+
+
+/* ==== js/live/liveGames.js ==== */
+/* =====================================================================
+   LiveGames — adapts each game to the shared Live Class flow.
+   Each adapter provides:
+     meta          { name, emoji, contentType }
+     buildRounds(topic)              -> [ round, ... ]
+     hostContent(el, round)          -> render the board's question area
+     playerContent(el, round, api)   -> tap UI; api.submit(payload)
+     score(round, payload, elapsedMs, timeLimit) -> { correct, points }
+     correctLabel(round)             -> text shown at reveal
+     speakOnReveal(round)            -> German text to pronounce (or null)
+   The Live controller supplies all the surrounding chrome (room code,
+   timer, answered counter, leaderboard, podium).
+   ===================================================================== */
+(function () {
+  function kit() {
+    return window.App.kit;
+  }
+
+  /* Kahoot-style shape/colour set for up to 4 answer buttons. */
+  var SHAPES = ["🔺", "🔷", "⬤", "⬛"];
+  var COLORS = ["#ff595e", "#1982c4", "#8ac926", "#ff924c"];
+
+  /* A "choice" game: board shows a German word, phones show 4 tap buttons. */
+  function choiceAdapter(meta) {
+    return {
+      meta: meta,
+      timeLimit: 20000,
+      buildRounds: function (topic) {
+        var words = (topic.words || []).filter(function (w) { return w.de && w.en; });
+        var picked = kit().sample(words, Math.min(10, words.length));
+        return picked.map(function (w) {
+          var others = words.filter(function (x) { return x.en !== w.en; });
+          var distract = kit().sample(others, Math.min(3, others.length)).map(function (x) { return x.en; });
+          var options = kit().shuffle([w.en].concat(distract));
+          return { type: "choice", de: w.de, emoji: w.emoji || "", options: options, answer: w.en };
+        });
+      },
+      hostContent: function (el, round) {
+        return el("div", { class: "live-q" }, [
+          el("div", { class: "live-q-tag", text: "What does this mean?" }),
+          el("div", { class: "live-q-word" }, [
+            document.createTextNode(round.de + " "),
+            kit().speakerButton(round.de)
+          ]),
+          round.emoji ? el("div", { class: "live-q-emoji", text: round.emoji }) : null,
+          el("div", { class: "live-q-options board" }, round.options.map(function (opt, i) {
+            return el("div", { class: "live-opt board", attrs: { style: "--c:" + COLORS[i] } }, [
+              el("span", { class: "opt-shape", text: SHAPES[i] }),
+              el("span", { class: "opt-text", text: opt })
+            ]);
+          }))
+        ]);
+      },
+      playerContent: function (el, round, api) {
+        return el("div", { class: "live-q-options phone" }, round.options.map(function (opt, i) {
+          return el("button", {
+            class: "live-opt phone",
+            attrs: { style: "--c:" + COLORS[i] },
+            on: { click: function () { api.submit({ choice: opt }); } }
+          }, [
+            el("span", { class: "opt-shape", text: SHAPES[i] }),
+            el("span", { class: "opt-text", text: opt })
+          ]);
+        }));
+      },
+      score: function (round, payload, elapsedMs, timeLimit) {
+        var correct = payload && payload.choice === round.answer;
+        if (!correct) return { correct: false, points: 0 };
+        var frac = Math.max(0, 1 - elapsedMs / timeLimit); // decays over the window
+        return { correct: true, points: Math.round(500 + 500 * frac) };
+      },
+      correctLabel: function (round) {
+        return round.answer;
+      },
+      speakOnReveal: function (round) {
+        return round.de;
+      }
+    };
+  }
+
+  window.LiveGames = {
+    quiz: choiceAdapter({ name: "Vocabulary Quiz", emoji: "🎯", contentType: "vocab" }),
+    memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" })
+    // hangman & scramble adapters are added in the next slice
+  };
+})();
+
+
+/* ==== js/live/live.js ==== */
+/* =====================================================================
+   LiveMode — Live Class Mode controller (host + player).
+   Renders into the app's #screen container. Talks to Firestore via
+   LiveDB and to per-game adapters via LiveGames. The correct answer is
+   NEVER written to the player-readable session doc during a question, so
+   phones can't peek — the host holds the answers and scores each round.
+   ===================================================================== */
+window.LiveMode = (function () {
+  var C, el, kit, store, goBack;
+  var unsubs = [];
+
+  function stop() {
+    unsubs.forEach(function (u) { try { u(); } catch (e) {} });
+    unsubs = [];
+  }
+  function track(u) { unsubs.push(u); return u; }
+  function show(node) { C.innerHTML = ""; C.appendChild(node); }
+  function screen(cls, children) { return el("div", { class: "live " + (cls || "") }, children); }
+
+  /* ---------- entry ---------- */
+  function start(container, api) {
+    C = container; el = api.el; kit = api.kit; store = api.store; goBack = api.back;
+    stop();
+    if (!window.LiveDB || !window.LiveDB.available()) return offlineNotice();
+    landing();
+  }
+
+  function offlineNotice() {
+    show(screen("live-center", [
+      el("div", { class: "live-card" }, [
+        el("div", { class: "live-big-emoji", text: "🌐" }),
+        el("h2", { text: "Live Class Mode needs the internet" }),
+        el("p", { class: "live-sub", text: "Open the app from its online link (GitHub Pages) to host or join a live game. Solo / Offline mode works here without internet." }),
+        el("button", { class: "btn primary", text: "← Back", on: { click: goBack } })
+      ])
+    ]));
+  }
+
+  function landing() {
+    stop();
+    show(screen("live-center", [
+      el("button", { class: "back-link", html: "← Back", on: { click: goBack } }),
+      el("div", { class: "live-choice" }, [
+        el("button", { class: "live-choice-card host", on: { click: hostRosters } }, [
+          el("div", { class: "live-big-emoji", text: "🖥️" }),
+          el("div", { class: "live-choice-name", text: "Host a class" }),
+          el("div", { class: "live-choice-sub", text: "Teacher — show on the smartboard" })
+        ]),
+        el("button", { class: "live-choice-card join", on: { click: playerJoin } }, [
+          el("div", { class: "live-big-emoji", text: "📱" }),
+          el("div", { class: "live-choice-name", text: "Join a game" }),
+          el("div", { class: "live-choice-sub", text: "Student — enter the room code" })
+        ])
+      ])
+    ]));
+  }
+
+  /* ============================================================
+     ROSTERS  (teacher-created, reusable class lists)
+     ============================================================ */
+  var RKEY = "skillbee_live_rosters";
+  function myRosterIds() {
+    try { return JSON.parse(localStorage.getItem(RKEY) || "[]"); } catch (e) { return []; }
+  }
+  function rememberRoster(id) {
+    var ids = myRosterIds();
+    if (ids.indexOf(id) < 0) { ids.push(id); try { localStorage.setItem(RKEY, JSON.stringify(ids)); } catch (e) {} }
+  }
+  function forgetRoster(id) {
+    try { localStorage.setItem(RKEY, JSON.stringify(myRosterIds().filter(function (x) { return x !== id; }))); } catch (e) {}
+  }
+  function slug(s) {
+    return String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "x";
+  }
+  function studentsFromText(text) {
+    var seen = {}, out = [];
+    text.split("\n").forEach(function (line) {
+      var name = line.trim();
+      if (!name) return;
+      var base = slug(name), id = base, n = 2;
+      while (seen[id]) id = base + "-" + n++;
+      seen[id] = true;
+      out.push({ id: id, name: name });
+    });
+    return out;
+  }
+
+  function hostRosters() {
+    stop();
+    var ids = myRosterIds();
+    var wrap = screen("", [
+      el("button", { class: "back-link", html: "← Back", on: { click: landing } }),
+      el("h2", { class: "live-title", text: "Choose a class" }),
+      el("p", { class: "live-sub", text: "A class is a reusable list of student names." })
+    ]);
+    var list = el("div", { class: "roster-list" });
+    wrap.appendChild(list);
+    wrap.appendChild(el("button", { class: "btn primary", html: "+ New class", on: { click: function () { rosterEditor(null); } } }));
+    show(wrap);
+
+    if (!ids.length) {
+      list.appendChild(el("p", { class: "live-muted", text: "No classes yet — create one to get started." }));
+      return;
+    }
+    ids.forEach(function (id) {
+      var row = el("div", { class: "roster-row" }, [el("div", { class: "live-muted", text: "Loading…" })]);
+      list.appendChild(row);
+      window.LiveDB.getRoster(id).then(function (r) {
+        row.innerHTML = "";
+        if (!r) { forgetRoster(id); row.remove(); return; }
+        row.appendChild(el("button", { class: "roster-main", on: { click: function () { hostSetup(r); } } }, [
+          el("div", { class: "roster-name", text: r.name }),
+          el("div", { class: "roster-count", text: (r.students || []).length + " students" })
+        ]));
+        row.appendChild(el("button", { class: "roster-edit", html: "✎", attrs: { title: "Edit" }, on: { click: function () { rosterEditor(r); } } }));
+      }).catch(function () { row.remove(); });
+    });
+  }
+
+  function rosterEditor(existing) {
+    stop();
+    var nameInput = el("input", { class: "adm-input", attrs: { type: "text", placeholder: "Class name (e.g. Period 3 German)", value: existing ? existing.name : "" } });
+    var namesArea = el("textarea", {
+      class: "roster-textarea",
+      attrs: { placeholder: "One student name per line…\nAnna\nBen\nClara" }
+    });
+    if (existing) namesArea.value = (existing.students || []).map(function (s) { return s.name; }).join("\n");
+
+    function save() {
+      var name = nameInput.value.trim() || "My class";
+      var students = studentsFromText(namesArea.value);
+      if (!students.length) { alert("Add at least one student name."); return; }
+      var p = existing
+        ? window.LiveDB.updateRoster(existing.id, { name: name, students: students }).then(function () { return existing.id; })
+        : window.LiveDB.createRoster(name, students);
+      p.then(function (id) { rememberRoster(id); hostRosters(); }).catch(function (e) { alert("Could not save: " + e.message); });
+    }
+
+    var wrap = screen("", [
+      el("button", { class: "back-link", html: "← Back", on: { click: hostRosters } }),
+      el("h2", { class: "live-title", text: existing ? "Edit class" : "New class" }),
+      el("div", { class: "roster-form" }, [
+        nameInput,
+        el("label", { class: "live-label", text: "Student names" }),
+        namesArea,
+        el("div", { class: "roster-actions" }, [
+          el("button", { class: "btn primary", text: "Save", on: { click: save } }),
+          existing ? el("button", {
+            class: "btn ghost", text: "Delete class", on: {
+              click: function () {
+                if (confirm("Delete this class?")) {
+                  window.LiveDB.deleteRoster(existing.id).then(function () { forgetRoster(existing.id); hostRosters(); });
+                }
+              }
+            }
+          }) : null
+        ])
+      ])
+    ]);
+    show(wrap);
+  }
+
+  /* ============================================================
+     HOST — set up a session
+     ============================================================ */
+  function hostSetup(roster) {
+    stop();
+    var gameId = null, topic = null, persistMode = "fresh";
+    var gameIds = Object.keys(window.LiveGames);
+
+    var wrap = screen("", [
+      el("button", { class: "back-link", html: "← Back", on: { click: hostRosters } }),
+      el("h2", { class: "live-title", text: roster.name }),
+      el("p", { class: "live-sub", text: "Pick a game and a topic, then start the room." })
+    ]);
+    var step = el("div", { class: "host-setup" });
+    wrap.appendChild(step);
+    show(wrap);
+
+    function renderStep() {
+      step.innerHTML = "";
+      // 1) game
+      step.appendChild(el("div", { class: "live-label", text: "1 · Game" }));
+      var gg = el("div", { class: "setup-grid" });
+      gameIds.forEach(function (id) {
+        var meta = window.LiveGames[id].meta;
+        gg.appendChild(el("button", {
+          class: "setup-card" + (gameId === id ? " sel" : ""),
+          on: { click: function () { gameId = id; topic = null; renderStep(); } }
+        }, [el("div", { class: "setup-emoji", text: meta.emoji }), el("div", { text: meta.name })]));
+      });
+      step.appendChild(gg);
+
+      // 2) topic
+      if (gameId) {
+        var type = window.LiveGames[gameId].meta.contentType;
+        var topics = store.topicsForGame(gameId, type);
+        step.appendChild(el("div", { class: "live-label", text: "2 · Topic" }));
+        if (!topics.length) {
+          step.appendChild(el("p", { class: "live-muted", text: "This game has no topics enabled. Enable some in ⚙️ Manage content → Games." }));
+        } else {
+          var tg = el("div", { class: "setup-grid" });
+          topics.forEach(function (t) {
+            tg.appendChild(el("button", {
+              class: "setup-card" + (topic && topic.id === t.id ? " sel" : ""),
+              on: { click: function () { topic = t; renderStep(); } }
+            }, [el("div", { class: "setup-emoji", text: t.emoji }), el("div", { text: t.name })]));
+          });
+          step.appendChild(tg);
+        }
+      }
+
+      // 3) scoreboard mode + start
+      if (gameId && topic) {
+        step.appendChild(el("div", { class: "live-label", text: "3 · Scoreboard" }));
+        var modeRow = el("div", { class: "setup-modes" }, [
+          modeBtn("fresh", "Start fresh", "Leaderboard resets to zero"),
+          modeBtn("continue", "Continue", "Add to this class's running scores")
+        ]);
+        step.appendChild(modeRow);
+        step.appendChild(el("button", { class: "btn primary big", text: "Start room ▶", on: { click: startRoom } }));
+      }
+
+      function modeBtn(id, title, sub) {
+        return el("button", {
+          class: "mode-pill" + (persistMode === id ? " sel" : ""),
+          on: { click: function () { persistMode = id; renderStep(); } }
+        }, [el("b", { text: title }), el("span", { text: sub })]);
+      }
+    }
+    renderStep();
+
+    function startRoom() {
+      var adapter = window.LiveGames[gameId];
+      var rounds = adapter.buildRounds(topic);
+      if (!rounds.length) { alert("This topic has no usable content."); return; }
+      // Host keeps the full rounds (with answers) in memory only.
+      var seed = { scores: {} };
+      var afterSeed = function () {
+        window.LiveDB.createSession({
+          rosterId: roster.id, rosterName: roster.name, students: roster.students,
+          gameId: gameId, gameName: adapter.meta.name, topicName: topic.name,
+          status: "lobby", questionIndex: -1, totalQuestions: rounds.length,
+          round: null, reveal: null, scores: seed.scores, joined: {}, persistMode: persistMode
+        }).then(function (code) {
+          hostRun(code, adapter, rounds);
+        }).catch(function (e) { alert("Could not start: " + e.message); });
+      };
+      if (persistMode === "continue") {
+        window.LiveDB.getLeaderboard(roster.id).then(function (lb) { seed.scores = lb.scores || {}; afterSeed(); });
+      } else afterSeed();
+    }
+  }
+
+  /* ============================================================
+     HOST — run the session (lobby → questions → podium)
+     ============================================================ */
+  function hostRun(code, adapter, rounds) {
+    stop();
+    var sess = null;
+    var answersUnsub = null;
+    var timer = null;
+    var TL = adapter.timeLimit || 20000;
+
+    track(window.LiveDB.listenSession(code, function (s) {
+      sess = s;
+      if (!s) return;
+      if (s.status === "lobby") hostLobby();
+    }));
+
+    function hostLobby() {
+      var joined = sess.joined || {};
+      var names = Object.keys(joined).map(function (id) { return joined[id].name; });
+      var chips = el("div", { class: "join-chips" }, names.map(function (n) { return el("span", { class: "join-chip", text: n }); }));
+      show(screen("host", [
+        el("div", { class: "roomcode-wrap" }, [
+          el("div", { class: "roomcode-label", text: "Join at this screen's URL — room code:" }),
+          el("div", { class: "roomcode", text: code })
+        ]),
+        el("div", { class: "join-count", text: names.length + " joined" }),
+        chips,
+        el("button", { class: "btn primary big", text: "Start game ▶", attrs: names.length ? {} : { disabled: "true" }, on: { click: nextQuestion } }),
+        el("button", { class: "back-link small", html: "✕ Close room", on: { click: closeRoom } })
+      ]));
+    }
+
+    function nextQuestion() {
+      var i = (sess.questionIndex == null ? -1 : sess.questionIndex) + 1;
+      if (i >= rounds.length) return podium();
+      var r = rounds[i];
+      window.LiveDB.updateSession(code, {
+        status: "question", questionIndex: i, reveal: null,
+        round: { index: i, type: r.type, de: r.de, emoji: r.emoji, options: r.options, startedAt: window.LiveDB.serverTs() }
+      });
+      watchAnswers(i, r);
+    }
+
+    function watchAnswers(i, r) {
+      if (answersUnsub) { answersUnsub(); answersUnsub = null; }
+      var answered = 0;
+      answersUnsub = window.LiveDB.listenAnswers(code, i, function (arr) {
+        answered = arr.length;
+        renderQuestion(i, r, answered);
+        var joinedN = Object.keys(sess.joined || {}).length || sess.students.length;
+        if (answered >= joinedN && joinedN > 0) { /* everyone answered — teacher may reveal */ }
+      });
+      // cosmetic countdown then auto-enable reveal
+      clearTimeout(timer);
+      timer = setTimeout(function () {}, TL);
+      renderQuestion(i, r, 0);
+    }
+
+    function renderQuestion(i, r, answered) {
+      var joinedN = Object.keys(sess.joined || {}).length || (sess.students || []).length;
+      show(screen("host", [
+        el("div", { class: "host-topbar" }, [
+          el("div", { class: "host-q-num", text: "Question " + (i + 1) + " / " + rounds.length }),
+          el("div", { class: "host-answered", text: answered + " of " + joinedN + " answered" })
+        ]),
+        adapter.hostContent(el, r),
+        el("div", { class: "host-controls" }, [
+          el("button", { class: "btn primary big", text: "Reveal answer ▶", on: { click: function () { reveal(i, r); } } })
+        ])
+      ]));
+    }
+
+    function reveal(i, r) {
+      clearTimeout(timer);
+      if (answersUnsub) { answersUnsub(); answersUnsub = null; }
+      window.LiveDB.getAnswers(code, i).then(function (arr) {
+        var startedAt = sess.round && sess.round.startedAt && sess.round.startedAt.toMillis ? sess.round.startedAt.toMillis() : null;
+        var byStudent = {};
+        arr.forEach(function (a) { byStudent[a.studentId] = a; });
+        var scores = Object.assign({}, sess.scores || {});
+        var results = [];
+        (sess.students || []).forEach(function (stu) {
+          var a = byStudent[stu.id];
+          if (!a) { results.push({ studentId: stu.id, name: stu.name, correct: false, points: 0, answered: false }); return; }
+          var ts = a.ts && a.ts.toMillis ? a.ts.toMillis() : null;
+          var elapsed = (startedAt != null && ts != null) ? Math.max(0, ts - startedAt) : TL;
+          var sc = adapter.score(r, a, elapsed, TL);
+          scores[stu.id] = (scores[stu.id] || 0) + sc.points;
+          results.push({ studentId: stu.id, name: stu.name, correct: sc.correct, points: sc.points, answered: true });
+        });
+        results.sort(function (x, y) { return y.points - x.points; });
+        results.forEach(function (rr, idx) { rr.rank = idx + 1; });
+        window.LiveDB.updateSession(code, {
+          status: "reveal", scores: scores,
+          reveal: { index: i, correct: adapter.correctLabel(r), results: results }
+        });
+        var german = adapter.speakOnReveal(r);
+        if (german) kit.speak(german);
+        renderReveal(i, r, results, scores);
+      });
+    }
+
+    function renderReveal(i, r, results, scores) {
+      var correctList = results.filter(function (x) { return x.correct; });
+      show(screen("host", [
+        el("div", { class: "host-topbar" }, [el("div", { class: "host-q-num", text: "Question " + (i + 1) + " / " + rounds.length })]),
+        el("div", { class: "reveal-answer" }, [
+          el("div", { class: "reveal-label", text: "Correct answer" }),
+          el("div", { class: "reveal-value", text: adapter.correctLabel(r) })
+        ]),
+        el("div", { class: "reveal-stat", text: correctList.length + " of " + results.length + " correct" }),
+        el("div", { class: "reveal-fast" }, correctList.slice(0, 5).map(function (x, idx) {
+          return el("div", { class: "reveal-fast-row" }, [
+            el("span", { class: "rf-rank", text: "#" + (idx + 1) }),
+            el("span", { class: "rf-name", text: x.name }),
+            el("span", { class: "rf-pts", text: "+" + x.points })
+          ]);
+        })),
+        el("button", { class: "btn primary big", text: "Show leaderboard ▶", on: { click: function () { leaderboard(); } } })
+      ]));
+    }
+
+    function leaderboard() {
+      window.LiveDB.updateSession(code, { status: "leaderboard" });
+      var scores = sess.scores || {};
+      var rows = (sess.students || []).map(function (s) { return { name: s.name, pts: scores[s.id] || 0 }; })
+        .sort(function (a, b) { return b.pts - a.pts; });
+      var last = sess.questionIndex + 1 >= rounds.length;
+      show(screen("host", [
+        el("h2", { class: "live-title", text: "Leaderboard" }),
+        el("div", { class: "board-list" }, rows.slice(0, 10).map(function (row, i) {
+          return el("div", { class: "board-row" + (i < 3 ? " top" : "") }, [
+            el("span", { class: "board-rank", text: (i + 1) }),
+            el("span", { class: "board-name", text: row.name }),
+            el("span", { class: "board-pts", text: row.pts })
+          ]);
+        })),
+        el("button", { class: "btn primary big", text: last ? "Finish ▶" : "Next question ▶", on: { click: nextQuestion } })
+      ]));
+    }
+
+    function podium() {
+      var scores = sess.scores || {};
+      var rows = (sess.students || []).map(function (s) { return { name: s.name, pts: scores[s.id] || 0 }; })
+        .sort(function (a, b) { return b.pts - a.pts; });
+      window.LiveDB.updateSession(code, { status: "podium" });
+      if (sess.persistMode === "continue") window.LiveDB.saveLeaderboard(sess.rosterId, scores);
+      kit.confetti(); kit.beep("win");
+      var top3 = rows.slice(0, 3);
+      show(screen("host", [
+        el("h2", { class: "live-title", text: "🏆 Final results" }),
+        el("div", { class: "podium" }, top3.map(function (row, i) {
+          return el("div", { class: "podium-col p" + (i + 1) }, [
+            el("div", { class: "podium-medal", text: ["🥇", "🥈", "🥉"][i] }),
+            el("div", { class: "podium-name", text: row.name }),
+            el("div", { class: "podium-pts", text: row.pts }),
+            el("div", { class: "podium-block", text: (i + 1) })
+          ]);
+        })),
+        el("button", { class: "btn primary", text: "Done", on: { click: function () { closeRoom(); } } })
+      ]));
+    }
+
+    function closeRoom() {
+      window.LiveDB.updateSession(code, { status: "ended" });
+      stop();
+      landing();
+    }
+  }
+
+  /* ============================================================
+     PLAYER (phone)
+     ============================================================ */
+  function playerJoin(prefill) {
+    stop();
+    var codeInput = el("input", {
+      class: "code-input",
+      attrs: { type: "text", maxlength: 4, placeholder: "CODE", autocapitalize: "characters", value: prefill || "" }
+    });
+    codeInput.addEventListener("input", function () { codeInput.value = codeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); });
+    function go() {
+      var code = codeInput.value.trim().toUpperCase();
+      if (code.length < 4) { return; }
+      window.LiveDB.getSession(code).then(function (s) {
+        if (!s) { showErr("No room with that code. Check the smartboard."); return; }
+        if (s.status === "ended") { showErr("That game has ended."); return; }
+        playerPickName(code, s);
+      }).catch(function (e) { showErr("Could not connect: " + e.message); });
+    }
+    var errBox = el("div", { class: "code-err" });
+    function showErr(m) { errBox.textContent = m; }
+    show(screen("player live-center", [
+      el("button", { class: "back-link", html: "← Back", on: { click: landing } }),
+      el("div", { class: "player-join" }, [
+        el("div", { class: "live-big-emoji", text: "📱" }),
+        el("h2", { text: "Enter room code" }),
+        codeInput,
+        errBox,
+        el("button", { class: "btn primary big", text: "Join", on: { click: go } })
+      ])
+    ]));
+  }
+
+  function playerPickName(code, s) {
+    stop();
+    var joined = s.joined || {};
+    var grid = el("div", { class: "name-grid" }, (s.students || []).map(function (stu) {
+      var taken = !!joined[stu.id];
+      return el("button", {
+        class: "name-btn" + (taken ? " taken" : ""),
+        on: { click: function () { pick(stu); } }
+      }, [el("span", { text: stu.name }), taken ? el("span", { class: "name-taken", text: "✓" }) : null]);
+    }));
+    function pick(stu) {
+      window.LiveDB.joinSession(code, stu.id, stu.name).then(function () {
+        playerRun(code, stu);
+      }).catch(function (e) { alert("Could not join: " + e.message); });
+    }
+    show(screen("player live-center", [
+      el("h2", { class: "live-title", text: "Who are you?" }),
+      el("p", { class: "live-sub", text: "Tap your name" }),
+      grid
+    ]));
+  }
+
+  function playerRun(code, stu) {
+    stop();
+    var answeredIndex = -1;
+    var lastStatus = null, lastQ = -1;
+
+    track(window.LiveDB.listenSession(code, function (s) {
+      if (!s) { show(screen("player live-center", [el("div", { class: "live-card" }, [el("h2", { text: "Room closed" })])])); return; }
+      var qi = s.round ? s.round.index : -1;
+      if (s.status === lastStatus && qi === lastQ && s.status !== "question") return;
+      lastStatus = s.status; lastQ = qi;
+
+      if (s.status === "lobby") return waitScreen("You're in! 🎉", "Get ready — watch the smartboard.");
+      if (s.status === "question") {
+        if (answeredIndex === qi) return waitScreen("Answer locked ✔", "Waiting for the class…");
+        return answerScreen(s);
+      }
+      if (s.status === "reveal") return resultScreen(s);
+      if (s.status === "leaderboard") return standingScreen(s);
+      if (s.status === "podium") return finalScreen(s);
+      if (s.status === "ended") return waitScreen("Game over", "Thanks for playing!");
+    }));
+
+    function waitScreen(title, sub) {
+      show(screen("player live-center", [el("div", { class: "live-card" }, [
+        el("div", { class: "player-name-tag", text: stu.name }),
+        el("div", { class: "live-big-emoji", text: "⏳" }),
+        el("h2", { text: title }),
+        el("p", { class: "live-sub", text: sub })
+      ])]));
+    }
+
+    function answerScreen(s) {
+      var adapter = window.LiveGames[s.gameId];
+      var r = s.round;
+      var locked = false;
+      var api = {
+        submit: function (payload) {
+          if (locked || answeredIndex === r.index) return;
+          locked = true; answeredIndex = r.index;
+          window.LiveDB.submitAnswer(code, r.index, stu.id, payload);
+          waitScreen("Answer locked ✔", "Waiting for the class…");
+        }
+      };
+      var body = screen("player", [
+        el("div", { class: "player-topbar" }, [
+          el("div", { class: "player-name-tag", text: stu.name }),
+          el("div", { class: "player-qnum", text: "Q" + (r.index + 1) })
+        ]),
+        el("div", { class: "player-prompt-hint", text: "Tap your answer 👇" }),
+        adapter.playerContent(el, r, api)
+      ]);
+      show(body);
+    }
+
+    function resultScreen(s) {
+      var me = (s.reveal && s.reveal.results || []).filter(function (x) { return x.studentId === stu.id; })[0];
+      var correct = me && me.correct;
+      var pts = me ? me.points : 0;
+      kit.beep(correct ? "good" : "bad");
+      show(screen("player live-center " + (correct ? "res-good" : "res-bad"), [el("div", { class: "live-card" }, [
+        el("div", { class: "player-name-tag", text: stu.name }),
+        el("div", { class: "live-big-emoji", text: correct ? "✅" : (me && me.answered ? "❌" : "⏰") }),
+        el("h2", { text: correct ? "Correct!" : (me && me.answered ? "Not quite" : "Too slow") }),
+        el("p", { class: "live-sub", text: "Answer: " + (s.reveal ? s.reveal.correct : "") }),
+        el("div", { class: "player-points", text: (pts > 0 ? "+" + pts : "0") + " points" })
+      ])]));
+    }
+
+    function standingScreen(s) {
+      var scores = s.scores || {};
+      var rows = (s.students || []).map(function (x) { return { id: x.id, name: x.name, pts: scores[x.id] || 0 }; })
+        .sort(function (a, b) { return b.pts - a.pts; });
+      var myRank = 0; for (var i = 0; i < rows.length; i++) if (rows[i].id === stu.id) myRank = i + 1;
+      show(screen("player live-center", [el("div", { class: "live-card" }, [
+        el("div", { class: "player-name-tag", text: stu.name }),
+        el("div", { class: "live-big-emoji", text: "📊" }),
+        el("h2", { text: "You're #" + myRank }),
+        el("div", { class: "player-points", text: (scores[stu.id] || 0) + " points" }),
+        el("p", { class: "live-sub", text: "Watch the smartboard for the full leaderboard." })
+      ])]));
+    }
+
+    function finalScreen(s) {
+      var scores = s.scores || {};
+      var rows = (s.students || []).map(function (x) { return { id: x.id, name: x.name, pts: scores[x.id] || 0 }; })
+        .sort(function (a, b) { return b.pts - a.pts; });
+      var myRank = 0; for (var i = 0; i < rows.length; i++) if (rows[i].id === stu.id) myRank = i + 1;
+      if (myRank <= 3) kit.confetti();
+      show(screen("player live-center", [el("div", { class: "live-card" }, [
+        el("div", { class: "player-name-tag", text: stu.name }),
+        el("div", { class: "live-big-emoji", text: myRank === 1 ? "🥇" : myRank === 2 ? "🥈" : myRank === 3 ? "🥉" : "🎉" }),
+        el("h2", { text: myRank <= 3 ? "You placed #" + myRank + "!" : "Final rank: #" + myRank }),
+        el("div", { class: "player-points", text: (scores[stu.id] || 0) + " points" })
+      ])]));
+    }
+  }
+
+  return { start: start, stop: stop };
 })();
 
 </script>

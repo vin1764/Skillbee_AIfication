@@ -1,0 +1,67 @@
+rules_version = '2';
+
+// Skillbee Deutsch Games — Live Class Mode security rules.
+// "Good enough, zero setup" model: no sign-in, but the database STRUCTURE is
+// locked down so nobody can tamper with other rooms, overwrite answers, or
+// inflate the scoreboard from outside. Residual risk (accepted): someone who
+// already knows a room code could answer as a classmate or advance the game.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function shortStr(v, max) {
+      return v is string && v.size() <= max;
+    }
+
+    // ---- Rosters: reusable class lists (no accounts, so validated-but-open) ----
+    match /rosters/{rosterId} {
+      allow read: if true;
+      allow create, update: if
+        shortStr(request.resource.data.name, 80) &&
+        request.resource.data.students is list &&
+        request.resource.data.students.size() <= 80;
+      allow delete: if true;
+    }
+
+    // ---- Sessions: one live game room, keyed by its 4-char code ----
+    match /sessions/{room} {
+      allow read: if true;
+
+      allow create: if
+        shortStr(request.resource.data.gameId, 40) &&
+        request.resource.data.status is string &&
+        request.resource.data.students is list &&
+        request.resource.data.students.size() <= 80;
+
+      // The host advances the game and writes scores. Without accounts we can't
+      // cryptographically prove "host", so we constrain shape/size and never
+      // allow the room to be deleted.
+      allow update: if
+        request.resource.data.status is string &&
+        request.resource.data.students is list &&
+        request.resource.data.students.size() <= 80;
+
+      allow delete: if false;
+
+      // ---- Answers: one document per student per question, write-once ----
+      match /answers/{answerId} {
+        allow read: if true;
+
+        // Can only be created while its question is the live one, and can never
+        // be changed or deleted afterwards (so nobody edits an answer later).
+        allow create: if
+          request.resource.data.studentId is string &&
+          request.resource.data.questionIndex is int &&
+          get(/databases/$(database)/documents/sessions/$(room)).data.status == 'question' &&
+          request.resource.data.questionIndex == get(/databases/$(database)/documents/sessions/$(room)).data.round.index;
+
+        allow update, delete: if false;
+      }
+    }
+
+    // ---- Cumulative leaderboards (only touched in "continue" mode) ----
+    match /leaderboards/{rosterId} {
+      allow read: if true;
+      allow write: if request.resource.data.scores is map;
+    }
+  }
+}

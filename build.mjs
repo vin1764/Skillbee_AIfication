@@ -22,7 +22,12 @@ const jsFiles = [
   "js/games/memory.js",
   "js/games/hangman.js",
   "js/games/scramble.js",
-  "js/admin.js"
+  "js/admin.js",
+  // Live Mode files are bundled too, but the offline file has no Firebase,
+  // so Live Mode there shows a friendly "needs the internet" message.
+  "js/live/firebase.js",
+  "js/live/liveGames.js",
+  "js/live/live.js"
 ];
 const js = jsFiles.map((f) => `/* ==== ${f} ==== */\n` + readFileSync(f, "utf8")).join("\n\n");
 

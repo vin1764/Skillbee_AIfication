@@ -183,7 +183,7 @@ const App = (function () {
       el("button", {
         class: "brand",
         attrs: { title: "Back to home" },
-        on: { click: () => showHome() },
+        on: { click: () => showModeSelect() },
         html:
           '<img class="skb-logo" src="' +
           (window.SkillbeeBrand ? window.SkillbeeBrand.logoWhite : "") +
@@ -218,13 +218,52 @@ const App = (function () {
   }
 
   /* ---- home screen (the lobby) ------------------------------------- */
+  function showModeSelect() {
+    if (window.LiveMode) window.LiveMode.stop();
+    window.speechSynthesis && window.speechSynthesis.cancel();
+    const main = document.getElementById("screen");
+    main.innerHTML = "";
+    main.appendChild(
+      el("section", { class: "hero" }, [
+        el("h1", { class: "hero-title", html: 'Skillbee <span>Deutsch</span> Games' }),
+        el("p", { class: "hero-sub", text: "Choose how you want to play." })
+      ])
+    );
+    const modeGrid = el("div", { class: "mode-grid" });
+    modeGrid.appendChild(
+      el("button", { class: "mode-card solo", on: { click: () => showHome() } }, [
+        el("div", { class: "mode-emoji", text: "🎮" }),
+        el("div", { class: "mode-name", text: "Solo / Offline" }),
+        el("div", { class: "mode-desc", text: "Practice on one device — works without internet. Great for a single learner or a station." })
+      ])
+    );
+    modeGrid.appendChild(
+      el("button", { class: "mode-card live", on: { click: () => showLive() } }, [
+        el("div", { class: "mode-emoji", text: "📡" }),
+        el("div", { class: "mode-name", text: "Live Class Mode" }),
+        el("div", { class: "mode-desc", text: "Teacher hosts on the smartboard, students play on their phones — room code, live scoring, leaderboard." })
+      ])
+    );
+    main.appendChild(modeGrid);
+  }
+
+  function showLive() {
+    const main = document.getElementById("screen");
+    main.innerHTML = "";
+    if (window.LiveMode) {
+      window.LiveMode.start(main, { el, kit, store: window.ContentStore, back: () => showModeSelect() });
+    }
+  }
+
   function showHome() {
+    if (window.LiveMode) window.LiveMode.stop();
     window.speechSynthesis && window.speechSynthesis.cancel();
     const main = document.getElementById("screen");
     main.innerHTML = "";
 
     main.appendChild(
       el("section", { class: "hero" }, [
+        el("button", { class: "back-link hero-back", html: "← Modes", on: { click: () => showModeSelect() } }),
         el("h1", { class: "hero-title", html: 'Welcome! Pick a <span>game</span> 🎲' }),
         el("p", {
           class: "hero-sub",
@@ -334,6 +373,7 @@ const App = (function () {
 
   /* ---- admin screen (content editor) ------------------------------- */
   function showAdmin() {
+    if (window.LiveMode) window.LiveMode.stop();
     window.speechSynthesis && window.speechSynthesis.cancel();
     const main = document.getElementById("screen");
     main.innerHTML = "";
@@ -371,10 +411,10 @@ const App = (function () {
     root.appendChild(el("main", { class: "screen", attrs: { id: "screen" } }));
     // Warm up voices list for speech synthesis.
     if ("speechSynthesis" in window) window.speechSynthesis.getVoices();
-    showHome();
+    showModeSelect();
   }
 
-  return { register, init, kit, state, addScore, showHome, showAdmin };
+  return { register, init, kit, state, addScore, showHome, showAdmin, showModeSelect, showLive };
 })();
 
 window.App = App;
