@@ -44,8 +44,10 @@ const App = (function () {
     },
     el,
 
-    /* Speak German out loud (browser text-to-speech). */
+    /* Speak German out loud. Routed through VoiceBox so the voice chosen in
+       Settings is used everywhere; falls back to plain browser speech. */
     speak(text, lang = "de-DE") {
+      if (window.VoiceBox) return window.VoiceBox.speak(text);
       try {
         if (!("speechSynthesis" in window)) return;
         window.speechSynthesis.cancel();
@@ -195,6 +197,12 @@ const App = (function () {
           el("span", { class: "score-star", html: "⭐" }),
           el("span", { class: "score-value", attrs: { id: "score-value" }, text: "0" })
         ]),
+        el("button", {
+          class: "icon-btn",
+          attrs: { id: "voice-btn", title: "Voice settings" },
+          html: "🎙️",
+          on: { click: () => { if (window.VoiceBox) window.VoiceBox.openSettings(); } }
+        }),
         el("button", {
           class: "icon-btn",
           attrs: { id: "mute-btn", title: "Sound on/off" },

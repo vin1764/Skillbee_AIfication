@@ -25,6 +25,7 @@ const jsFiles = [
   "js/store.js",
   "js/teacher.js",
   "js/app.js",
+  "js/voice.js",
   "js/games/quiz.js",
   "js/games/memory.js",
   "js/games/hangman.js",

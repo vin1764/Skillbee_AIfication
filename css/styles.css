@@ -669,6 +669,35 @@ kbd {
 /* =====================================================================
    TEACHER PIN modal
    ===================================================================== */
+/* Voice settings modal */
+.voice-overlay {
+  position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center;
+  background: rgba(31, 42, 68, 0.55); backdrop-filter: blur(4px); padding: 16px; animation: fadeIn 0.2s ease;
+}
+.voice-card {
+  background: var(--card); border-radius: 22px; padding: 24px 22px; width: 100%; max-width: 440px;
+  box-shadow: var(--shadow-lg); max-height: 86vh; display: flex; flex-direction: column;
+}
+.voice-title { font-size: 1.35rem; font-weight: 900; }
+.voice-sub { color: var(--ink-soft); font-size: 0.9rem; margin: 4px 0 12px; }
+.voice-list { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.voice-row {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: 12px; cursor: pointer; background: #fff;
+}
+.voice-row.sel { border-color: var(--skb); box-shadow: 0 0 0 3px rgba(59, 77, 232, 0.15); }
+.voice-radio { width: 18px; height: 18px; accent-color: var(--skb); flex: 0 0 auto; }
+.voice-name { flex: 1 1 auto; font-weight: 700; color: var(--ink); }
+.voice-test {
+  flex: 0 0 auto; width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--line);
+  background: #fff; color: var(--skb); font-size: 0.9rem; cursor: pointer;
+}
+.voice-test:hover:not([disabled]) { background: #eef0ff; border-color: var(--skb); }
+.voice-test[disabled] { opacity: 0.4; cursor: default; }
+.voice-tag { flex: 0 0 auto; font-size: 0.7rem; font-weight: 800; color: var(--ink-soft); background: #f2f4f8; padding: 3px 8px; border-radius: 999px; }
+.voice-note { font-size: 0.82rem; color: var(--ink-soft); margin: 12px 0 0; line-height: 1.4; }
+.voice-done { margin-top: 14px; align-self: center; }
+
 .pin-overlay {
   position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center;
   background: rgba(31, 42, 68, 0.55); backdrop-filter: blur(4px); padding: 16px; animation: fadeIn 0.2s ease;
