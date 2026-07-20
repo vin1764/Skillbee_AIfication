@@ -592,6 +592,7 @@ kbd {
 .podium-col.p1 .podium-block { height: 150px; background: linear-gradient(180deg, #ffd166, #f0b400); }
 .podium-col.p2 .podium-block { height: 110px; background: linear-gradient(180deg, #cfd6e6, #9fb0c9); }
 .podium-col.p3 .podium-block { height: 80px; background: linear-gradient(180deg, #e6b98f, #cd9b6a); }
+.podium-actions { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 8px; }
 
 /* =====================================================================
    PLAYER (phone)
@@ -3487,15 +3488,19 @@ window.LiveMode = (function () {
   /* ============================================================
      HOST — set up a session
      ============================================================ */
-  function hostSetup(roster) {
+  // Reusable game / topic / answer-mode / scoreboard picker. Used both for the
+  // first game of a room and for "play another game" in an existing room.
+  // opts: { title, sub, startLabel, back, continueLabel, continueSub, freshSub,
+  //         onStart({ gameId, topic, answerMode, persistMode, adapter, rounds }) }
+  function gamePicker(opts) {
     stop();
     var gameId = null, topic = null, persistMode = "fresh", answerMode = "options";
     var gameIds = Object.keys(window.LiveGames);
 
     var wrap = screen("", [
-      el("button", { class: "back-link", html: "← Back", on: { click: hostRosters } }),
-      el("h2", { class: "live-title", text: roster.name }),
-      el("p", { class: "live-sub", text: "Pick a game and a topic, then start the room." })
+      el("button", { class: "back-link", html: "← Back", on: { click: opts.back } }),
+      el("h2", { class: "live-title", text: opts.title }),
+      el("p", { class: "live-sub", text: opts.sub })
     ]);
     var step = el("div", { class: "host-setup" });
     wrap.appendChild(step);
@@ -3549,11 +3554,11 @@ window.LiveMode = (function () {
         }
         step.appendChild(el("div", { class: "live-label", text: n + " · Scoreboard" }));
         var modeRow = el("div", { class: "setup-modes" }, [
-          modeBtn("fresh", "Start fresh", "Leaderboard resets to zero"),
-          modeBtn("continue", "Continue", "Add to this class's running scores")
+          modeBtn("fresh", "Start fresh", opts.freshSub || "Leaderboard resets to zero"),
+          modeBtn("continue", opts.continueLabel || "Continue", opts.continueSub || "Add to this class's running scores")
         ]);
         step.appendChild(modeRow);
-        step.appendChild(el("button", { class: "btn primary big", text: "Start room ▶", on: { click: startRoom } }));
+        step.appendChild(el("button", { class: "btn primary big", text: opts.startLabel || "Start room ▶", on: { click: doStart } }));
       }
 
       function answerPill(id, title, sub) {
@@ -3572,33 +3577,45 @@ window.LiveMode = (function () {
     }
     renderStep();
 
-    function startRoom() {
+    function doStart() {
       var adapter = window.LiveGames[gameId];
       var rounds = adapter.buildRounds(topic);
       if (!rounds.length) { alert("This topic has no usable content."); return; }
-      // Host keeps the full rounds (with answers) in memory only.
-      var seed = { scores: {} };
-      var afterSeed = function () {
-        window.LiveDB.createSession({
-          rosterId: roster.id, rosterName: roster.name, students: roster.students,
-          gameId: gameId, gameName: adapter.meta.name, topicName: topic.name,
-          status: "lobby", questionIndex: -1, totalQuestions: rounds.length,
-          round: null, reveal: null, scores: seed.scores, joined: {}, persistMode: persistMode,
-          answerMode: answerMode
-        }).then(function (code) {
-          hostRun(code, adapter, rounds);
-        }).catch(function (e) { alert("Could not start: " + e.message); });
-      };
-      if (persistMode === "continue") {
-        window.LiveDB.getLeaderboard(roster.id).then(function (lb) { seed.scores = lb.scores || {}; afterSeed(); });
-      } else afterSeed();
+      opts.onStart({ gameId: gameId, topic: topic, answerMode: answerMode, persistMode: persistMode, adapter: adapter, rounds: rounds });
     }
+  }
+
+  function hostSetup(roster) {
+    gamePicker({
+      title: roster.name,
+      sub: "Pick a game and a topic, then start the room.",
+      startLabel: "Start room ▶",
+      back: hostRosters,
+      onStart: function (sel) {
+        // Host keeps the full rounds (with answers) in memory only.
+        var seed = { scores: {} };
+        var afterSeed = function () {
+          window.LiveDB.createSession({
+            rosterId: roster.id, rosterName: roster.name, students: roster.students,
+            gameId: sel.gameId, gameName: sel.adapter.meta.name, topicName: sel.topic.name,
+            status: "lobby", questionIndex: -1, totalQuestions: sel.rounds.length,
+            round: null, reveal: null, scores: seed.scores, joined: {}, persistMode: sel.persistMode,
+            answerMode: sel.answerMode, gameSeq: 0
+          }).then(function (code) {
+            hostRun(code, sel.adapter, sel.rounds, roster);
+          }).catch(function (e) { alert("Could not start: " + e.message); });
+        };
+        if (sel.persistMode === "continue") {
+          window.LiveDB.getLeaderboard(roster.id).then(function (lb) { seed.scores = lb.scores || {}; afterSeed(); });
+        } else afterSeed();
+      }
+    });
   }
 
   /* ============================================================
      HOST — run the session (lobby → questions → podium)
      ============================================================ */
-  function hostRun(code, adapter, rounds) {
+  function hostRun(code, adapter, rounds, roster) {
     stop();
     var sess = null;
     var answersUnsub = null;
@@ -3733,15 +3750,20 @@ window.LiveMode = (function () {
     }
 
     function podium() {
+      // Transition into the final screen (once), then render it.
+      window.LiveDB.updateSession(code, { status: "podium" });
+      if (sess.persistMode === "continue") window.LiveDB.saveLeaderboard(sess.rosterId, sess.scores || {});
+      kit.confetti(); kit.beep("win");
+      renderPodium();
+    }
+
+    function renderPodium() {
       var scores = sess.scores || {};
       var rows = (sess.students || []).map(function (s) { return { name: s.name, pts: scores[s.id] || 0 }; })
         .sort(function (a, b) { return b.pts - a.pts; });
-      window.LiveDB.updateSession(code, { status: "podium" });
-      if (sess.persistMode === "continue") window.LiveDB.saveLeaderboard(sess.rosterId, scores);
-      kit.confetti(); kit.beep("win");
       var top3 = rows.slice(0, 3);
       show(screen("host", [
-        el("h2", { class: "live-title", text: "🏆 Final results" }),
+        el("h2", { class: "live-title", text: "🏆 " + (sess.gameName || "Final") + " — results" }),
         el("div", { class: "podium" }, top3.map(function (row, i) {
           return el("div", { class: "podium-col p" + (i + 1) }, [
             el("div", { class: "podium-medal", text: ["🥇", "🥈", "🥉"][i] }),
@@ -3750,8 +3772,48 @@ window.LiveMode = (function () {
             el("div", { class: "podium-block", text: (i + 1) })
           ]);
         })),
-        el("button", { class: "btn primary", text: "Done", on: { click: function () { closeRoom(); } } })
+        // Full standings for the whole class.
+        el("h3", { class: "reveal-board-title", text: "Final leaderboard" }),
+        rows.length
+          ? el("div", { class: "board-list" }, rows.map(function (row, idx) {
+              return el("div", { class: "board-row" + (idx === 0 ? " top" : "") }, [
+                el("span", { class: "board-rank", text: (idx + 1) }),
+                el("span", { class: "board-name", text: row.name }),
+                el("span", { class: "board-pts", text: row.pts })
+              ]);
+            }))
+          : el("p", { class: "live-muted", text: "No players." }),
+        el("div", { class: "podium-actions" }, [
+          el("button", { class: "btn primary big", text: "▶ Play another game", on: { click: playAnother } }),
+          el("button", { class: "back-link small", html: "✕ Close room", on: { click: closeRoom } })
+        ])
       ]));
+    }
+
+    // Start a new game in the SAME room, keeping the joined students.
+    function playAnother() {
+      var carried = (sess && sess.scores) || {};
+      var seq = (sess && sess.gameSeq) || 0;
+      gamePicker({
+        title: "Play another game",
+        sub: "Same room · code " + code + " · same players. Pick the next game.",
+        startLabel: "Start game ▶",
+        continueLabel: "Keep scores",
+        continueSub: "Add to this room's running totals",
+        freshSub: "Everyone starts this game at zero",
+        back: renderPodium,
+        onStart: function (sel) {
+          var seedScores = sel.persistMode === "continue" ? carried : {};
+          window.LiveDB.updateSession(code, {
+            gameId: sel.gameId, gameName: sel.adapter.meta.name, topicName: sel.topic.name,
+            status: "lobby", questionIndex: -1, totalQuestions: sel.rounds.length,
+            round: null, reveal: null, scores: seedScores, answerMode: sel.answerMode,
+            persistMode: sel.persistMode, gameSeq: seq + 1
+          }).then(function () {
+            hostRun(code, sel.adapter, sel.rounds, roster);
+          }).catch(function (e) { alert("Could not start: " + e.message); });
+        }
+      });
     }
 
     function closeRoom() {
@@ -3819,10 +3881,13 @@ window.LiveMode = (function () {
   function playerRun(code, stu) {
     stop();
     var answeredIndex = -1;
-    var lastStatus = null, lastQ = -1;
+    var lastStatus = null, lastQ = -1, lastSeq = null;
 
     track(window.LiveDB.listenSession(code, function (s) {
       if (!s) { show(screen("player live-center", [el("div", { class: "live-card" }, [el("h2", { text: "Room closed" })])])); return; }
+      // A new game in the same room resets question numbering — allow answering again.
+      var seq = s.gameSeq || 0;
+      if (seq !== lastSeq) { answeredIndex = -1; lastSeq = seq; }
       var qi = s.round ? s.round.index : -1;
       if (s.status === lastStatus && qi === lastQ && s.status !== "question") return;
       lastStatus = s.status; lastQ = qi;
