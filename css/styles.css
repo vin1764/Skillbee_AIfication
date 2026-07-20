@@ -465,8 +465,15 @@ kbd {
 .live-q-word { font-size: clamp(2rem, 6vw, 4rem); font-weight: 900; margin: 8px 0; }
 .live-q-emoji { font-size: 3.5rem; margin-bottom: 10px; }
 .live-q-options.board { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
-.live-opt { display: flex; align-items: center; gap: 12px; border-radius: 16px; padding: 18px 20px; font-weight: 800; color: #fff; background: var(--c); box-shadow: var(--shadow); }
-.live-opt .opt-shape { font-size: 1.1rem; }
+/* Neutral, readable answer buttons — the colour + shape are just a position
+   marker (matching the board), so they never clash with the answer text
+   (e.g. the word "orange" on a red box in the colours topic). */
+.live-opt {
+  display: flex; align-items: center; gap: 14px; border-radius: 16px; padding: 18px 20px;
+  font-weight: 800; color: var(--ink); background: var(--card);
+  border: 2px solid var(--line); border-left: 10px solid var(--c); box-shadow: var(--shadow);
+}
+.live-opt .opt-shape { font-size: 1.4rem; color: var(--c); line-height: 1; }
 .live-opt.board { font-size: clamp(1.1rem, 2.4vw, 1.6rem); }
 
 /* reveal */
@@ -527,8 +534,9 @@ kbd {
 .player-name-tag { font-weight: 800; background: var(--skb-tint); color: var(--skb-dark); padding: 6px 14px; border-radius: 999px; display: inline-block; }
 .player-qnum { font-weight: 800; color: var(--ink-soft); }
 .player-prompt-hint { text-align: center; color: var(--ink-soft); font-weight: 700; margin-bottom: 12px; }
-.live-q-options.phone { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.live-opt.phone { min-height: 96px; justify-content: center; text-align: center; font-size: 1.15rem; flex-direction: column; gap: 6px; }
+.live-q-options.phone { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.live-opt.phone { min-height: 72px; font-size: 1.25rem; }
+.live-opt.phone:active { transform: scale(0.98); border-color: var(--skb); }
 .player-points { font-size: 1.8rem; font-weight: 900; color: var(--skb); margin-top: 8px; }
 .res-good .live-card { border-color: var(--good); }
 .res-bad .live-card { border-color: var(--bad); }
