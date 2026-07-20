@@ -17,6 +17,16 @@ window.LiveMode = (function () {
   function show(node) { C.innerHTML = ""; C.appendChild(node); }
   function screen(cls, children) { return el("div", { class: "live " + (cls || "") }, children); }
 
+  // Rebuild a sentence with the blank filled in (article highlighted) — used on
+  // the reveal so students see the full, correct sentence.
+  function filledSentence(sentence, article) {
+    return String(sentence).split(/(\s+)/).map(function (tok) {
+      if (/^\s+$/.test(tok)) return document.createTextNode(tok);
+      if (tok.indexOf("___") >= 0) return el("span", { class: "rs-fill", text: article });
+      return el("span", { text: tok });
+    });
+  }
+
   /* ---------- entry ---------- */
   function start(container, api) {
     C = container; el = api.el; kit = api.kit; store = api.store; goBack = api.back;
@@ -394,6 +404,7 @@ window.LiveMode = (function () {
           el("div", { class: "reveal-label", text: "Correct answer" }),
           el("div", { class: "reveal-value", text: adapter.correctLabel(r) }),
           r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null,
+          r.sentence ? el("div", { class: "reveal-sentence" }, filledSentence(r.sentence, r.correct)) : null,
           r.explanation ? el("div", { class: "reveal-why", text: r.explanation }) : null
         ]),
         el("div", { class: "reveal-stat", text: correctCount + " of " + results.length + " correct" }),

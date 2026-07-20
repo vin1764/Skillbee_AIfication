@@ -500,6 +500,8 @@ kbd {
 .cases-blank { display: inline-block; min-width: 2.4em; border-bottom: 4px solid var(--skb); vertical-align: bottom; color: transparent; }
 .cases-clue { padding: 0 4px; border-radius: 5px; animation: clueGlow 0.4s ease 2.5s forwards; }
 @keyframes clueGlow { to { background: #fff3a0; box-shadow: 0 0 0 3px #fff3a0; color: var(--ink); } }
+.reveal-sentence { font-size: clamp(1.15rem, 2.6vw, 1.7rem); font-weight: 700; color: var(--ink); margin-top: 12px; line-height: 1.5; }
+.rs-fill { background: var(--skb); color: #fff; padding: 1px 8px; border-radius: 6px; font-weight: 900; }
 .reveal-why { margin-top: 10px; color: var(--skb-dark); font-weight: 700; font-style: italic; }
 .player-why { color: var(--ink-soft); font-weight: 600; font-size: 0.95rem; margin: 4px 0 0; }
 .setup-sub { font-size: 0.78rem; color: var(--ink-soft); margin-top: 2px; }
@@ -3070,6 +3072,16 @@ window.LiveMode = (function () {
   function show(node) { C.innerHTML = ""; C.appendChild(node); }
   function screen(cls, children) { return el("div", { class: "live " + (cls || "") }, children); }
 
+  // Rebuild a sentence with the blank filled in (article highlighted) — used on
+  // the reveal so students see the full, correct sentence.
+  function filledSentence(sentence, article) {
+    return String(sentence).split(/(\s+)/).map(function (tok) {
+      if (/^\s+$/.test(tok)) return document.createTextNode(tok);
+      if (tok.indexOf("___") >= 0) return el("span", { class: "rs-fill", text: article });
+      return el("span", { text: tok });
+    });
+  }
+
   /* ---------- entry ---------- */
   function start(container, api) {
     C = container; el = api.el; kit = api.kit; store = api.store; goBack = api.back;
@@ -3447,6 +3459,7 @@ window.LiveMode = (function () {
           el("div", { class: "reveal-label", text: "Correct answer" }),
           el("div", { class: "reveal-value", text: adapter.correctLabel(r) }),
           r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null,
+          r.sentence ? el("div", { class: "reveal-sentence" }, filledSentence(r.sentence, r.correct)) : null,
           r.explanation ? el("div", { class: "reveal-why", text: r.explanation }) : null
         ]),
         el("div", { class: "reveal-stat", text: correctCount + " of " + results.length + " correct" }),
