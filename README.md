@@ -79,7 +79,7 @@ This project can publish itself to a free public web page using **GitHub Pages**
 
 That's it. Every time changes are pushed, the included workflow
 (`.github/workflows/deploy.yml`) publishes the latest version, and GitHub gives you a link like
-`https://<your-name>.github.io/skillbee_aification/` to share with teachers.
+`https://vin1764.github.io/Skillbee_GermanGames/` to share with teachers.
 
 ---
 

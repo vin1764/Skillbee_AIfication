@@ -38,7 +38,7 @@ Live Class Mode needs the **online version** of the app (it can't run from the o
 because it has to talk to Firebase in real time).
 
 - Turn on the **GitHub Pages link** (Settings → Pages → Deploy from a branch). You get a URL like
-  `https://vin1764.github.io/Skillbee_AIfication/`.
+  `https://vin1764.github.io/Skillbee_GermanGames/`.
 - **Teacher:** open that link on the smartboard → **Live Class Mode → Host a class**.
 - **Students:** open the *same* link on their phones → **Live Class Mode → Join a game**, then type
   the room code shown on the smartboard.
