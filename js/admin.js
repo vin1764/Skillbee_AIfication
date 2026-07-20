@@ -13,7 +13,7 @@
       var store = api.store;
       var games = api.games || [];
 
-      var mode = "bank"; // "bank" | "games"
+      var mode = "games"; // "bank" | "games" — Games is the default view
       var bankTab = "vocab"; // "vocab" | "sentences" (within the bank)
       var currentGame = null; // gameId when configuring one game
 
@@ -117,7 +117,7 @@
         var list = store.poolFor(bankTab);
         if (!list.length) body.appendChild(emptyState(bankTab === "vocab" ? "No word topics yet." : "No sentence topics yet."));
         list.forEach(function (topic, i) {
-          body.appendChild(topicCard(topic, i, bankTab, { expanded: true }));
+          body.appendChild(topicCard(topic, i, bankTab, { expanded: false }));
         });
       }
 
