@@ -483,6 +483,18 @@ kbd {
 .reveal-emoji { font-size: 3rem; margin-top: 6px; }
 .reveal-stat { font-weight: 800; color: var(--ink-soft); margin: 12px 0; }
 .reveal-board-title { text-align: center; margin: 8px 0 6px; font-size: 1rem; color: var(--ink-soft); font-weight: 800; }
+
+/* Fall-Detektiv (case detective) */
+.cases-q { text-align: center; }
+.cases-tag { color: var(--ink-soft); text-transform: uppercase; letter-spacing: 1px; font-weight: 800; font-size: 0.9rem; margin-bottom: 12px; }
+.cases-sentence { font-size: clamp(1.6rem, 4.5vw, 3rem); font-weight: 800; line-height: 1.6; }
+.cases-sentence.phone { font-size: 1.35rem; text-align: center; margin-bottom: 16px; line-height: 1.55; }
+.cases-blank { display: inline-block; min-width: 2.4em; border-bottom: 4px solid var(--skb); vertical-align: bottom; color: transparent; }
+.cases-clue { padding: 0 4px; border-radius: 5px; animation: clueGlow 0.4s ease 2.5s forwards; }
+@keyframes clueGlow { to { background: #fff3a0; box-shadow: 0 0 0 3px #fff3a0; color: var(--ink); } }
+.reveal-why { margin-top: 10px; color: var(--skb-dark); font-weight: 700; font-style: italic; }
+.player-why { color: var(--ink-soft); font-weight: 600; font-size: 0.95rem; margin: 4px 0 0; }
+.setup-sub { font-size: 0.78rem; color: var(--ink-soft); margin-top: 2px; }
 .reveal-fast { max-width: 460px; margin: 0 auto 18px; display: flex; flex-direction: column; gap: 8px; }
 .reveal-fast-row { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; box-shadow: var(--shadow); }
 .rf-rank { font-weight: 900; color: var(--accent); }

@@ -491,6 +491,18 @@ kbd {
 .reveal-emoji { font-size: 3rem; margin-top: 6px; }
 .reveal-stat { font-weight: 800; color: var(--ink-soft); margin: 12px 0; }
 .reveal-board-title { text-align: center; margin: 8px 0 6px; font-size: 1rem; color: var(--ink-soft); font-weight: 800; }
+
+/* Fall-Detektiv (case detective) */
+.cases-q { text-align: center; }
+.cases-tag { color: var(--ink-soft); text-transform: uppercase; letter-spacing: 1px; font-weight: 800; font-size: 0.9rem; margin-bottom: 12px; }
+.cases-sentence { font-size: clamp(1.6rem, 4.5vw, 3rem); font-weight: 800; line-height: 1.6; }
+.cases-sentence.phone { font-size: 1.35rem; text-align: center; margin-bottom: 16px; line-height: 1.55; }
+.cases-blank { display: inline-block; min-width: 2.4em; border-bottom: 4px solid var(--skb); vertical-align: bottom; color: transparent; }
+.cases-clue { padding: 0 4px; border-radius: 5px; animation: clueGlow 0.4s ease 2.5s forwards; }
+@keyframes clueGlow { to { background: #fff3a0; box-shadow: 0 0 0 3px #fff3a0; color: var(--ink); } }
+.reveal-why { margin-top: 10px; color: var(--skb-dark); font-weight: 700; font-style: italic; }
+.player-why { color: var(--ink-soft); font-weight: 600; font-size: 0.95rem; margin: 4px 0 0; }
+.setup-sub { font-size: 0.78rem; color: var(--ink-soft); margin-top: 2px; }
 .reveal-fast { max-width: 460px; margin: 0 auto 18px; display: flex; flex-direction: column; gap: 8px; }
 .reveal-fast-row { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; box-shadow: var(--shadow); }
 .rf-rank { font-weight: 900; color: var(--accent); }
@@ -675,16 +687,16 @@ const VOCAB_TOPICS = [
     english: "Animals",
     emoji: "🐾",
     words: [
-      { de: "der Hund", en: "the dog", emoji: "🐶" },
-      { de: "die Katze", en: "the cat", emoji: "🐱" },
-      { de: "das Pferd", en: "the horse", emoji: "🐴" },
-      { de: "der Vogel", en: "the bird", emoji: "🐦" },
-      { de: "der Fisch", en: "the fish", emoji: "🐟" },
-      { de: "die Kuh", en: "the cow", emoji: "🐮" },
-      { de: "das Schwein", en: "the pig", emoji: "🐷" },
-      { de: "der Bär", en: "the bear", emoji: "🐻" },
-      { de: "der Löwe", en: "the lion", emoji: "🦁" },
-      { de: "der Elefant", en: "the elephant", emoji: "🐘" }
+      { de: "der Hund", en: "the dog", emoji: "🐶", gender: "der" },
+      { de: "die Katze", en: "the cat", emoji: "🐱", gender: "die" },
+      { de: "das Pferd", en: "the horse", emoji: "🐴", gender: "das" },
+      { de: "der Vogel", en: "the bird", emoji: "🐦", gender: "der" },
+      { de: "der Fisch", en: "the fish", emoji: "🐟", gender: "der" },
+      { de: "die Kuh", en: "the cow", emoji: "🐮", gender: "die" },
+      { de: "das Schwein", en: "the pig", emoji: "🐷", gender: "das" },
+      { de: "der Bär", en: "the bear", emoji: "🐻", gender: "der" },
+      { de: "der Löwe", en: "the lion", emoji: "🦁", gender: "der" },
+      { de: "der Elefant", en: "the elephant", emoji: "🐘", gender: "der" }
     ]
   },
   {
@@ -693,16 +705,16 @@ const VOCAB_TOPICS = [
     english: "Food & Drink",
     emoji: "🍽️",
     words: [
-      { de: "das Brot", en: "the bread", emoji: "🍞" },
-      { de: "der Apfel", en: "the apple", emoji: "🍎" },
-      { de: "der Käse", en: "the cheese", emoji: "🧀" },
-      { de: "das Ei", en: "the egg", emoji: "🥚" },
-      { de: "die Milch", en: "the milk", emoji: "🥛" },
-      { de: "der Kaffee", en: "the coffee", emoji: "☕" },
-      { de: "das Wasser", en: "the water", emoji: "💧" },
-      { de: "der Fisch", en: "the fish", emoji: "🐟" },
-      { de: "die Banane", en: "the banana", emoji: "🍌" },
-      { de: "der Kuchen", en: "the cake", emoji: "🍰" }
+      { de: "das Brot", en: "the bread", emoji: "🍞", gender: "das" },
+      { de: "der Apfel", en: "the apple", emoji: "🍎", gender: "der" },
+      { de: "der Käse", en: "the cheese", emoji: "🧀", gender: "der" },
+      { de: "das Ei", en: "the egg", emoji: "🥚", gender: "das" },
+      { de: "die Milch", en: "the milk", emoji: "🥛", gender: "die" },
+      { de: "der Kaffee", en: "the coffee", emoji: "☕", gender: "der" },
+      { de: "das Wasser", en: "the water", emoji: "💧", gender: "das" },
+      { de: "der Fisch", en: "the fish", emoji: "🐟", gender: "der" },
+      { de: "die Banane", en: "the banana", emoji: "🍌", gender: "die" },
+      { de: "der Kuchen", en: "the cake", emoji: "🍰", gender: "der" }
     ]
   },
   {
@@ -711,14 +723,14 @@ const VOCAB_TOPICS = [
     english: "Family",
     emoji: "👪",
     words: [
-      { de: "die Mutter", en: "the mother", emoji: "👩" },
-      { de: "der Vater", en: "the father", emoji: "👨" },
-      { de: "die Schwester", en: "the sister", emoji: "👧" },
-      { de: "der Bruder", en: "the brother", emoji: "👦" },
-      { de: "die Oma", en: "the grandma", emoji: "👵" },
-      { de: "der Opa", en: "the grandpa", emoji: "👴" },
-      { de: "das Kind", en: "the child", emoji: "🧒" },
-      { de: "das Baby", en: "the baby", emoji: "👶" }
+      { de: "die Mutter", en: "the mother", emoji: "👩", gender: "die" },
+      { de: "der Vater", en: "the father", emoji: "👨", gender: "der" },
+      { de: "die Schwester", en: "the sister", emoji: "👧", gender: "die" },
+      { de: "der Bruder", en: "the brother", emoji: "👦", gender: "der" },
+      { de: "die Oma", en: "the grandma", emoji: "👵", gender: "die" },
+      { de: "der Opa", en: "the grandpa", emoji: "👴", gender: "der" },
+      { de: "das Kind", en: "the child", emoji: "🧒", gender: "das" },
+      { de: "das Baby", en: "the baby", emoji: "👶", gender: "das" }
     ]
   },
   {
@@ -778,6 +790,76 @@ const SENTENCE_TOPICS = [
 
 /* Make the data available to the rest of the app. */
 window.GameData = { VOCAB_TOPICS, SENTENCE_TOPICS };
+
+
+/* ==== js/data-cases.js ==== */
+/* =====================================================================
+   Fall-Detektiv (Case Detective) — sentence bank.
+   Each entry: a sentence with a blanked article, the case it needs, the
+   correct article, three distractor articles, the "clue" word (verb or
+   preposition that decides the case), and a one-line explanation.
+
+   Levels build up (a class only sees cases it has learned):
+     Level 1 = accusative
+     Level 2 = accusative + dative
+     Level 3 = accusative + dative + genitive
+   ===================================================================== */
+const CASE_DRILLS = {
+  accusative: [
+    { sentence: "Ich sehe ___ Mann.", blank: "Mann", correct: "den", distractors: ["der", "dem", "des"], clueWord: "sehe", explanation: "sehen + accusative — direct object" },
+    { sentence: "Er isst ___ Banane.", blank: "Banane", correct: "die", distractors: ["der", "den", "dem"], clueWord: "isst", explanation: "essen + accusative — direct object" },
+    { sentence: "Für ___ Kind ist das Geschenk.", blank: "Kind", correct: "das", distractors: ["dem", "des", "der"], clueWord: "Für", explanation: "für + accusative (preposition)" },
+    { sentence: "Wir kaufen ___ Apfel.", blank: "Apfel", correct: "den", distractors: ["der", "dem", "des"], clueWord: "kaufen", explanation: "kaufen + accusative — direct object" },
+    { sentence: "Ich lese ___ Buch.", blank: "Buch", correct: "das", distractors: ["dem", "des", "der"], clueWord: "lese", explanation: "lesen + accusative — direct object" },
+    { sentence: "Sie trinkt ___ Milch.", blank: "Milch", correct: "die", distractors: ["der", "den", "dem"], clueWord: "trinkt", explanation: "trinken + accusative — direct object" },
+    { sentence: "Hast du ___ Hund?", blank: "Hund", correct: "den", distractors: ["der", "dem", "des"], clueWord: "Hast", explanation: "haben + accusative — direct object" },
+    { sentence: "Ohne ___ Auto komme ich nicht.", blank: "Auto", correct: "das", distractors: ["dem", "des", "der"], clueWord: "Ohne", explanation: "ohne + accusative (preposition)" },
+    { sentence: "Ich suche ___ Katze.", blank: "Katze", correct: "die", distractors: ["der", "den", "dem"], clueWord: "suche", explanation: "suchen + accusative — direct object" },
+    { sentence: "Er nimmt ___ Ball.", blank: "Ball", correct: "den", distractors: ["der", "dem", "des"], clueWord: "nimmt", explanation: "nehmen + accusative — direct object" },
+    { sentence: "Wir besuchen ___ Oma.", blank: "Oma", correct: "die", distractors: ["der", "den", "dem"], clueWord: "besuchen", explanation: "besuchen + accusative — direct object" },
+    { sentence: "Durch ___ Fenster scheint die Sonne.", blank: "Fenster", correct: "das", distractors: ["dem", "des", "der"], clueWord: "Durch", explanation: "durch + accusative (preposition)" },
+    { sentence: "Ich brauche ___ Löffel.", blank: "Löffel", correct: "den", distractors: ["der", "dem", "des"], clueWord: "brauche", explanation: "brauchen + accusative — direct object" },
+    { sentence: "Sie liest ___ Zeitung.", blank: "Zeitung", correct: "die", distractors: ["der", "den", "dem"], clueWord: "liest", explanation: "lesen + accusative — direct object" },
+    { sentence: "Gegen ___ Wand steht ein Tisch.", blank: "Wand", correct: "die", distractors: ["der", "den", "dem"], clueWord: "Gegen", explanation: "gegen + accusative (preposition)" },
+    { sentence: "Ich mache ___ Tür auf.", blank: "Tür", correct: "die", distractors: ["der", "den", "dem"], clueWord: "mache", explanation: "aufmachen + accusative — direct object" }
+  ],
+  dative: [
+    { sentence: "Ich helfe ___ Mann.", blank: "Mann", correct: "dem", distractors: ["der", "den", "des"], clueWord: "helfe", explanation: "helfen + dative" },
+    { sentence: "Wir fahren mit ___ Bus.", blank: "Bus", correct: "dem", distractors: ["der", "den", "des"], clueWord: "mit", explanation: "mit + dative (preposition)" },
+    { sentence: "Sie gibt ___ Kind einen Apfel.", blank: "Kind", correct: "dem", distractors: ["das", "den", "des"], clueWord: "gibt", explanation: "geben — the recipient takes dative" },
+    { sentence: "Das Buch gehört ___ Frau.", blank: "Frau", correct: "der", distractors: ["die", "dem", "den"], clueWord: "gehört", explanation: "gehören + dative" },
+    { sentence: "Nach ___ Schule gehe ich nach Hause.", blank: "Schule", correct: "der", distractors: ["die", "dem", "den"], clueWord: "Nach", explanation: "nach + dative (preposition)" },
+    { sentence: "Ich danke ___ Lehrer.", blank: "Lehrer", correct: "dem", distractors: ["der", "den", "des"], clueWord: "danke", explanation: "danken + dative" },
+    { sentence: "Bei ___ Oma ist es schön.", blank: "Oma", correct: "der", distractors: ["die", "dem", "den"], clueWord: "Bei", explanation: "bei + dative (preposition)" },
+    { sentence: "Der Hund folgt ___ Kind.", blank: "Kind", correct: "dem", distractors: ["das", "den", "des"], clueWord: "folgt", explanation: "folgen + dative" },
+    { sentence: "Aus ___ Flasche trinkt er Wasser.", blank: "Flasche", correct: "der", distractors: ["die", "dem", "den"], clueWord: "Aus", explanation: "aus + dative (preposition)" },
+    { sentence: "Ich antworte ___ Lehrerin.", blank: "Lehrerin", correct: "der", distractors: ["die", "dem", "den"], clueWord: "antworte", explanation: "antworten + dative" },
+    { sentence: "Mit ___ Katze spielt das Kind.", blank: "Katze", correct: "der", distractors: ["die", "dem", "den"], clueWord: "Mit", explanation: "mit + dative (preposition)" },
+    { sentence: "Von ___ Frau habe ich es gehört.", blank: "Frau", correct: "der", distractors: ["die", "dem", "den"], clueWord: "Von", explanation: "von + dative (preposition)" },
+    { sentence: "Seit ___ Woche bin ich krank.", blank: "Woche", correct: "der", distractors: ["die", "dem", "den"], clueWord: "Seit", explanation: "seit + dative (preposition)" },
+    { sentence: "Das Auto gehört ___ Mann.", blank: "Mann", correct: "dem", distractors: ["der", "den", "des"], clueWord: "gehört", explanation: "gehören + dative" },
+    { sentence: "Der Film gefällt ___ Kind.", blank: "Kind", correct: "dem", distractors: ["das", "den", "des"], clueWord: "gefällt", explanation: "gefallen + dative" }
+  ],
+  genitive: [
+    { sentence: "Wegen ___ Wetters bleiben wir zu Hause.", blank: "Wetters", correct: "des", distractors: ["dem", "das", "der"], clueWord: "Wegen", explanation: "wegen + genitive (preposition)" },
+    { sentence: "Trotz ___ Regens spielen sie Fußball.", blank: "Regens", correct: "des", distractors: ["dem", "den", "der"], clueWord: "Trotz", explanation: "trotz + genitive (preposition)" },
+    { sentence: "Während ___ Woche arbeite ich viel.", blank: "Woche", correct: "der", distractors: ["die", "dem", "den"], clueWord: "Während", explanation: "während + genitive (preposition)" },
+    { sentence: "Wegen ___ Kindes bleibt sie zu Hause.", blank: "Kindes", correct: "des", distractors: ["dem", "das", "der"], clueWord: "Wegen", explanation: "wegen + genitive (preposition)" },
+    { sentence: "Trotz ___ Kälte gehen wir spazieren.", blank: "Kälte", correct: "der", distractors: ["die", "dem", "den"], clueWord: "Trotz", explanation: "trotz + genitive (preposition)" },
+    { sentence: "Während ___ Films schläft er ein.", blank: "Films", correct: "des", distractors: ["dem", "den", "der"], clueWord: "Während", explanation: "während + genitive (preposition)" },
+    { sentence: "Statt ___ Apfels isst er eine Banane.", blank: "Apfels", correct: "des", distractors: ["dem", "den", "der"], clueWord: "Statt", explanation: "statt + genitive (preposition)" },
+    { sentence: "Wegen ___ Krankheit fehlt der Lehrer.", blank: "Krankheit", correct: "der", distractors: ["die", "dem", "den"], clueWord: "Wegen", explanation: "wegen + genitive (preposition)" },
+    { sentence: "Trotz ___ Problems bleibt er ruhig.", blank: "Problems", correct: "des", distractors: ["dem", "das", "der"], clueWord: "Trotz", explanation: "trotz + genitive (preposition)" },
+    { sentence: "Während ___ Reise regnet es oft.", blank: "Reise", correct: "der", distractors: ["die", "dem", "den"], clueWord: "Während", explanation: "während + genitive (preposition)" },
+    { sentence: "Wegen ___ Autos kommen wir zu spät.", blank: "Autos", correct: "des", distractors: ["dem", "das", "der"], clueWord: "Wegen", explanation: "wegen + genitive (preposition)" },
+    { sentence: "Trotz ___ Hundes hat sie keine Angst.", blank: "Hundes", correct: "des", distractors: ["dem", "den", "der"], clueWord: "Trotz", explanation: "trotz + genitive (preposition)" },
+    { sentence: "Während ___ Stunde stellt er viele Fragen.", blank: "Stunde", correct: "der", distractors: ["die", "dem", "den"], clueWord: "Während", explanation: "während + genitive (preposition)" },
+    { sentence: "Statt ___ Buches liest sie eine Zeitung.", blank: "Buches", correct: "des", distractors: ["dem", "das", "der"], clueWord: "Statt", explanation: "statt + genitive (preposition)" },
+    { sentence: "Wegen ___ Mannes sind alle nervös.", blank: "Mannes", correct: "des", distractors: ["dem", "den", "der"], clueWord: "Wegen", explanation: "wegen + genitive (preposition)" }
+  ]
+};
+
+window.CaseData = CASE_DRILLS;
 
 
 /* ==== js/brand.js ==== */
@@ -2760,10 +2842,77 @@ document.addEventListener("DOMContentLoaded", App.init);
     };
   }
 
+  /* ---- Fall-Detektiv (Case Detective): pick the correctly-declined article ---- */
+  // Render a sentence, styling the blank and (on the host) the clue word, which
+  // glows after a short delay via CSS so struggling students get a hint.
+  function renderSentence(el, sentence, clueWord, isHost) {
+    return String(sentence).split(/(\s+)/).map(function (tok) {
+      if (/^\s+$/.test(tok)) return document.createTextNode(tok);
+      if (tok.indexOf("___") >= 0) return el("span", { class: "cases-blank", text: "____" });
+      var core = tok.replace(/[.,!?;:]/g, "");
+      if (isHost && clueWord && core.toLowerCase() === clueWord.toLowerCase()) {
+        return el("span", { class: "cases-clue", text: tok });
+      }
+      return el("span", { text: tok });
+    });
+  }
+
+  var casesAdapter = {
+    meta: { name: "Fall-Detektiv", emoji: "🕵️", contentType: "cases" },
+    timeLimit: 20000,
+    // The "topics" for this game are the three difficulty levels.
+    getTopics: function () {
+      return [
+        { id: "l1", name: "Level 1", english: "Accusative", emoji: "1️⃣", level: 1 },
+        { id: "l2", name: "Level 2", english: "+ Dative", emoji: "2️⃣", level: 2 },
+        { id: "l3", name: "Level 3", english: "+ Genitive", emoji: "3️⃣", level: 3 }
+      ];
+    },
+    buildRounds: function (topic) {
+      var C = window.CaseData || { accusative: [], dative: [], genitive: [] };
+      var pool = C.accusative.slice();
+      if (topic.level >= 2) pool = pool.concat(C.dative);
+      if (topic.level >= 3) pool = pool.concat(C.genitive);
+      return kit().sample(pool, Math.min(10, pool.length)).map(function (s) {
+        return {
+          type: "cases", sentence: s.sentence, blank: s.blank, clueWord: s.clueWord,
+          options: kit().shuffle([s.correct].concat(s.distractors)),
+          answer: s.correct, correct: s.correct, explanation: s.explanation
+        };
+      });
+    },
+    hostContent: function (el, round) {
+      return el("div", { class: "cases-q" }, [
+        el("div", { class: "cases-tag", text: "🕵️ Which article fits the blank?" }),
+        el("div", { class: "cases-sentence" }, renderSentence(el, round.sentence, round.clueWord, true))
+      ]);
+    },
+    playerContent: function (el, round, api) {
+      return el("div", { class: "cases-player" }, [
+        el("div", { class: "cases-sentence phone" }, renderSentence(el, round.sentence, round.clueWord, false)),
+        el("div", { class: "live-q-options phone" }, round.options.map(function (opt, i) {
+          return el("button", {
+            class: "live-opt phone", attrs: { style: "--c:" + COLORS[i] },
+            on: { click: function () { api.submit({ choice: opt }); } }
+          }, [el("span", { class: "opt-shape", text: SHAPES[i] }), el("span", { class: "opt-text", text: opt })]);
+        }))
+      ]);
+    },
+    score: function (round, payload, elapsedMs, timeLimit) {
+      var correct = payload && payload.choice === round.answer;
+      if (!correct) return { correct: false, points: 0 };
+      var frac = Math.max(0, 1 - elapsedMs / timeLimit);
+      return { correct: true, points: Math.round(500 + 500 * frac) };
+    },
+    correctLabel: function (round) { return round.correct; },
+    speakOnReveal: function (round) { return String(round.sentence).replace("___", round.correct); }
+  };
+
   window.LiveGames = {
     quiz: choiceAdapter({ name: "Vocabulary Quiz", emoji: "🎯", contentType: "vocab" }),
-    memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" })
-    // hangman & scramble adapters are added in the next slice
+    memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" }),
+    cases: casesAdapter
+    // Wortmonster adapter comes next
   };
 })();
 
@@ -2968,9 +3117,10 @@ window.LiveMode = (function () {
 
       // 2) topic
       if (gameId) {
-        var type = window.LiveGames[gameId].meta.contentType;
-        var topics = store.topicsForGame(gameId, type);
-        step.appendChild(el("div", { class: "live-label", text: "2 · Topic" }));
+        var gAdapter = window.LiveGames[gameId];
+        var type = gAdapter.meta.contentType;
+        var topics = gAdapter.getTopics ? gAdapter.getTopics() : store.topicsForGame(gameId, type);
+        step.appendChild(el("div", { class: "live-label", text: gAdapter.getTopics ? "2 · Level" : "2 · Topic" }));
         if (!topics.length) {
           step.appendChild(el("p", { class: "live-muted", text: "This game has no topics enabled. Enable some in ⚙️ Manage content → Games." }));
         } else {
@@ -2979,7 +3129,7 @@ window.LiveMode = (function () {
             tg.appendChild(el("button", {
               class: "setup-card" + (topic && topic.id === t.id ? " sel" : ""),
               on: { click: function () { topic = t; renderStep(); } }
-            }, [el("div", { class: "setup-emoji", text: t.emoji }), el("div", { text: t.name })]));
+            }, [el("div", { class: "setup-emoji", text: t.emoji }), el("div", { text: t.name }), t.english ? el("div", { class: "setup-sub", text: t.english }) : null]));
           });
           step.appendChild(tg);
         }
@@ -3065,7 +3215,11 @@ window.LiveMode = (function () {
       var r = rounds[i];
       window.LiveDB.updateSession(code, {
         status: "question", questionIndex: i, reveal: null,
-        round: { index: i, type: r.type, de: r.de, emoji: r.emoji, options: r.options, startedAt: window.LiveDB.serverTs() }
+        round: {
+          index: i, type: r.type, de: r.de || null, emoji: r.emoji || null, options: r.options,
+          sentence: r.sentence || null, blank: r.blank || null, clueWord: r.clueWord || null,
+          startedAt: window.LiveDB.serverTs()
+        }
       });
       watchAnswers(i, r);
     }
@@ -3121,7 +3275,7 @@ window.LiveMode = (function () {
         results.forEach(function (rr, idx) { rr.rank = idx + 1; });
         window.LiveDB.updateSession(code, {
           status: "reveal", scores: scores,
-          reveal: { index: i, correct: adapter.correctLabel(r), results: results }
+          reveal: { index: i, correct: adapter.correctLabel(r), explanation: r.explanation || null, results: results }
         });
         var german = adapter.speakOnReveal(r);
         if (german) kit.speak(german);
@@ -3139,7 +3293,8 @@ window.LiveMode = (function () {
         el("div", { class: "reveal-answer" }, [
           el("div", { class: "reveal-label", text: "Correct answer" }),
           el("div", { class: "reveal-value", text: adapter.correctLabel(r) }),
-          r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null
+          r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null,
+          r.explanation ? el("div", { class: "reveal-why", text: r.explanation }) : null
         ]),
         el("div", { class: "reveal-stat", text: correctCount + " of " + results.length + " correct" }),
         el("h3", { class: "reveal-board-title", text: "Top scorers — this question" }),
@@ -3304,6 +3459,7 @@ window.LiveMode = (function () {
         el("div", { class: "live-big-emoji", text: correct ? "✅" : (me && me.answered ? "❌" : "⏰") }),
         el("h2", { text: correct ? "Correct!" : (me && me.answered ? "Not quite" : "Too slow") }),
         el("p", { class: "live-sub", text: "Answer: " + (s.reveal ? s.reveal.correct : "") }),
+        s.reveal && s.reveal.explanation ? el("p", { class: "player-why", text: s.reveal.explanation }) : null,
         el("div", { class: "player-points", text: (pts > 0 ? "+" + pts : "0") + " points" })
       ])]));
     }

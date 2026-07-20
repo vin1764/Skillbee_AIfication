@@ -197,9 +197,10 @@ window.LiveMode = (function () {
 
       // 2) topic
       if (gameId) {
-        var type = window.LiveGames[gameId].meta.contentType;
-        var topics = store.topicsForGame(gameId, type);
-        step.appendChild(el("div", { class: "live-label", text: "2 · Topic" }));
+        var gAdapter = window.LiveGames[gameId];
+        var type = gAdapter.meta.contentType;
+        var topics = gAdapter.getTopics ? gAdapter.getTopics() : store.topicsForGame(gameId, type);
+        step.appendChild(el("div", { class: "live-label", text: gAdapter.getTopics ? "2 · Level" : "2 · Topic" }));
         if (!topics.length) {
           step.appendChild(el("p", { class: "live-muted", text: "This game has no topics enabled. Enable some in ⚙️ Manage content → Games." }));
         } else {
@@ -208,7 +209,7 @@ window.LiveMode = (function () {
             tg.appendChild(el("button", {
               class: "setup-card" + (topic && topic.id === t.id ? " sel" : ""),
               on: { click: function () { topic = t; renderStep(); } }
-            }, [el("div", { class: "setup-emoji", text: t.emoji }), el("div", { text: t.name })]));
+            }, [el("div", { class: "setup-emoji", text: t.emoji }), el("div", { text: t.name }), t.english ? el("div", { class: "setup-sub", text: t.english }) : null]));
           });
           step.appendChild(tg);
         }
@@ -294,7 +295,11 @@ window.LiveMode = (function () {
       var r = rounds[i];
       window.LiveDB.updateSession(code, {
         status: "question", questionIndex: i, reveal: null,
-        round: { index: i, type: r.type, de: r.de, emoji: r.emoji, options: r.options, startedAt: window.LiveDB.serverTs() }
+        round: {
+          index: i, type: r.type, de: r.de || null, emoji: r.emoji || null, options: r.options,
+          sentence: r.sentence || null, blank: r.blank || null, clueWord: r.clueWord || null,
+          startedAt: window.LiveDB.serverTs()
+        }
       });
       watchAnswers(i, r);
     }
@@ -350,7 +355,7 @@ window.LiveMode = (function () {
         results.forEach(function (rr, idx) { rr.rank = idx + 1; });
         window.LiveDB.updateSession(code, {
           status: "reveal", scores: scores,
-          reveal: { index: i, correct: adapter.correctLabel(r), results: results }
+          reveal: { index: i, correct: adapter.correctLabel(r), explanation: r.explanation || null, results: results }
         });
         var german = adapter.speakOnReveal(r);
         if (german) kit.speak(german);
@@ -368,7 +373,8 @@ window.LiveMode = (function () {
         el("div", { class: "reveal-answer" }, [
           el("div", { class: "reveal-label", text: "Correct answer" }),
           el("div", { class: "reveal-value", text: adapter.correctLabel(r) }),
-          r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null
+          r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null,
+          r.explanation ? el("div", { class: "reveal-why", text: r.explanation }) : null
         ]),
         el("div", { class: "reveal-stat", text: correctCount + " of " + results.length + " correct" }),
         el("h3", { class: "reveal-board-title", text: "Top scorers — this question" }),
@@ -533,6 +539,7 @@ window.LiveMode = (function () {
         el("div", { class: "live-big-emoji", text: correct ? "✅" : (me && me.answered ? "❌" : "⏰") }),
         el("h2", { text: correct ? "Correct!" : (me && me.answered ? "Not quite" : "Too slow") }),
         el("p", { class: "live-sub", text: "Answer: " + (s.reveal ? s.reveal.correct : "") }),
+        s.reveal && s.reveal.explanation ? el("p", { class: "player-why", text: s.reveal.explanation }) : null,
         el("div", { class: "player-points", text: (pts > 0 ? "+" + pts : "0") + " points" })
       ])]));
     }
