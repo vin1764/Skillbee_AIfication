@@ -364,7 +364,8 @@ window.LiveMode = (function () {
         el("div", { class: "host-topbar" }, [el("div", { class: "host-q-num", text: "Question " + (i + 1) + " / " + rounds.length })]),
         el("div", { class: "reveal-answer" }, [
           el("div", { class: "reveal-label", text: "Correct answer" }),
-          el("div", { class: "reveal-value", text: adapter.correctLabel(r) })
+          el("div", { class: "reveal-value", text: adapter.correctLabel(r) }),
+          r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null
         ]),
         el("div", { class: "reveal-stat", text: correctList.length + " of " + results.length + " correct" }),
         el("div", { class: "reveal-fast" }, correctList.slice(0, 5).map(function (x, idx) {

@@ -42,7 +42,8 @@
             document.createTextNode(round.de + " "),
             kit().speakerButton(round.de)
           ]),
-          round.emoji ? el("div", { class: "live-q-emoji", text: round.emoji }) : null,
+          // NOTE: the word's emoji is deliberately NOT shown here — for colours,
+          // numbers, etc. it would give away the answer. It appears at reveal.
           el("div", { class: "live-q-options board" }, round.options.map(function (opt, i) {
             return el("div", { class: "live-opt board", attrs: { style: "--c:" + COLORS[i] } }, [
               el("span", { class: "opt-shape", text: SHAPES[i] }),

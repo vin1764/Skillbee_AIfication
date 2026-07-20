@@ -473,6 +473,7 @@ kbd {
 .reveal-answer { background: #eafaf7; border: 2px solid var(--good); border-radius: 18px; padding: 22px; margin: 10px auto; max-width: 560px; }
 .reveal-label { color: var(--ink-soft); font-weight: 800; text-transform: uppercase; letter-spacing: 1px; font-size: 0.85rem; }
 .reveal-value { font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 900; }
+.reveal-emoji { font-size: 3rem; margin-top: 6px; }
 .reveal-stat { font-weight: 800; color: var(--ink-soft); margin: 12px 0; }
 .reveal-fast { max-width: 460px; margin: 0 auto 18px; display: flex; flex-direction: column; gap: 8px; }
 .reveal-fast-row { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; box-shadow: var(--shadow); }

@@ -481,6 +481,7 @@ kbd {
 .reveal-answer { background: #eafaf7; border: 2px solid var(--good); border-radius: 18px; padding: 22px; margin: 10px auto; max-width: 560px; }
 .reveal-label { color: var(--ink-soft); font-weight: 800; text-transform: uppercase; letter-spacing: 1px; font-size: 0.85rem; }
 .reveal-value { font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 900; }
+.reveal-emoji { font-size: 3rem; margin-top: 6px; }
 .reveal-stat { font-weight: 800; color: var(--ink-soft); margin: 12px 0; }
 .reveal-fast { max-width: 460px; margin: 0 auto 18px; display: flex; flex-direction: column; gap: 8px; }
 .reveal-fast-row { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; box-shadow: var(--shadow); }
@@ -2719,7 +2720,8 @@ document.addEventListener("DOMContentLoaded", App.init);
             document.createTextNode(round.de + " "),
             kit().speakerButton(round.de)
           ]),
-          round.emoji ? el("div", { class: "live-q-emoji", text: round.emoji }) : null,
+          // NOTE: the word's emoji is deliberately NOT shown here — for colours,
+          // numbers, etc. it would give away the answer. It appears at reveal.
           el("div", { class: "live-q-options board" }, round.options.map(function (opt, i) {
             return el("div", { class: "live-opt board", attrs: { style: "--c:" + COLORS[i] } }, [
               el("span", { class: "opt-shape", text: SHAPES[i] }),
@@ -3130,7 +3132,8 @@ window.LiveMode = (function () {
         el("div", { class: "host-topbar" }, [el("div", { class: "host-q-num", text: "Question " + (i + 1) + " / " + rounds.length })]),
         el("div", { class: "reveal-answer" }, [
           el("div", { class: "reveal-label", text: "Correct answer" }),
-          el("div", { class: "reveal-value", text: adapter.correctLabel(r) })
+          el("div", { class: "reveal-value", text: adapter.correctLabel(r) }),
+          r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null
         ]),
         el("div", { class: "reveal-stat", text: correctList.length + " of " + results.length + " correct" }),
         el("div", { class: "reveal-fast" }, correctList.slice(0, 5).map(function (x, idx) {
