@@ -3,3 +3,6 @@ node_modules/
 scratch_*
 dist/artifact.html
 ._test*
+# Secret keys — never commit (used only by the one-time audio generator)
+.env
+.env.*
