@@ -483,6 +483,7 @@ kbd {
 .reveal-value { font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 900; }
 .reveal-emoji { font-size: 3rem; margin-top: 6px; }
 .reveal-stat { font-weight: 800; color: var(--ink-soft); margin: 12px 0; }
+.reveal-board-title { text-align: center; margin: 8px 0 6px; font-size: 1rem; color: var(--ink-soft); font-weight: 800; }
 .reveal-fast { max-width: 460px; margin: 0 auto 18px; display: flex; flex-direction: column; gap: 8px; }
 .reveal-fast-row { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; box-shadow: var(--shadow); }
 .rf-rank { font-weight: 900; color: var(--accent); }
@@ -3126,8 +3127,11 @@ window.LiveMode = (function () {
       });
     }
 
-    function renderReveal(i, r, results, scores) {
-      var correctList = results.filter(function (x) { return x.correct; });
+    function renderReveal(i, r, results) {
+      var last = (i + 1) >= rounds.length;
+      var correctCount = results.filter(function (x) { return x.correct; }).length;
+      // Leaderboard for THIS question only (ranked by points earned this round).
+      var ranked = results.filter(function (x) { return x.answered; }).sort(function (a, b) { return b.points - a.points; });
       show(screen("host", [
         el("div", { class: "host-topbar" }, [el("div", { class: "host-q-num", text: "Question " + (i + 1) + " / " + rounds.length })]),
         el("div", { class: "reveal-answer" }, [
@@ -3135,33 +3139,17 @@ window.LiveMode = (function () {
           el("div", { class: "reveal-value", text: adapter.correctLabel(r) }),
           r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null
         ]),
-        el("div", { class: "reveal-stat", text: correctList.length + " of " + results.length + " correct" }),
-        el("div", { class: "reveal-fast" }, correctList.slice(0, 5).map(function (x, idx) {
-          return el("div", { class: "reveal-fast-row" }, [
-            el("span", { class: "rf-rank", text: "#" + (idx + 1) }),
-            el("span", { class: "rf-name", text: x.name }),
-            el("span", { class: "rf-pts", text: "+" + x.points })
-          ]);
-        })),
-        el("button", { class: "btn primary big", text: "Show leaderboard ▶", on: { click: function () { leaderboard(); } } })
-      ]));
-    }
-
-    function leaderboard() {
-      window.LiveDB.updateSession(code, { status: "leaderboard" });
-      var scores = sess.scores || {};
-      var rows = (sess.students || []).map(function (s) { return { name: s.name, pts: scores[s.id] || 0 }; })
-        .sort(function (a, b) { return b.pts - a.pts; });
-      var last = sess.questionIndex + 1 >= rounds.length;
-      show(screen("host", [
-        el("h2", { class: "live-title", text: "Leaderboard" }),
-        el("div", { class: "board-list" }, rows.slice(0, 10).map(function (row, i) {
-          return el("div", { class: "board-row" + (i < 3 ? " top" : "") }, [
-            el("span", { class: "board-rank", text: (i + 1) }),
-            el("span", { class: "board-name", text: row.name }),
-            el("span", { class: "board-pts", text: row.pts })
-          ]);
-        })),
+        el("div", { class: "reveal-stat", text: correctCount + " of " + results.length + " correct" }),
+        el("h3", { class: "reveal-board-title", text: "Top scorers — this question" }),
+        ranked.length
+          ? el("div", { class: "board-list" }, ranked.slice(0, 8).map(function (x, idx) {
+              return el("div", { class: "board-row" + (idx === 0 && x.correct ? " top" : "") }, [
+                el("span", { class: "board-rank", text: (idx + 1) }),
+                el("span", { class: "board-name", text: x.name }),
+                el("span", { class: "board-pts", text: x.correct ? "+" + x.points : "✗" })
+              ]);
+            }))
+          : el("p", { class: "live-muted", text: "No answers this round." }),
         el("button", { class: "btn primary big", text: last ? "Finish ▶" : "Next question ▶", on: { click: nextQuestion } })
       ]));
     }
