@@ -94,6 +94,16 @@
     });
   }
 
+  // Three wrong article options. Use the ones stored with the sentence if
+  // present; otherwise pick three other real German articles (so teacher-added
+  // rows work without having to type distractors by hand).
+  var ARTICLE_POOL = ["der", "die", "das", "den", "dem", "des"];
+  function caseDistractors(s) {
+    if (s.distractors && s.distractors.length >= 3) return s.distractors.slice(0, 3);
+    var pool = ARTICLE_POOL.filter(function (a) { return a !== s.correct; });
+    return kit().sample(pool, 3);
+  }
+
   var casesAdapter = {
     meta: { name: "Fall-Detektiv", emoji: "🕵️", contentType: "cases" },
     timeLimit: 20000,
@@ -107,15 +117,20 @@
       ];
     },
     buildRounds: function (topic) {
-      var C = window.CaseData || { accusative: [], dative: [], genitive: [] };
-      var pool = C.accusative.slice();
-      if (topic.level >= 2) pool = pool.concat(C.dative);
-      if (topic.level >= 3) pool = pool.concat(C.genitive);
+      var store = window.ContentStore;
+      var C = (store && store.casesData && store.casesData()) || window.CaseData || { accusative: [], dative: [], genitive: [] };
+      var pool = (C.accusative || []).slice();
+      if (topic.level >= 2) pool = pool.concat(C.dative || []);
+      if (topic.level >= 3) pool = pool.concat(C.genitive || []);
+      // Skip half-finished rows a teacher may have added in the editor.
+      pool = pool.filter(function (s) {
+        return s && s.sentence && String(s.sentence).indexOf("___") >= 0 && s.correct;
+      });
       return kit().sample(pool, Math.min(10, pool.length)).map(function (s) {
         return {
-          type: "cases", sentence: s.sentence, blank: s.blank, clueWord: s.clueWord,
-          options: kit().shuffle([s.correct].concat(s.distractors)),
-          answer: s.correct, correct: s.correct, explanation: s.explanation
+          type: "cases", sentence: s.sentence, blank: s.blank || "", clueWord: s.clueWord || "",
+          options: kit().shuffle([s.correct].concat(caseDistractors(s))),
+          answer: s.correct, correct: s.correct, explanation: s.explanation || ""
         };
       });
     },
@@ -158,6 +173,13 @@
   };
 
   /* ---- Wortmonster (Word Monster): build compound nouns from two tiles ---- */
+  // Join two parts the German way: the second part's first letter becomes
+  // lower-case (Hand + Schuh -> Handschuh). Used for teacher-added rows.
+  function joinCompound(a, b) {
+    b = String(b || "");
+    return String(a || "") + (b ? b.charAt(0).toLowerCase() + b.slice(1) : "");
+  }
+
   var compoundAdapter = {
     meta: { name: "Wortmonster", emoji: "🧟", contentType: "compounds" },
     timeLimit: 20000,
@@ -165,7 +187,16 @@
       return [{ id: "all", name: "Wortmonster", english: "All compounds", emoji: "🧟" }];
     },
     buildRounds: function () {
-      var all = window.CompoundData || [];
+      var store = window.ContentStore;
+      var raw = (store && store.compoundsData && store.compoundsData()) || window.CompoundData || [];
+      // Keep only usable rows and make sure each has a compound (parts join directly).
+      var all = raw.filter(function (c) { return c && c.partA && c.partB; }).map(function (c) {
+        return {
+          partA: c.partA, partB: c.partB, gender: c.gender || "der",
+          meaning: c.meaning || "", emoji: c.emoji || "",
+          compound: c.compound || joinCompound(c.partA, c.partB)
+        };
+      });
       return kit().sample(all, Math.min(10, all.length)).map(function (c) {
         // tile set = the two correct parts + a few decoy parts from other words
         var others = all.filter(function (x) { return x.compound !== c.compound; });

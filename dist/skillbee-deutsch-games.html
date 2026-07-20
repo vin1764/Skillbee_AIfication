@@ -371,6 +371,33 @@ kbd {
 .adm-del:hover { background: #ffeef0; border-color: var(--bad); }
 .adm-add-row { margin-top: 6px; }
 
+/* Fall-Detektiv (cases) editor */
+.adm-case-h { margin: 18px 0 8px; font-size: 1rem; font-weight: 800; color: var(--ink); }
+.adm-case {
+  border: 1px solid var(--line); border-radius: 12px; padding: 10px;
+  margin-bottom: 8px; background: #fff;
+}
+.adm-case-line { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.adm-case-line:last-child { margin-bottom: 0; }
+.adm-case-line > .adm-input { flex: 1 1 140px; }
+.adm-case-line > .adm-article { flex: 0 0 78px; text-align: center; font-weight: 800; }
+
+/* Wortmonster (compounds) editor */
+.adm-compound-row {
+  display: grid; grid-template-columns: 58px 1fr 1fr 1.1fr 82px 1.2fr 40px;
+  gap: 8px; align-items: center; margin-bottom: 8px;
+}
+.adm-compound-word {
+  font-weight: 800; color: var(--skb); text-align: center;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.adm-gender { cursor: pointer; }
+@media (max-width: 560px) {
+  .adm-compound-row { display: flex; flex-wrap: wrap; }
+  .adm-compound-row > .adm-input, .adm-compound-row > .adm-gender { flex: 1 1 40%; }
+  .adm-compound-word { flex: 1 1 100%; text-align: left; }
+}
+
 .adm-toast {
   position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px);
   background: var(--ink); color: #fff; padding: 12px 22px; border-radius: 999px;
@@ -952,14 +979,37 @@ window.SkillbeeBrand = {
     return JSON.parse(JSON.stringify(x));
   }
 
+  function defaultCases() {
+    return clone(window.CaseData || { accusative: [], dative: [], genitive: [] });
+  }
+  function defaultCompounds() {
+    return clone(window.CompoundData || []);
+  }
+
   function defaults() {
     return {
       vocab: clone(window.GameData.VOCAB_TOPICS),
       sentences: clone(window.GameData.SENTENCE_TOPICS),
+      // Fall-Detektiv (case sentences) and Wortmonster (compound words) content,
+      // seeded from the built-in banks but editable + saved like everything else.
+      cases: defaultCases(),
+      compounds: defaultCompounds(),
       // Per-game topic selection. Missing entry / no "topics" list = the game
       // uses ALL topics of its type from the bank (the default).
       games: {}
     };
+  }
+
+  // Make sure an older saved store (from before these games existed) gains the
+  // new sections instead of showing empty editors.
+  function ensureSections(d) {
+    if (!d.cases || typeof d.cases !== "object") d.cases = defaultCases();
+    ["accusative", "dative", "genitive"].forEach(function (k) {
+      if (!Array.isArray(d.cases[k])) d.cases[k] = [];
+    });
+    if (!Array.isArray(d.compounds)) d.compounds = defaultCompounds();
+    if (!d.games || typeof d.games !== "object") d.games = {};
+    return d;
   }
 
   var store = {
@@ -971,8 +1021,7 @@ window.SkillbeeBrand = {
         if (raw) {
           var parsed = JSON.parse(raw);
           if (parsed && Array.isArray(parsed.vocab) && Array.isArray(parsed.sentences)) {
-            if (!parsed.games || typeof parsed.games !== "object") parsed.games = {};
-            this.data = parsed;
+            this.data = ensureSections(parsed);
             return;
           }
         }
@@ -1015,6 +1064,15 @@ window.SkillbeeBrand = {
 
     poolFor: function (type) {
       return type === "sentences" ? this.data.sentences : this.data.vocab;
+    },
+
+    /* Fall-Detektiv case sentences, grouped by case (accusative/dative/genitive). */
+    casesData: function () {
+      return this.data.cases;
+    },
+    /* Wortmonster compound-word list. */
+    compoundsData: function () {
+      return this.data.compounds;
     },
 
     /* Topics a given game should offer (its selected subset, or all by default). */
@@ -1091,8 +1149,7 @@ window.SkillbeeBrand = {
       if (!parsed || !Array.isArray(parsed.vocab) || !Array.isArray(parsed.sentences)) {
         throw new Error("The file is not in the right format.");
       }
-      if (!parsed.games || typeof parsed.games !== "object") parsed.games = {};
-      this.data = parsed;
+      this.data = ensureSections(parsed);
       this.save();
     }
   };
@@ -2367,14 +2424,20 @@ document.addEventListener("DOMContentLoaded", App.init);
         body.appendChild(
           el("div", { class: "adm-tabs" }, [
             subBtn("vocab", "🔤 Words"),
-            subBtn("sentences", "🗣️ Sentences")
+            subBtn("sentences", "🗣️ Sentences"),
+            subBtn("cases", "🕵️ Fall-Detektiv"),
+            subBtn("compounds", "🧟 Wortmonster")
           ])
         );
+        if (bankTab === "cases") return renderCases(body);
+        if (bankTab === "compounds") return renderCompounds(body);
+
         body.appendChild(
           el("p", {
             class: "adm-hint",
-            html:
-              "This is the shared bank that feeds every game. Words are used by <b>Vocabulary Quiz</b>, <b>Memory</b> and <b>Hangman</b>; sentences by <b>Sentence Scramble</b>. Changes save automatically in this browser."
+            html: bankTab === "vocab"
+              ? "Words are used by <b>Vocabulary Quiz</b> and <b>Memory</b> (in class and solo) and <b>Hangman</b>. Changes save automatically in this browser."
+              : "Sentences are used by <b>Sentence Scramble</b>. Changes save automatically in this browser."
           })
         );
         addTopicButton(body, bankTab, null);
@@ -2383,6 +2446,124 @@ document.addEventListener("DOMContentLoaded", App.init);
         list.forEach(function (topic, i) {
           body.appendChild(topicCard(topic, i, bankTab, { expanded: true }));
         });
+      }
+
+      /* ---- Fall-Detektiv: case sentences, grouped by case (= difficulty level) ---- */
+      function renderCases(body) {
+        body.appendChild(
+          el("p", {
+            class: "adm-hint",
+            html:
+              "These sentences power <b>🕵️ Fall-Detektiv</b> in Live Class Mode. Put <code>___</code> where the article belongs, then give the correct article. " +
+              "Levels stack: <b>Level 1</b> uses Accusative, <b>Level 2</b> adds Dative, <b>Level 3</b> adds Genitive. Changes save automatically."
+          })
+        );
+        var C = store.casesData();
+        [
+          ["accusative", "Accusative — Level 1", "🥇"],
+          ["dative", "Dative — Level 2", "🥈"],
+          ["genitive", "Genitive — Level 3", "🥉"]
+        ].forEach(function (sec) {
+          var key = sec[0];
+          var list = C[key] || (C[key] = []);
+          body.appendChild(el("h3", { class: "adm-case-h", text: sec[2] + " " + sec[1] + "  (" + list.length + ")" }));
+          list.forEach(function (entry, i) { body.appendChild(caseRow(entry, list, i)); });
+          body.appendChild(addRowBtn("+ Sentence", function () {
+            list.push({ sentence: "", correct: "", clueWord: "", explanation: "" });
+            store.save();
+            render();
+          }));
+        });
+      }
+
+      function caseRow(entry, list, index) {
+        var card = el("div", { class: "adm-case" });
+        card.appendChild(el("div", { class: "adm-case-line" }, [
+          input(entry, "sentence", "e.g. Ich sehe ___ Mann.", "adm-input grow"),
+          input(entry, "correct", "den", "adm-input adm-article", 5),
+          el("button", {
+            class: "adm-del", html: "🗑", attrs: { title: "Remove sentence" },
+            on: { click: function () { list.splice(index, 1); store.save(); render(); } }
+          })
+        ]));
+        card.appendChild(el("div", { class: "adm-case-line" }, [
+          input(entry, "clueWord", "clue word (the verb or preposition)", "adm-input"),
+          input(entry, "explanation", "why it's correct (shown at reveal)", "adm-input grow")
+        ]));
+        return card;
+      }
+
+      /* ---- Wortmonster: compound words (Part 1 + Part 2) ---- */
+      function renderCompounds(body) {
+        body.appendChild(
+          el("p", {
+            class: "adm-hint",
+            html:
+              "These word-parts power <b>🧟 Wortmonster</b> in Live Class Mode. The word is <b>Part 1 + Part 2</b> joined together, " +
+              "and the gender (der/die/das) comes from Part 2. Changes save automatically."
+          })
+        );
+        var list = store.compoundsData();
+        body.appendChild(el("div", { class: "adm-row adm-row-head adm-compound-row" }, [
+          el("span", { text: "Icon" }),
+          el("span", { text: "Part 1" }),
+          el("span", { text: "Part 2" }),
+          el("span", { text: "= Word" }),
+          el("span", { text: "Gender" }),
+          el("span", { text: "Meaning" }),
+          el("span", {})
+        ]));
+        if (!list.length) body.appendChild(emptyState("No compound words yet."));
+        list.forEach(function (c, i) { body.appendChild(compoundRow(c, list, i)); });
+        body.appendChild(addRowBtn("+ Compound", function () {
+          list.push({ emoji: "", partA: "", partB: "", gender: "der", meaning: "" });
+          store.save();
+          render();
+        }));
+      }
+
+      // Join German-style: second part's first letter goes lower-case.
+      function joinCompound(a, b) {
+        b = String(b || "");
+        return String(a || "") + (b ? b.charAt(0).toLowerCase() + b.slice(1) : "");
+      }
+
+      function compoundRow(c, list, index) {
+        var word = el("span", { class: "adm-compound-word", text: joinCompound(c.partA, c.partB) });
+        function refresh() { word.textContent = joinCompound(c.partA, c.partB); }
+        return el("div", { class: "adm-row adm-compound-row" }, [
+          input(c, "emoji", "🙂", "adm-emoji", 6),
+          partInput(c, "partA", "Hand", refresh),
+          partInput(c, "partB", "Schuh", refresh),
+          word,
+          genderSelect(c),
+          input(c, "meaning", "e.g. glove", "adm-input"),
+          el("button", {
+            class: "adm-del", html: "✕", attrs: { title: "Remove" },
+            on: { click: function () { list.splice(index, 1); store.save(); render(); } }
+          })
+        ]);
+      }
+
+      function partInput(obj, field, placeholder, after) {
+        return el("input", {
+          class: "adm-input",
+          attrs: { type: "text", value: obj[field] == null ? "" : obj[field], placeholder: placeholder },
+          on: { input: function (e) { obj[field] = e.target.value; if (after) after(); store.save(); } }
+        });
+      }
+
+      function genderSelect(obj) {
+        var sel = document.createElement("select");
+        sel.className = "adm-input adm-gender";
+        ["der", "die", "das"].forEach(function (g) {
+          var o = document.createElement("option");
+          o.value = g; o.textContent = g;
+          if ((obj.gender || "der") === g) o.selected = true;
+          sel.appendChild(o);
+        });
+        sel.addEventListener("change", function () { obj.gender = sel.value; store.save(); });
+        return sel;
       }
 
       function subBtn(id, label) {
@@ -2920,6 +3101,16 @@ document.addEventListener("DOMContentLoaded", App.init);
     });
   }
 
+  // Three wrong article options. Use the ones stored with the sentence if
+  // present; otherwise pick three other real German articles (so teacher-added
+  // rows work without having to type distractors by hand).
+  var ARTICLE_POOL = ["der", "die", "das", "den", "dem", "des"];
+  function caseDistractors(s) {
+    if (s.distractors && s.distractors.length >= 3) return s.distractors.slice(0, 3);
+    var pool = ARTICLE_POOL.filter(function (a) { return a !== s.correct; });
+    return kit().sample(pool, 3);
+  }
+
   var casesAdapter = {
     meta: { name: "Fall-Detektiv", emoji: "🕵️", contentType: "cases" },
     timeLimit: 20000,
@@ -2933,15 +3124,20 @@ document.addEventListener("DOMContentLoaded", App.init);
       ];
     },
     buildRounds: function (topic) {
-      var C = window.CaseData || { accusative: [], dative: [], genitive: [] };
-      var pool = C.accusative.slice();
-      if (topic.level >= 2) pool = pool.concat(C.dative);
-      if (topic.level >= 3) pool = pool.concat(C.genitive);
+      var store = window.ContentStore;
+      var C = (store && store.casesData && store.casesData()) || window.CaseData || { accusative: [], dative: [], genitive: [] };
+      var pool = (C.accusative || []).slice();
+      if (topic.level >= 2) pool = pool.concat(C.dative || []);
+      if (topic.level >= 3) pool = pool.concat(C.genitive || []);
+      // Skip half-finished rows a teacher may have added in the editor.
+      pool = pool.filter(function (s) {
+        return s && s.sentence && String(s.sentence).indexOf("___") >= 0 && s.correct;
+      });
       return kit().sample(pool, Math.min(10, pool.length)).map(function (s) {
         return {
-          type: "cases", sentence: s.sentence, blank: s.blank, clueWord: s.clueWord,
-          options: kit().shuffle([s.correct].concat(s.distractors)),
-          answer: s.correct, correct: s.correct, explanation: s.explanation
+          type: "cases", sentence: s.sentence, blank: s.blank || "", clueWord: s.clueWord || "",
+          options: kit().shuffle([s.correct].concat(caseDistractors(s))),
+          answer: s.correct, correct: s.correct, explanation: s.explanation || ""
         };
       });
     },
@@ -2984,6 +3180,13 @@ document.addEventListener("DOMContentLoaded", App.init);
   };
 
   /* ---- Wortmonster (Word Monster): build compound nouns from two tiles ---- */
+  // Join two parts the German way: the second part's first letter becomes
+  // lower-case (Hand + Schuh -> Handschuh). Used for teacher-added rows.
+  function joinCompound(a, b) {
+    b = String(b || "");
+    return String(a || "") + (b ? b.charAt(0).toLowerCase() + b.slice(1) : "");
+  }
+
   var compoundAdapter = {
     meta: { name: "Wortmonster", emoji: "🧟", contentType: "compounds" },
     timeLimit: 20000,
@@ -2991,7 +3194,16 @@ document.addEventListener("DOMContentLoaded", App.init);
       return [{ id: "all", name: "Wortmonster", english: "All compounds", emoji: "🧟" }];
     },
     buildRounds: function () {
-      var all = window.CompoundData || [];
+      var store = window.ContentStore;
+      var raw = (store && store.compoundsData && store.compoundsData()) || window.CompoundData || [];
+      // Keep only usable rows and make sure each has a compound (parts join directly).
+      var all = raw.filter(function (c) { return c && c.partA && c.partB; }).map(function (c) {
+        return {
+          partA: c.partA, partB: c.partB, gender: c.gender || "der",
+          meaning: c.meaning || "", emoji: c.emoji || "",
+          compound: c.compound || joinCompound(c.partA, c.partB)
+        };
+      });
       return kit().sample(all, Math.min(10, all.length)).map(function (c) {
         // tile set = the two correct parts + a few decoy parts from other words
         var others = all.filter(function (x) { return x.compound !== c.compound; });

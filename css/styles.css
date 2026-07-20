@@ -363,6 +363,33 @@ kbd {
 .adm-del:hover { background: #ffeef0; border-color: var(--bad); }
 .adm-add-row { margin-top: 6px; }
 
+/* Fall-Detektiv (cases) editor */
+.adm-case-h { margin: 18px 0 8px; font-size: 1rem; font-weight: 800; color: var(--ink); }
+.adm-case {
+  border: 1px solid var(--line); border-radius: 12px; padding: 10px;
+  margin-bottom: 8px; background: #fff;
+}
+.adm-case-line { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.adm-case-line:last-child { margin-bottom: 0; }
+.adm-case-line > .adm-input { flex: 1 1 140px; }
+.adm-case-line > .adm-article { flex: 0 0 78px; text-align: center; font-weight: 800; }
+
+/* Wortmonster (compounds) editor */
+.adm-compound-row {
+  display: grid; grid-template-columns: 58px 1fr 1fr 1.1fr 82px 1.2fr 40px;
+  gap: 8px; align-items: center; margin-bottom: 8px;
+}
+.adm-compound-word {
+  font-weight: 800; color: var(--skb); text-align: center;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.adm-gender { cursor: pointer; }
+@media (max-width: 560px) {
+  .adm-compound-row { display: flex; flex-wrap: wrap; }
+  .adm-compound-row > .adm-input, .adm-compound-row > .adm-gender { flex: 1 1 40%; }
+  .adm-compound-word { flex: 1 1 100%; text-align: left; }
+}
+
 .adm-toast {
   position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px);
   background: var(--ink); color: #fff; padding: 12px 22px; border-radius: 999px;

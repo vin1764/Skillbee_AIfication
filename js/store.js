@@ -15,14 +15,37 @@
     return JSON.parse(JSON.stringify(x));
   }
 
+  function defaultCases() {
+    return clone(window.CaseData || { accusative: [], dative: [], genitive: [] });
+  }
+  function defaultCompounds() {
+    return clone(window.CompoundData || []);
+  }
+
   function defaults() {
     return {
       vocab: clone(window.GameData.VOCAB_TOPICS),
       sentences: clone(window.GameData.SENTENCE_TOPICS),
+      // Fall-Detektiv (case sentences) and Wortmonster (compound words) content,
+      // seeded from the built-in banks but editable + saved like everything else.
+      cases: defaultCases(),
+      compounds: defaultCompounds(),
       // Per-game topic selection. Missing entry / no "topics" list = the game
       // uses ALL topics of its type from the bank (the default).
       games: {}
     };
+  }
+
+  // Make sure an older saved store (from before these games existed) gains the
+  // new sections instead of showing empty editors.
+  function ensureSections(d) {
+    if (!d.cases || typeof d.cases !== "object") d.cases = defaultCases();
+    ["accusative", "dative", "genitive"].forEach(function (k) {
+      if (!Array.isArray(d.cases[k])) d.cases[k] = [];
+    });
+    if (!Array.isArray(d.compounds)) d.compounds = defaultCompounds();
+    if (!d.games || typeof d.games !== "object") d.games = {};
+    return d;
   }
 
   var store = {
@@ -34,8 +57,7 @@
         if (raw) {
           var parsed = JSON.parse(raw);
           if (parsed && Array.isArray(parsed.vocab) && Array.isArray(parsed.sentences)) {
-            if (!parsed.games || typeof parsed.games !== "object") parsed.games = {};
-            this.data = parsed;
+            this.data = ensureSections(parsed);
             return;
           }
         }
@@ -78,6 +100,15 @@
 
     poolFor: function (type) {
       return type === "sentences" ? this.data.sentences : this.data.vocab;
+    },
+
+    /* Fall-Detektiv case sentences, grouped by case (accusative/dative/genitive). */
+    casesData: function () {
+      return this.data.cases;
+    },
+    /* Wortmonster compound-word list. */
+    compoundsData: function () {
+      return this.data.compounds;
     },
 
     /* Topics a given game should offer (its selected subset, or all by default). */
@@ -154,8 +185,7 @@
       if (!parsed || !Array.isArray(parsed.vocab) || !Array.isArray(parsed.sentences)) {
         throw new Error("The file is not in the right format.");
       }
-      if (!parsed.games || typeof parsed.games !== "object") parsed.games = {};
-      this.data = parsed;
+      this.data = ensureSections(parsed);
       this.save();
     }
   };

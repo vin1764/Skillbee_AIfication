@@ -102,14 +102,20 @@
         body.appendChild(
           el("div", { class: "adm-tabs" }, [
             subBtn("vocab", "🔤 Words"),
-            subBtn("sentences", "🗣️ Sentences")
+            subBtn("sentences", "🗣️ Sentences"),
+            subBtn("cases", "🕵️ Fall-Detektiv"),
+            subBtn("compounds", "🧟 Wortmonster")
           ])
         );
+        if (bankTab === "cases") return renderCases(body);
+        if (bankTab === "compounds") return renderCompounds(body);
+
         body.appendChild(
           el("p", {
             class: "adm-hint",
-            html:
-              "This is the shared bank that feeds every game. Words are used by <b>Vocabulary Quiz</b>, <b>Memory</b> and <b>Hangman</b>; sentences by <b>Sentence Scramble</b>. Changes save automatically in this browser."
+            html: bankTab === "vocab"
+              ? "Words are used by <b>Vocabulary Quiz</b> and <b>Memory</b> (in class and solo) and <b>Hangman</b>. Changes save automatically in this browser."
+              : "Sentences are used by <b>Sentence Scramble</b>. Changes save automatically in this browser."
           })
         );
         addTopicButton(body, bankTab, null);
@@ -118,6 +124,124 @@
         list.forEach(function (topic, i) {
           body.appendChild(topicCard(topic, i, bankTab, { expanded: true }));
         });
+      }
+
+      /* ---- Fall-Detektiv: case sentences, grouped by case (= difficulty level) ---- */
+      function renderCases(body) {
+        body.appendChild(
+          el("p", {
+            class: "adm-hint",
+            html:
+              "These sentences power <b>🕵️ Fall-Detektiv</b> in Live Class Mode. Put <code>___</code> where the article belongs, then give the correct article. " +
+              "Levels stack: <b>Level 1</b> uses Accusative, <b>Level 2</b> adds Dative, <b>Level 3</b> adds Genitive. Changes save automatically."
+          })
+        );
+        var C = store.casesData();
+        [
+          ["accusative", "Accusative — Level 1", "🥇"],
+          ["dative", "Dative — Level 2", "🥈"],
+          ["genitive", "Genitive — Level 3", "🥉"]
+        ].forEach(function (sec) {
+          var key = sec[0];
+          var list = C[key] || (C[key] = []);
+          body.appendChild(el("h3", { class: "adm-case-h", text: sec[2] + " " + sec[1] + "  (" + list.length + ")" }));
+          list.forEach(function (entry, i) { body.appendChild(caseRow(entry, list, i)); });
+          body.appendChild(addRowBtn("+ Sentence", function () {
+            list.push({ sentence: "", correct: "", clueWord: "", explanation: "" });
+            store.save();
+            render();
+          }));
+        });
+      }
+
+      function caseRow(entry, list, index) {
+        var card = el("div", { class: "adm-case" });
+        card.appendChild(el("div", { class: "adm-case-line" }, [
+          input(entry, "sentence", "e.g. Ich sehe ___ Mann.", "adm-input grow"),
+          input(entry, "correct", "den", "adm-input adm-article", 5),
+          el("button", {
+            class: "adm-del", html: "🗑", attrs: { title: "Remove sentence" },
+            on: { click: function () { list.splice(index, 1); store.save(); render(); } }
+          })
+        ]));
+        card.appendChild(el("div", { class: "adm-case-line" }, [
+          input(entry, "clueWord", "clue word (the verb or preposition)", "adm-input"),
+          input(entry, "explanation", "why it's correct (shown at reveal)", "adm-input grow")
+        ]));
+        return card;
+      }
+
+      /* ---- Wortmonster: compound words (Part 1 + Part 2) ---- */
+      function renderCompounds(body) {
+        body.appendChild(
+          el("p", {
+            class: "adm-hint",
+            html:
+              "These word-parts power <b>🧟 Wortmonster</b> in Live Class Mode. The word is <b>Part 1 + Part 2</b> joined together, " +
+              "and the gender (der/die/das) comes from Part 2. Changes save automatically."
+          })
+        );
+        var list = store.compoundsData();
+        body.appendChild(el("div", { class: "adm-row adm-row-head adm-compound-row" }, [
+          el("span", { text: "Icon" }),
+          el("span", { text: "Part 1" }),
+          el("span", { text: "Part 2" }),
+          el("span", { text: "= Word" }),
+          el("span", { text: "Gender" }),
+          el("span", { text: "Meaning" }),
+          el("span", {})
+        ]));
+        if (!list.length) body.appendChild(emptyState("No compound words yet."));
+        list.forEach(function (c, i) { body.appendChild(compoundRow(c, list, i)); });
+        body.appendChild(addRowBtn("+ Compound", function () {
+          list.push({ emoji: "", partA: "", partB: "", gender: "der", meaning: "" });
+          store.save();
+          render();
+        }));
+      }
+
+      // Join German-style: second part's first letter goes lower-case.
+      function joinCompound(a, b) {
+        b = String(b || "");
+        return String(a || "") + (b ? b.charAt(0).toLowerCase() + b.slice(1) : "");
+      }
+
+      function compoundRow(c, list, index) {
+        var word = el("span", { class: "adm-compound-word", text: joinCompound(c.partA, c.partB) });
+        function refresh() { word.textContent = joinCompound(c.partA, c.partB); }
+        return el("div", { class: "adm-row adm-compound-row" }, [
+          input(c, "emoji", "🙂", "adm-emoji", 6),
+          partInput(c, "partA", "Hand", refresh),
+          partInput(c, "partB", "Schuh", refresh),
+          word,
+          genderSelect(c),
+          input(c, "meaning", "e.g. glove", "adm-input"),
+          el("button", {
+            class: "adm-del", html: "✕", attrs: { title: "Remove" },
+            on: { click: function () { list.splice(index, 1); store.save(); render(); } }
+          })
+        ]);
+      }
+
+      function partInput(obj, field, placeholder, after) {
+        return el("input", {
+          class: "adm-input",
+          attrs: { type: "text", value: obj[field] == null ? "" : obj[field], placeholder: placeholder },
+          on: { input: function (e) { obj[field] = e.target.value; if (after) after(); store.save(); } }
+        });
+      }
+
+      function genderSelect(obj) {
+        var sel = document.createElement("select");
+        sel.className = "adm-input adm-gender";
+        ["der", "die", "das"].forEach(function (g) {
+          var o = document.createElement("option");
+          o.value = g; o.textContent = g;
+          if ((obj.gender || "der") === g) o.selected = true;
+          sel.appendChild(o);
+        });
+        sel.addEventListener("change", function () { obj.gender = sel.value; store.save(); });
+        return sel;
       }
 
       function subBtn(id, label) {
