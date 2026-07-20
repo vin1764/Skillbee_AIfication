@@ -65,16 +65,16 @@ const VOCAB_TOPICS = [
     english: "Animals",
     emoji: "🐾",
     words: [
-      { de: "der Hund", en: "the dog", emoji: "🐶" },
-      { de: "die Katze", en: "the cat", emoji: "🐱" },
-      { de: "das Pferd", en: "the horse", emoji: "🐴" },
-      { de: "der Vogel", en: "the bird", emoji: "🐦" },
-      { de: "der Fisch", en: "the fish", emoji: "🐟" },
-      { de: "die Kuh", en: "the cow", emoji: "🐮" },
-      { de: "das Schwein", en: "the pig", emoji: "🐷" },
-      { de: "der Bär", en: "the bear", emoji: "🐻" },
-      { de: "der Löwe", en: "the lion", emoji: "🦁" },
-      { de: "der Elefant", en: "the elephant", emoji: "🐘" }
+      { de: "der Hund", en: "the dog", emoji: "🐶", gender: "der" },
+      { de: "die Katze", en: "the cat", emoji: "🐱", gender: "die" },
+      { de: "das Pferd", en: "the horse", emoji: "🐴", gender: "das" },
+      { de: "der Vogel", en: "the bird", emoji: "🐦", gender: "der" },
+      { de: "der Fisch", en: "the fish", emoji: "🐟", gender: "der" },
+      { de: "die Kuh", en: "the cow", emoji: "🐮", gender: "die" },
+      { de: "das Schwein", en: "the pig", emoji: "🐷", gender: "das" },
+      { de: "der Bär", en: "the bear", emoji: "🐻", gender: "der" },
+      { de: "der Löwe", en: "the lion", emoji: "🦁", gender: "der" },
+      { de: "der Elefant", en: "the elephant", emoji: "🐘", gender: "der" }
     ]
   },
   {
@@ -83,16 +83,16 @@ const VOCAB_TOPICS = [
     english: "Food & Drink",
     emoji: "🍽️",
     words: [
-      { de: "das Brot", en: "the bread", emoji: "🍞" },
-      { de: "der Apfel", en: "the apple", emoji: "🍎" },
-      { de: "der Käse", en: "the cheese", emoji: "🧀" },
-      { de: "das Ei", en: "the egg", emoji: "🥚" },
-      { de: "die Milch", en: "the milk", emoji: "🥛" },
-      { de: "der Kaffee", en: "the coffee", emoji: "☕" },
-      { de: "das Wasser", en: "the water", emoji: "💧" },
-      { de: "der Fisch", en: "the fish", emoji: "🐟" },
-      { de: "die Banane", en: "the banana", emoji: "🍌" },
-      { de: "der Kuchen", en: "the cake", emoji: "🍰" }
+      { de: "das Brot", en: "the bread", emoji: "🍞", gender: "das" },
+      { de: "der Apfel", en: "the apple", emoji: "🍎", gender: "der" },
+      { de: "der Käse", en: "the cheese", emoji: "🧀", gender: "der" },
+      { de: "das Ei", en: "the egg", emoji: "🥚", gender: "das" },
+      { de: "die Milch", en: "the milk", emoji: "🥛", gender: "die" },
+      { de: "der Kaffee", en: "the coffee", emoji: "☕", gender: "der" },
+      { de: "das Wasser", en: "the water", emoji: "💧", gender: "das" },
+      { de: "der Fisch", en: "the fish", emoji: "🐟", gender: "der" },
+      { de: "die Banane", en: "the banana", emoji: "🍌", gender: "die" },
+      { de: "der Kuchen", en: "the cake", emoji: "🍰", gender: "der" }
     ]
   },
   {
@@ -101,14 +101,14 @@ const VOCAB_TOPICS = [
     english: "Family",
     emoji: "👪",
     words: [
-      { de: "die Mutter", en: "the mother", emoji: "👩" },
-      { de: "der Vater", en: "the father", emoji: "👨" },
-      { de: "die Schwester", en: "the sister", emoji: "👧" },
-      { de: "der Bruder", en: "the brother", emoji: "👦" },
-      { de: "die Oma", en: "the grandma", emoji: "👵" },
-      { de: "der Opa", en: "the grandpa", emoji: "👴" },
-      { de: "das Kind", en: "the child", emoji: "🧒" },
-      { de: "das Baby", en: "the baby", emoji: "👶" }
+      { de: "die Mutter", en: "the mother", emoji: "👩", gender: "die" },
+      { de: "der Vater", en: "the father", emoji: "👨", gender: "der" },
+      { de: "die Schwester", en: "the sister", emoji: "👧", gender: "die" },
+      { de: "der Bruder", en: "the brother", emoji: "👦", gender: "der" },
+      { de: "die Oma", en: "the grandma", emoji: "👵", gender: "die" },
+      { de: "der Opa", en: "the grandpa", emoji: "👴", gender: "der" },
+      { de: "das Kind", en: "the child", emoji: "🧒", gender: "das" },
+      { de: "das Baby", en: "the baby", emoji: "👶", gender: "das" }
     ]
   },
   {
