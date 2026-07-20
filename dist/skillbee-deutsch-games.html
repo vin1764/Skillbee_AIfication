@@ -432,6 +432,7 @@ kbd {
 .live-choice-sub { color: var(--ink-soft); font-size: 0.9rem; margin-top: 4px; }
 
 /* rosters */
+.roster-toolbar { display: flex; gap: 10px; flex-wrap: wrap; }
 .roster-list { display: flex; flex-direction: column; gap: 10px; margin: 14px 0 18px; }
 .roster-row { display: flex; gap: 8px; }
 .roster-main { flex: 1; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; box-shadow: var(--shadow); }
@@ -1139,8 +1140,16 @@ const App = (function () {
   }
 
   /* ---- home screen (the lobby) ------------------------------------- */
+  /* The admin gear is teacher-only: shown in Solo mode, hidden on the mode
+     picker and everywhere in Live Mode (so students on phones can't reach it). */
+  function setAdminVisible(v) {
+    const b = document.getElementById("admin-btn");
+    if (b) b.style.display = v ? "" : "none";
+  }
+
   function showModeSelect() {
     if (window.LiveMode) window.LiveMode.stop();
+    setAdminVisible(false);
     window.speechSynthesis && window.speechSynthesis.cancel();
     const main = document.getElementById("screen");
     main.innerHTML = "";
@@ -1169,6 +1178,7 @@ const App = (function () {
   }
 
   function showLive() {
+    setAdminVisible(false);
     const main = document.getElementById("screen");
     main.innerHTML = "";
     if (window.LiveMode) {
@@ -1178,6 +1188,7 @@ const App = (function () {
 
   function showHome() {
     if (window.LiveMode) window.LiveMode.stop();
+    setAdminVisible(true);
     window.speechSynthesis && window.speechSynthesis.cancel();
     const main = document.getElementById("screen");
     main.innerHTML = "";
@@ -1293,8 +1304,9 @@ const App = (function () {
   }
 
   /* ---- admin screen (content editor) ------------------------------- */
-  function showAdmin() {
+  function showAdmin(onExit) {
     if (window.LiveMode) window.LiveMode.stop();
+    setAdminVisible(false);
     window.speechSynthesis && window.speechSynthesis.cancel();
     const main = document.getElementById("screen");
     main.innerHTML = "";
@@ -1306,7 +1318,7 @@ const App = (function () {
         kit,
         store: window.ContentStore,
         games: games.map((g) => ({ id: g.id, name: g.name, emoji: g.emoji, color: g.color, contentType: g.contentType })),
-        onExit: () => showHome()
+        onExit: typeof onExit === "function" ? onExit : () => showHome()
       });
     }
   }
@@ -1335,7 +1347,7 @@ const App = (function () {
     showModeSelect();
   }
 
-  return { register, init, kit, state, addScore, showHome, showAdmin, showModeSelect, showLive };
+  return { register, init, kit, state, addScore, showHome, showAdmin, showModeSelect, showLive, setAdminVisible };
 })();
 
 window.App = App;
@@ -2599,6 +2611,7 @@ window.LiveMode = (function () {
   function start(container, api) {
     C = container; el = api.el; kit = api.kit; store = api.store; goBack = api.back;
     stop();
+    if (window.App) window.App.setAdminVisible(false); // admin is teacher-only, never in Live
     if (!window.LiveDB || !window.LiveDB.available()) return offlineNotice();
     landing();
   }
@@ -2673,7 +2686,10 @@ window.LiveMode = (function () {
     ]);
     var list = el("div", { class: "roster-list" });
     wrap.appendChild(list);
-    wrap.appendChild(el("button", { class: "btn primary", html: "+ New class", on: { click: function () { rosterEditor(null); } } }));
+    wrap.appendChild(el("div", { class: "roster-toolbar" }, [
+      el("button", { class: "btn primary", html: "+ New class", on: { click: function () { rosterEditor(null); } } }),
+      el("button", { class: "btn ghost", html: "⚙️ Manage content", attrs: { title: "Edit words & sentences (teacher only)" }, on: { click: function () { if (window.App) window.App.showAdmin(hostRosters); } } })
+    ]));
     show(wrap);
 
     if (!ids.length) {

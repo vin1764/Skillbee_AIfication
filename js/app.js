@@ -218,8 +218,16 @@ const App = (function () {
   }
 
   /* ---- home screen (the lobby) ------------------------------------- */
+  /* The admin gear is teacher-only: shown in Solo mode, hidden on the mode
+     picker and everywhere in Live Mode (so students on phones can't reach it). */
+  function setAdminVisible(v) {
+    const b = document.getElementById("admin-btn");
+    if (b) b.style.display = v ? "" : "none";
+  }
+
   function showModeSelect() {
     if (window.LiveMode) window.LiveMode.stop();
+    setAdminVisible(false);
     window.speechSynthesis && window.speechSynthesis.cancel();
     const main = document.getElementById("screen");
     main.innerHTML = "";
@@ -248,6 +256,7 @@ const App = (function () {
   }
 
   function showLive() {
+    setAdminVisible(false);
     const main = document.getElementById("screen");
     main.innerHTML = "";
     if (window.LiveMode) {
@@ -257,6 +266,7 @@ const App = (function () {
 
   function showHome() {
     if (window.LiveMode) window.LiveMode.stop();
+    setAdminVisible(true);
     window.speechSynthesis && window.speechSynthesis.cancel();
     const main = document.getElementById("screen");
     main.innerHTML = "";
@@ -372,8 +382,9 @@ const App = (function () {
   }
 
   /* ---- admin screen (content editor) ------------------------------- */
-  function showAdmin() {
+  function showAdmin(onExit) {
     if (window.LiveMode) window.LiveMode.stop();
+    setAdminVisible(false);
     window.speechSynthesis && window.speechSynthesis.cancel();
     const main = document.getElementById("screen");
     main.innerHTML = "";
@@ -385,7 +396,7 @@ const App = (function () {
         kit,
         store: window.ContentStore,
         games: games.map((g) => ({ id: g.id, name: g.name, emoji: g.emoji, color: g.color, contentType: g.contentType })),
-        onExit: () => showHome()
+        onExit: typeof onExit === "function" ? onExit : () => showHome()
       });
     }
   }
@@ -414,7 +425,7 @@ const App = (function () {
     showModeSelect();
   }
 
-  return { register, init, kit, state, addScore, showHome, showAdmin, showModeSelect, showLive };
+  return { register, init, kit, state, addScore, showHome, showAdmin, showModeSelect, showLive, setAdminVisible };
 })();
 
 window.App = App;

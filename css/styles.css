@@ -424,6 +424,7 @@ kbd {
 .live-choice-sub { color: var(--ink-soft); font-size: 0.9rem; margin-top: 4px; }
 
 /* rosters */
+.roster-toolbar { display: flex; gap: 10px; flex-wrap: wrap; }
 .roster-list { display: flex; flex-direction: column; gap: 10px; margin: 14px 0 18px; }
 .roster-row { display: flex; gap: 8px; }
 .roster-main { flex: 1; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; box-shadow: var(--shadow); }

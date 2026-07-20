@@ -21,6 +21,7 @@ window.LiveMode = (function () {
   function start(container, api) {
     C = container; el = api.el; kit = api.kit; store = api.store; goBack = api.back;
     stop();
+    if (window.App) window.App.setAdminVisible(false); // admin is teacher-only, never in Live
     if (!window.LiveDB || !window.LiveDB.available()) return offlineNotice();
     landing();
   }
@@ -95,7 +96,10 @@ window.LiveMode = (function () {
     ]);
     var list = el("div", { class: "roster-list" });
     wrap.appendChild(list);
-    wrap.appendChild(el("button", { class: "btn primary", html: "+ New class", on: { click: function () { rosterEditor(null); } } }));
+    wrap.appendChild(el("div", { class: "roster-toolbar" }, [
+      el("button", { class: "btn primary", html: "+ New class", on: { click: function () { rosterEditor(null); } } }),
+      el("button", { class: "btn ghost", html: "⚙️ Manage content", attrs: { title: "Edit words & sentences (teacher only)" }, on: { click: function () { if (window.App) window.App.showAdmin(hostRosters); } } })
+    ]));
     show(wrap);
 
     if (!ids.length) {
