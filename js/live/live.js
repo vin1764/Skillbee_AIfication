@@ -42,7 +42,7 @@ window.LiveMode = (function () {
     show(screen("live-center", [
       el("button", { class: "back-link", html: "← Back", on: { click: goBack } }),
       el("div", { class: "live-choice" }, [
-        el("button", { class: "live-choice-card host", on: { click: hostRosters } }, [
+        el("button", { class: "live-choice-card host", on: { click: function () { if (window.TeacherGate) window.TeacherGate.require(hostRosters); else hostRosters(); } } }, [
           el("div", { class: "live-big-emoji", text: "🖥️" }),
           el("div", { class: "live-choice-name", text: "Host a class" }),
           el("div", { class: "live-choice-sub", text: "Teacher — show on the smartboard" })

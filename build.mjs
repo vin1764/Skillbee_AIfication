@@ -17,6 +17,7 @@ const jsFiles = [
   "js/data.js",
   "js/brand.js",
   "js/store.js",
+  "js/teacher.js",
   "js/app.js",
   "js/games/quiz.js",
   "js/games/memory.js",

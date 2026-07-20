@@ -62,6 +62,9 @@
             el("div", { class: "adm-tools" }, [
               el("button", { class: "btn small", html: "⬇ Export", attrs: { title: "Save everything to a file" }, on: { click: doExport } }),
               el("button", { class: "btn small", html: "⬆ Import", attrs: { title: "Load from a file" }, on: { click: doImport } }),
+              (window.TeacherGate && window.TeacherGate.gated())
+                ? el("button", { class: "btn small ghost", html: "🔒 PIN", attrs: { title: "Change teacher PIN" }, on: { click: function () { window.TeacherGate.changePin(); } } })
+                : null,
               el("button", { class: "btn small ghost", html: "↺ Reset", on: { click: doReset } })
             ])
           ])

@@ -148,6 +148,16 @@
         });
     },
 
+    /* ---------------- teacher PIN config ---------------- */
+    getConfig: function () {
+      return db.collection("config").doc("teacher").get().then(function (d) {
+        return d.exists ? d.data() : null;
+      });
+    },
+    setConfig: function (data) {
+      return db.collection("config").doc("teacher").set(data, { merge: true });
+    },
+
     /* ---------------- cumulative leaderboards ---------------- */
     getLeaderboard: function (rosterId) {
       return db.collection("leaderboards").doc(rosterId).get().then(function (d) {

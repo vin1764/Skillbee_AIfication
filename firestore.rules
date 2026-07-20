@@ -58,6 +58,13 @@ service cloud.firestore {
       }
     }
 
+    // ---- App config: the teacher PIN (stored hashed, not plaintext) ----
+    match /config/{doc} {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasOnly(['pin']) &&
+        request.resource.data.pin is string && request.resource.data.pin.size() <= 64;
+    }
+
     // ---- Cumulative leaderboards (only touched in "continue" mode) ----
     match /leaderboards/{rosterId} {
       allow read: if true;

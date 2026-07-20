@@ -383,6 +383,12 @@ const App = (function () {
 
   /* ---- admin screen (content editor) ------------------------------- */
   function showAdmin(onExit) {
+    // Teacher PIN gate (only enforced online); once unlocked, opens the editor.
+    if (window.TeacherGate) window.TeacherGate.require(() => openAdmin(onExit));
+    else openAdmin(onExit);
+  }
+
+  function openAdmin(onExit) {
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(false);
     window.speechSynthesis && window.speechSynthesis.cancel();

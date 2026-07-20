@@ -45,7 +45,21 @@ because it has to talk to Firebase in real time).
 
 ---
 
-## 3. A note on the Firebase key in the code
+## 3. The teacher PIN
+
+Hosting a live class and opening the content editor are protected by a **4-digit teacher PIN** so
+students can't reach them.
+
+- **First time:** the first person to Host or open the editor is asked to **create** the PIN
+  (enter it twice). Do this yourself during setup so *you* choose it.
+- After that, hosting/editing asks for the PIN. Students don't know it, so they can't host or edit.
+- Once you enter it, your device stays unlocked for that browser session.
+- **Change it** anytime from the content editor's toolbar (**🔒 PIN**).
+
+It's a light gate, not a bank vault — but combined with the fact that student edits only ever
+affect their own phone, it's plenty for a classroom.
+
+## 4. A note on the Firebase key in the code
 
 You'll see the Firebase configuration (including `apiKey`) sitting in `js/live/firebase.js`. That
 is **normal and safe** — Firebase web keys are public by design and are sent to every browser that
