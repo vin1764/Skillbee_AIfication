@@ -191,12 +191,6 @@ const App = (function () {
           '<span class="brand-text"><b>Deutsch</b> Games</span>'
       }),
       el("div", { class: "topbar-right" }, [
-        el("button", {
-          class: "icon-btn",
-          attrs: { id: "admin-btn", title: "Manage content" },
-          html: "⚙️",
-          on: { click: () => showAdmin() }
-        }),
         el("div", { class: "score-badge", attrs: { title: "Points this session" } }, [
           el("span", { class: "score-star", html: "⭐" }),
           el("span", { class: "score-value", attrs: { id: "score-value" }, text: "0" })
@@ -272,8 +266,13 @@ const App = (function () {
     main.innerHTML = "";
 
     main.appendChild(
+      el("div", { class: "screen-back" }, [
+        el("button", { class: "back-link", html: "← Modes", on: { click: () => showModeSelect() } })
+      ])
+    );
+
+    main.appendChild(
       el("section", { class: "hero" }, [
-        el("button", { class: "back-link hero-back", html: "← Modes", on: { click: () => showModeSelect() } }),
         el("h1", { class: "hero-title", html: 'Welcome! Pick a <span>game</span> 🎲' }),
         el("p", {
           class: "hero-sub",
@@ -305,11 +304,6 @@ const App = (function () {
 
     main.appendChild(
       el("footer", { class: "home-foot" }, [
-        el("button", {
-          class: "foot-admin",
-          html: "⚙️ Manage content",
-          on: { click: () => showAdmin() }
-        }),
         el("div", {
           class: "foot-note",
           html: "Made for Skillbee German teachers · Tip: press <kbd>F11</kbd> for full-screen in class"

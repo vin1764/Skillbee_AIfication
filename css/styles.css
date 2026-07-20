@@ -388,7 +388,7 @@ kbd {
 /* =====================================================================
    MODE SELECT (Solo vs Live)
    ===================================================================== */
-.hero-back { position: absolute; }
+.screen-back { margin-bottom: 4px; }
 .mode-grid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); max-width: 760px; margin: 10px auto; }
 .mode-card {
   text-align: left; background: var(--card); border: 1px solid var(--line);
