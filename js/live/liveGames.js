@@ -20,6 +20,23 @@
   var SHAPES = ["🔺", "🔷", "⬤", "⬛"];
   var COLORS = ["#ff595e", "#1982c4", "#8ac926", "#ff924c"];
 
+  // Build up to `n` wrong options. Uses the teacher's custom ones first (from the
+  // admin editor), then tops up with auto-generated ones from `autoPool`. Never
+  // includes the correct answer; blanks/duplicates are dropped. If the teacher
+  // set nothing, this behaves exactly like the previous auto-only generation.
+  function wrongOptions(custom, correct, autoPool, n) {
+    var out = [];
+    (custom || []).forEach(function (d) {
+      d = String(d).trim();
+      if (d && d !== correct && out.indexOf(d) < 0) out.push(d);
+    });
+    if (out.length < n) {
+      var pool = autoPool.filter(function (x) { return x !== correct && out.indexOf(x) < 0; });
+      kit().sample(pool, n - out.length).forEach(function (x) { out.push(x); });
+    }
+    return out.slice(0, n);
+  }
+
   /* A "choice" game: board shows a German word, phones show 4 tap buttons. */
   function choiceAdapter(meta) {
     return {
@@ -29,8 +46,8 @@
         var words = (topic.words || []).filter(function (w) { return w.de && w.en; });
         var picked = kit().sample(words, Math.min(10, words.length));
         return picked.map(function (w) {
-          var others = words.filter(function (x) { return x.en !== w.en; });
-          var distract = kit().sample(others, Math.min(3, others.length)).map(function (x) { return x.en; });
+          var autoPool = words.filter(function (x) { return x.en !== w.en; }).map(function (x) { return x.en; });
+          var distract = wrongOptions(w.distractors, w.en, autoPool, 3);
           var options = kit().shuffle([w.en].concat(distract));
           return { type: "choice", de: w.de, emoji: w.emoji || "", options: options, answer: w.en };
         });
@@ -99,9 +116,7 @@
   // rows work without having to type distractors by hand).
   var ARTICLE_POOL = ["der", "die", "das", "den", "dem", "des"];
   function caseDistractors(s) {
-    if (s.distractors && s.distractors.length >= 3) return s.distractors.slice(0, 3);
-    var pool = ARTICLE_POOL.filter(function (a) { return a !== s.correct; });
-    return kit().sample(pool, 3);
+    return wrongOptions(s.distractors, s.correct, ARTICLE_POOL, 3);
   }
 
   var casesAdapter = {

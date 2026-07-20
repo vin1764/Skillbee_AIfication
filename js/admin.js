@@ -37,6 +37,22 @@
         });
       }
 
+      /* An input for an optional list of "wrong options" (comma-separated).
+         Stored as an array; blank = let the game auto-generate them. */
+      function optionsInput(obj, field, placeholder) {
+        return el("input", {
+          class: "adm-input",
+          attrs: { type: "text", value: (obj[field] || []).join(", "), placeholder: placeholder || "" },
+          on: {
+            input: function (e) {
+              var arr = e.target.value.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+              if (arr.length) obj[field] = arr; else delete obj[field];
+              store.save();
+            }
+          }
+        });
+      }
+
       function toast(msg) {
         var t = el("div", { class: "adm-toast", text: msg });
         document.body.appendChild(t);
@@ -55,9 +71,16 @@
       function render() {
         container.innerHTML = "";
 
+        // One back button (pinned top-left): steps up a level when inside a
+        // single game's editor, otherwise leaves the content editor.
+        var inGame = mode === "games" && currentGame;
         container.appendChild(
           el("div", { class: "adm-head" }, [
-            el("button", { class: "back-link", html: "← Menu", on: { click: api.onExit } }),
+            el("button", {
+              class: "back-link",
+              html: inGame ? "← Games" : "← Menu",
+              on: { click: inGame ? function () { currentGame = null; render(); } : api.onExit }
+            }),
             el("h2", { class: "adm-title", html: "🛠️ Manage content" }),
             el("div", { class: "adm-tools" }, [
               el("button", { class: "btn small", html: "⬇ Export", attrs: { title: "Save everything to a file" }, on: { click: doExport } }),
@@ -161,6 +184,7 @@
         ]));
         card.appendChild(el("div", { class: "adm-case-line" }, [
           input(entry, "clueWord", "clue word (the verb or preposition)", "adm-input"),
+          optionsInput(entry, "distractors", "wrong articles (optional, auto if blank)"),
           input(entry, "explanation", "why it's correct (shown at reveal)", "adm-input grow")
         ]));
         return card;
@@ -315,7 +339,6 @@
           var lg = currentGame === "cases" ? LIVE_GAMES[0] : LIVE_GAMES[1];
           body.appendChild(
             el("div", { class: "adm-subhead" }, [
-              el("button", { class: "back-link small", html: "← Games", on: { click: function () { currentGame = null; render(); } } }),
               el("h3", { class: "adm-game-title", text: lg.emoji + " " + lg.name })
             ])
           );
@@ -331,7 +354,6 @@
 
         body.appendChild(
           el("div", { class: "adm-subhead" }, [
-            el("button", { class: "back-link small", html: "← Games", on: { click: function () { currentGame = null; render(); } } }),
             el("h3", { class: "adm-game-title", text: game.emoji + " " + game.name })
           ])
         );
@@ -409,19 +431,24 @@
 
         if (type === "vocab") {
           rows.appendChild(
-            el("div", { class: "adm-row adm-row-head" }, [
+            el("p", { class: "adm-hint tiny", html: "<b>Wrong options</b> are optional. Leave blank and the game auto-picks wrong answers from the other words in this topic. Type your own (comma-separated) to control exactly what students see." })
+          );
+          rows.appendChild(
+            el("div", { class: "adm-row adm-row-vocab adm-row-head" }, [
               el("span", { class: "adm-emoji-h", text: "Icon" }),
               el("span", { text: "German" }),
-              el("span", { text: "English" }),
+              el("span", { text: "English (correct)" }),
+              el("span", { text: "Wrong options (optional)" }),
               el("span", {})
             ])
           );
           topic.words.forEach(function (w, wi) {
             rows.appendChild(
-              el("div", { class: "adm-row" }, [
+              el("div", { class: "adm-row adm-row-vocab" }, [
                 input(w, "emoji", "🙂", "adm-emoji", 6),
                 input(w, "de", "e.g. der Hund", "adm-input"),
                 input(w, "en", "e.g. the dog", "adm-input"),
+                optionsInput(w, "distractors", "auto — or e.g. the cat, the fish"),
                 delRowBtn("Remove word", function () { topic.words.splice(wi, 1); store.save(); render(); })
               ])
             );

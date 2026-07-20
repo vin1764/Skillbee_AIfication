@@ -123,12 +123,16 @@ kbd {
 .picker { text-align: center; margin-bottom: 22px; }
 .picker-title { font-size: clamp(1.5rem, 4vw, 2.2rem); margin: 6px 0; }
 .picker-sub { color: var(--ink-soft); margin: 0; }
+/* One standard back button, pinned to the upper-left of every screen. */
 .back-link {
+  position: fixed; top: 60px; left: clamp(14px, 4vw, 40px); z-index: 15;
   background: #fff; border: 1px solid var(--line); border-radius: 10px;
   padding: 8px 14px; font-weight: 700; color: var(--ink); box-shadow: var(--shadow);
 }
-.back-link.small { padding: 6px 10px; font-size: 0.9rem; }
+.back-link.small { padding: 8px 14px; font-size: 0.92rem; }
 .back-link:hover { border-color: var(--accent); color: var(--accent); }
+/* Reserve room for the pinned button only on screens that actually have one. */
+.screen:has(.back-link) { padding-top: 64px; }
 
 .topic-grid {
   display: grid; gap: 14px;
@@ -368,6 +372,8 @@ kbd {
   align-items: center; margin-bottom: 8px;
 }
 .adm-row-sent { grid-template-columns: 1fr 1fr 40px; }
+.adm-row-vocab { grid-template-columns: 58px 1fr 1fr 1.15fr 40px; }
+.adm-hint.tiny { font-size: 0.82rem; margin: 2px 0 8px; opacity: 0.92; }
 .adm-row-head { font-size: 0.78rem; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
 .adm-row-head .adm-emoji-h { text-align: center; }
 .adm-del {
@@ -424,6 +430,8 @@ kbd {
   .adm-row { grid-template-columns: 48px 1fr 40px; }
   .adm-row > .adm-input:nth-child(3) { grid-column: 2 / 4; }
   .adm-row-head { display: none; }
+  .adm-row-vocab { display: flex; flex-wrap: wrap; }
+  .adm-row-vocab > .adm-input { flex: 1 1 42%; }
 }
 
 /* =====================================================================
@@ -2366,6 +2374,22 @@ document.addEventListener("DOMContentLoaded", App.init);
         });
       }
 
+      /* An input for an optional list of "wrong options" (comma-separated).
+         Stored as an array; blank = let the game auto-generate them. */
+      function optionsInput(obj, field, placeholder) {
+        return el("input", {
+          class: "adm-input",
+          attrs: { type: "text", value: (obj[field] || []).join(", "), placeholder: placeholder || "" },
+          on: {
+            input: function (e) {
+              var arr = e.target.value.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+              if (arr.length) obj[field] = arr; else delete obj[field];
+              store.save();
+            }
+          }
+        });
+      }
+
       function toast(msg) {
         var t = el("div", { class: "adm-toast", text: msg });
         document.body.appendChild(t);
@@ -2384,9 +2408,16 @@ document.addEventListener("DOMContentLoaded", App.init);
       function render() {
         container.innerHTML = "";
 
+        // One back button (pinned top-left): steps up a level when inside a
+        // single game's editor, otherwise leaves the content editor.
+        var inGame = mode === "games" && currentGame;
         container.appendChild(
           el("div", { class: "adm-head" }, [
-            el("button", { class: "back-link", html: "← Menu", on: { click: api.onExit } }),
+            el("button", {
+              class: "back-link",
+              html: inGame ? "← Games" : "← Menu",
+              on: { click: inGame ? function () { currentGame = null; render(); } : api.onExit }
+            }),
             el("h2", { class: "adm-title", html: "🛠️ Manage content" }),
             el("div", { class: "adm-tools" }, [
               el("button", { class: "btn small", html: "⬇ Export", attrs: { title: "Save everything to a file" }, on: { click: doExport } }),
@@ -2490,6 +2521,7 @@ document.addEventListener("DOMContentLoaded", App.init);
         ]));
         card.appendChild(el("div", { class: "adm-case-line" }, [
           input(entry, "clueWord", "clue word (the verb or preposition)", "adm-input"),
+          optionsInput(entry, "distractors", "wrong articles (optional, auto if blank)"),
           input(entry, "explanation", "why it's correct (shown at reveal)", "adm-input grow")
         ]));
         return card;
@@ -2644,7 +2676,6 @@ document.addEventListener("DOMContentLoaded", App.init);
           var lg = currentGame === "cases" ? LIVE_GAMES[0] : LIVE_GAMES[1];
           body.appendChild(
             el("div", { class: "adm-subhead" }, [
-              el("button", { class: "back-link small", html: "← Games", on: { click: function () { currentGame = null; render(); } } }),
               el("h3", { class: "adm-game-title", text: lg.emoji + " " + lg.name })
             ])
           );
@@ -2660,7 +2691,6 @@ document.addEventListener("DOMContentLoaded", App.init);
 
         body.appendChild(
           el("div", { class: "adm-subhead" }, [
-            el("button", { class: "back-link small", html: "← Games", on: { click: function () { currentGame = null; render(); } } }),
             el("h3", { class: "adm-game-title", text: game.emoji + " " + game.name })
           ])
         );
@@ -2738,19 +2768,24 @@ document.addEventListener("DOMContentLoaded", App.init);
 
         if (type === "vocab") {
           rows.appendChild(
-            el("div", { class: "adm-row adm-row-head" }, [
+            el("p", { class: "adm-hint tiny", html: "<b>Wrong options</b> are optional. Leave blank and the game auto-picks wrong answers from the other words in this topic. Type your own (comma-separated) to control exactly what students see." })
+          );
+          rows.appendChild(
+            el("div", { class: "adm-row adm-row-vocab adm-row-head" }, [
               el("span", { class: "adm-emoji-h", text: "Icon" }),
               el("span", { text: "German" }),
-              el("span", { text: "English" }),
+              el("span", { text: "English (correct)" }),
+              el("span", { text: "Wrong options (optional)" }),
               el("span", {})
             ])
           );
           topic.words.forEach(function (w, wi) {
             rows.appendChild(
-              el("div", { class: "adm-row" }, [
+              el("div", { class: "adm-row adm-row-vocab" }, [
                 input(w, "emoji", "🙂", "adm-emoji", 6),
                 input(w, "de", "e.g. der Hund", "adm-input"),
                 input(w, "en", "e.g. the dog", "adm-input"),
+                optionsInput(w, "distractors", "auto — or e.g. the cat, the fish"),
                 delRowBtn("Remove word", function () { topic.words.splice(wi, 1); store.save(); render(); })
               ])
             );
@@ -3071,6 +3106,23 @@ document.addEventListener("DOMContentLoaded", App.init);
   var SHAPES = ["🔺", "🔷", "⬤", "⬛"];
   var COLORS = ["#ff595e", "#1982c4", "#8ac926", "#ff924c"];
 
+  // Build up to `n` wrong options. Uses the teacher's custom ones first (from the
+  // admin editor), then tops up with auto-generated ones from `autoPool`. Never
+  // includes the correct answer; blanks/duplicates are dropped. If the teacher
+  // set nothing, this behaves exactly like the previous auto-only generation.
+  function wrongOptions(custom, correct, autoPool, n) {
+    var out = [];
+    (custom || []).forEach(function (d) {
+      d = String(d).trim();
+      if (d && d !== correct && out.indexOf(d) < 0) out.push(d);
+    });
+    if (out.length < n) {
+      var pool = autoPool.filter(function (x) { return x !== correct && out.indexOf(x) < 0; });
+      kit().sample(pool, n - out.length).forEach(function (x) { out.push(x); });
+    }
+    return out.slice(0, n);
+  }
+
   /* A "choice" game: board shows a German word, phones show 4 tap buttons. */
   function choiceAdapter(meta) {
     return {
@@ -3080,8 +3132,8 @@ document.addEventListener("DOMContentLoaded", App.init);
         var words = (topic.words || []).filter(function (w) { return w.de && w.en; });
         var picked = kit().sample(words, Math.min(10, words.length));
         return picked.map(function (w) {
-          var others = words.filter(function (x) { return x.en !== w.en; });
-          var distract = kit().sample(others, Math.min(3, others.length)).map(function (x) { return x.en; });
+          var autoPool = words.filter(function (x) { return x.en !== w.en; }).map(function (x) { return x.en; });
+          var distract = wrongOptions(w.distractors, w.en, autoPool, 3);
           var options = kit().shuffle([w.en].concat(distract));
           return { type: "choice", de: w.de, emoji: w.emoji || "", options: options, answer: w.en };
         });
@@ -3150,9 +3202,7 @@ document.addEventListener("DOMContentLoaded", App.init);
   // rows work without having to type distractors by hand).
   var ARTICLE_POOL = ["der", "die", "das", "den", "dem", "des"];
   function caseDistractors(s) {
-    if (s.distractors && s.distractors.length >= 3) return s.distractors.slice(0, 3);
-    var pool = ARTICLE_POOL.filter(function (a) { return a !== s.correct; });
-    return kit().sample(pool, 3);
+    return wrongOptions(s.distractors, s.correct, ARTICLE_POOL, 3);
   }
 
   var casesAdapter = {
