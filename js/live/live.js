@@ -169,7 +169,7 @@ window.LiveMode = (function () {
      ============================================================ */
   function hostSetup(roster) {
     stop();
-    var gameId = null, topic = null, persistMode = "fresh";
+    var gameId = null, topic = null, persistMode = "fresh", answerMode = "options";
     var gameIds = Object.keys(window.LiveGames);
 
     var wrap = screen("", [
@@ -215,15 +215,32 @@ window.LiveMode = (function () {
         }
       }
 
-      // 3) scoreboard mode + start
+      // 3) answer mode (games that support typing) + scoreboard + start
       if (gameId && topic) {
-        step.appendChild(el("div", { class: "live-label", text: "3 · Scoreboard" }));
+        var supportsTyping = window.LiveGames[gameId].supportsTyping;
+        var n = 3;
+        if (supportsTyping) {
+          step.appendChild(el("div", { class: "live-label", text: "3 · How students answer" }));
+          step.appendChild(el("div", { class: "setup-modes" }, [
+            answerPill("options", "Tap the article", "Multiple choice — faster"),
+            answerPill("type", "Type the article", "Free recall — harder")
+          ]));
+          n = 4;
+        }
+        step.appendChild(el("div", { class: "live-label", text: n + " · Scoreboard" }));
         var modeRow = el("div", { class: "setup-modes" }, [
           modeBtn("fresh", "Start fresh", "Leaderboard resets to zero"),
           modeBtn("continue", "Continue", "Add to this class's running scores")
         ]);
         step.appendChild(modeRow);
         step.appendChild(el("button", { class: "btn primary big", text: "Start room ▶", on: { click: startRoom } }));
+      }
+
+      function answerPill(id, title, sub) {
+        return el("button", {
+          class: "mode-pill" + (answerMode === id ? " sel" : ""),
+          on: { click: function () { answerMode = id; renderStep(); } }
+        }, [el("b", { text: title }), el("span", { text: sub })]);
       }
 
       function modeBtn(id, title, sub) {
@@ -246,7 +263,8 @@ window.LiveMode = (function () {
           rosterId: roster.id, rosterName: roster.name, students: roster.students,
           gameId: gameId, gameName: adapter.meta.name, topicName: topic.name,
           status: "lobby", questionIndex: -1, totalQuestions: rounds.length,
-          round: null, reveal: null, scores: seed.scores, joined: {}, persistMode: persistMode
+          round: null, reveal: null, scores: seed.scores, joined: {}, persistMode: persistMode,
+          answerMode: answerMode
         }).then(function (code) {
           hostRun(code, adapter, rounds);
         }).catch(function (e) { alert("Could not start: " + e.message); });
@@ -296,8 +314,10 @@ window.LiveMode = (function () {
       window.LiveDB.updateSession(code, {
         status: "question", questionIndex: i, reveal: null,
         round: {
-          index: i, type: r.type, de: r.de || null, emoji: r.emoji || null, options: r.options,
+          index: i, type: r.type, de: r.de || null, emoji: r.emoji || null, options: r.options || null,
           sentence: r.sentence || null, blank: r.blank || null, clueWord: r.clueWord || null,
+          meaning: r.meaning || null, tiles: r.tiles || null,
+          answerMode: sess.answerMode || "options",
           startedAt: window.LiveDB.serverTs()
         }
       });

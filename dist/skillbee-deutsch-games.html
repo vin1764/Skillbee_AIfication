@@ -503,6 +503,36 @@ kbd {
 .reveal-why { margin-top: 10px; color: var(--skb-dark); font-weight: 700; font-style: italic; }
 .player-why { color: var(--ink-soft); font-weight: 600; font-size: 0.95rem; margin: 4px 0 0; }
 .setup-sub { font-size: 0.78rem; color: var(--ink-soft); margin-top: 2px; }
+.type-row { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.type-input {
+  font-size: 1.8rem; font-weight: 800; text-align: center; padding: 16px;
+  border: 2px solid var(--line); border-radius: 14px; width: 100%;
+}
+.type-input:focus { outline: 3px solid rgba(59, 77, 232, 0.25); border-color: var(--skb); }
+.type-go { font-size: 1.15rem; }
+
+/* Wortmonster (compound words) */
+.wm-host { text-align: center; }
+.wm-emoji.big { font-size: 5rem; line-height: 1; }
+.wm-meaning.big { font-size: clamp(1.6rem, 4vw, 2.6rem); font-weight: 900; margin-top: 6px; }
+.wm-player { text-align: center; }
+.wm-target { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-bottom: 6px; }
+.wm-target .wm-emoji { font-size: 2.6rem; }
+.wm-target .wm-meaning { font-weight: 800; font-size: 1.2rem; }
+.wm-hint { color: var(--ink-soft); font-weight: 700; margin-bottom: 10px; }
+.wm-answer {
+  min-height: 58px; border: 2px dashed var(--line); border-radius: 14px; background: #fbfcfe;
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; padding: 10px; margin-bottom: 12px;
+}
+.wm-bank { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 14px; }
+.wm-tile {
+  background: #fff; border: 2px solid var(--line); border-radius: 12px; padding: 12px 16px;
+  font-size: 1.2rem; font-weight: 800; box-shadow: var(--shadow);
+}
+.wm-tile:hover:not(.used) { border-color: var(--skb); transform: translateY(-2px); }
+.wm-tile.used { opacity: 0.3; }
+.wm-tile.chosen { border-color: var(--skb); background: var(--skb-tint); color: var(--skb-dark); }
+.wm-submit { width: 100%; }
 .reveal-fast { max-width: 460px; margin: 0 auto 18px; display: flex; flex-direction: column; gap: 8px; }
 .reveal-fast-row { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; box-shadow: var(--shadow); }
 .rf-rank { font-weight: 900; color: var(--accent); }
@@ -860,6 +890,37 @@ const CASE_DRILLS = {
 };
 
 window.CaseData = CASE_DRILLS;
+
+
+/* ==== js/data-compounds.js ==== */
+/* =====================================================================
+   Wortmonster (Word Monster) — compound-word bank.
+   Each entry combines two real word-parts into a compound. The parts join
+   directly (partA + partB), and the gender always comes from partB (the
+   base word), which is the rule the game teaches.
+     { partA, partB, compound, gender, meaning, emoji }
+   ===================================================================== */
+const COMPOUNDS = [
+  { partA: "Hand", partB: "Schuh", compound: "Handschuh", gender: "der", meaning: "glove", emoji: "🧤" },
+  { partA: "Zahn", partB: "Bürste", compound: "Zahnbürste", gender: "die", meaning: "toothbrush", emoji: "🪥" },
+  { partA: "Regen", partB: "Schirm", compound: "Regenschirm", gender: "der", meaning: "umbrella", emoji: "☂️" },
+  { partA: "Feuer", partB: "Zeug", compound: "Feuerzeug", gender: "das", meaning: "lighter", emoji: "🔥" },
+  { partA: "Wasser", partB: "Fall", compound: "Wasserfall", gender: "der", meaning: "waterfall", emoji: "🌊" },
+  { partA: "Fuß", partB: "Ball", compound: "Fußball", gender: "der", meaning: "football", emoji: "⚽" },
+  { partA: "Apfel", partB: "Saft", compound: "Apfelsaft", gender: "der", meaning: "apple juice", emoji: "🧃" },
+  { partA: "Schnee", partB: "Mann", compound: "Schneemann", gender: "der", meaning: "snowman", emoji: "⛄" },
+  { partA: "Haus", partB: "Tür", compound: "Haustür", gender: "die", meaning: "front door", emoji: "🚪" },
+  { partA: "Nacht", partB: "Tisch", compound: "Nachttisch", gender: "der", meaning: "bedside table", emoji: "🛏️" },
+  { partA: "Kinder", partB: "Garten", compound: "Kindergarten", gender: "der", meaning: "kindergarten", emoji: "🧒" },
+  { partA: "Tisch", partB: "Tennis", compound: "Tischtennis", gender: "das", meaning: "table tennis", emoji: "🏓" },
+  { partA: "Auto", partB: "Bahn", compound: "Autobahn", gender: "die", meaning: "motorway", emoji: "🛣️" },
+  { partA: "Brief", partB: "Marke", compound: "Briefmarke", gender: "die", meaning: "postage stamp", emoji: "" },
+  { partA: "Fahr", partB: "Rad", compound: "Fahrrad", gender: "das", meaning: "bicycle", emoji: "🚲" },
+  { partA: "Spiel", partB: "Platz", compound: "Spielplatz", gender: "der", meaning: "playground", emoji: "🎠" },
+  { partA: "Buch", partB: "Laden", compound: "Buchladen", gender: "der", meaning: "bookshop", emoji: "📚" }
+];
+
+window.CompoundData = COMPOUNDS;
 
 
 /* ==== js/brand.js ==== */
@@ -2860,6 +2921,7 @@ document.addEventListener("DOMContentLoaded", App.init);
   var casesAdapter = {
     meta: { name: "Fall-Detektiv", emoji: "🕵️", contentType: "cases" },
     timeLimit: 20000,
+    supportsTyping: true, // teacher can choose tap-options or type-the-answer
     // The "topics" for this game are the three difficulty levels.
     getTopics: function () {
       return [
@@ -2888,8 +2950,19 @@ document.addEventListener("DOMContentLoaded", App.init);
       ]);
     },
     playerContent: function (el, round, api) {
+      var sentence = el("div", { class: "cases-sentence phone" }, renderSentence(el, round.sentence, round.clueWord, false));
+      if (round.answerMode === "type") {
+        var input = el("input", { class: "type-input", attrs: { type: "text", placeholder: "type the article…", autocapitalize: "off", autocomplete: "off", spellcheck: "false" } });
+        var submit = function () { var v = (input.value || "").trim(); if (v) api.submit({ text: v }); };
+        input.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
+        setTimeout(function () { try { input.focus(); } catch (e) {} }, 50);
+        return el("div", { class: "cases-player" }, [
+          sentence,
+          el("div", { class: "type-row" }, [input, el("button", { class: "btn primary type-go", text: "Submit", on: { click: submit } })])
+        ]);
+      }
       return el("div", { class: "cases-player" }, [
-        el("div", { class: "cases-sentence phone" }, renderSentence(el, round.sentence, round.clueWord, false)),
+        sentence,
         el("div", { class: "live-q-options phone" }, round.options.map(function (opt, i) {
           return el("button", {
             class: "live-opt phone", attrs: { style: "--c:" + COLORS[i] },
@@ -2899,8 +2972,8 @@ document.addEventListener("DOMContentLoaded", App.init);
       ]);
     },
     score: function (round, payload, elapsedMs, timeLimit) {
-      var correct = payload && payload.choice === round.answer;
-      if (!correct) return { correct: false, points: 0 };
+      var given = payload ? (payload.choice != null ? payload.choice : (payload.text || "").trim().toLowerCase()) : "";
+      if (given !== round.answer) return { correct: false, points: 0 };
       var frac = Math.max(0, 1 - elapsedMs / timeLimit);
       return { correct: true, points: Math.round(500 + 500 * frac) };
     },
@@ -2908,11 +2981,71 @@ document.addEventListener("DOMContentLoaded", App.init);
     speakOnReveal: function (round) { return String(round.sentence).replace("___", round.correct); }
   };
 
+  /* ---- Wortmonster (Word Monster): build compound nouns from two tiles ---- */
+  var compoundAdapter = {
+    meta: { name: "Wortmonster", emoji: "🧟", contentType: "compounds" },
+    timeLimit: 20000,
+    getTopics: function () {
+      return [{ id: "all", name: "Wortmonster", english: "All compounds", emoji: "🧟" }];
+    },
+    buildRounds: function () {
+      var all = window.CompoundData || [];
+      return kit().sample(all, Math.min(10, all.length)).map(function (c) {
+        // tile set = the two correct parts + a few decoy parts from other words
+        var others = all.filter(function (x) { return x.compound !== c.compound; });
+        var decoys = kit().sample(others, 5).map(function (o) { return kit().shuffle([o.partA, o.partB])[0]; });
+        var seen = {}, tiles = [];
+        kit().shuffle([c.partA, c.partB].concat(decoys)).forEach(function (t) { if (!seen[t]) { seen[t] = 1; tiles.push(t); } });
+        return {
+          type: "compound", meaning: c.meaning, emoji: c.emoji, tiles: tiles,
+          partA: c.partA, partB: c.partB, compound: c.compound, gender: c.gender,
+          correct: c.compound,
+          explanation: c.gender + " — from " + c.gender + " " + c.partB
+        };
+      });
+    },
+    hostContent: function (el, round) {
+      return el("div", { class: "wm-host" }, [
+        el("div", { class: "cases-tag", text: "🧟 Build the German word" }),
+        round.emoji ? el("div", { class: "wm-emoji big", text: round.emoji }) : null,
+        el("div", { class: "wm-meaning big", text: round.meaning })
+      ]);
+    },
+    playerContent: function (el, round, api) {
+      var built = [], tileEls = {};
+      var answerRow = el("div", { class: "wm-answer" });
+      var bank = el("div", { class: "wm-bank" });
+      var submitBtn = el("button", { class: "btn primary wm-submit", text: "Submit", attrs: { disabled: "true" }, on: { click: function () { if (built.length === 2) api.submit({ parts: built.slice() }); } } });
+      function renderAnswer() {
+        answerRow.innerHTML = "";
+        built.forEach(function (t, i) { answerRow.appendChild(el("button", { class: "wm-tile chosen", text: t, on: { click: function () { unpick(i); } } })); });
+        submitBtn.disabled = built.length !== 2;
+      }
+      function pick(t, btn) { if (built.length >= 2 || btn.classList.contains("used")) return; built.push(t); btn.classList.add("used"); renderAnswer(); }
+      function unpick(i) { var t = built[i]; built.splice(i, 1); if (tileEls[t]) tileEls[t].classList.remove("used"); renderAnswer(); }
+      round.tiles.forEach(function (t) { var btn = el("button", { class: "wm-tile", text: t, on: { click: function () { pick(t, btn); } } }); tileEls[t] = btn; bank.appendChild(btn); });
+      return el("div", { class: "wm-player" }, [
+        el("div", { class: "wm-target" }, [round.emoji ? el("div", { class: "wm-emoji", text: round.emoji }) : null, el("div", { class: "wm-meaning", text: round.meaning })]),
+        el("div", { class: "wm-hint", text: "Tap two parts in order" }),
+        answerRow, bank, submitBtn
+      ]);
+    },
+    score: function (round, payload, elapsedMs, timeLimit) {
+      var p = payload && payload.parts;
+      var correct = p && p.length === 2 && p[0] === round.partA && p[1] === round.partB;
+      if (!correct) return { correct: false, points: 0 };
+      var frac = Math.max(0, 1 - elapsedMs / timeLimit);
+      return { correct: true, points: Math.round(500 + 500 * frac) };
+    },
+    correctLabel: function (round) { return round.gender + " " + round.compound; },
+    speakOnReveal: function (round) { return round.gender + " " + round.compound; }
+  };
+
   window.LiveGames = {
     quiz: choiceAdapter({ name: "Vocabulary Quiz", emoji: "🎯", contentType: "vocab" }),
     memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" }),
-    cases: casesAdapter
-    // Wortmonster adapter comes next
+    cases: casesAdapter,
+    wortmonster: compoundAdapter
   };
 })();
 
@@ -3089,7 +3222,7 @@ window.LiveMode = (function () {
      ============================================================ */
   function hostSetup(roster) {
     stop();
-    var gameId = null, topic = null, persistMode = "fresh";
+    var gameId = null, topic = null, persistMode = "fresh", answerMode = "options";
     var gameIds = Object.keys(window.LiveGames);
 
     var wrap = screen("", [
@@ -3135,15 +3268,32 @@ window.LiveMode = (function () {
         }
       }
 
-      // 3) scoreboard mode + start
+      // 3) answer mode (games that support typing) + scoreboard + start
       if (gameId && topic) {
-        step.appendChild(el("div", { class: "live-label", text: "3 · Scoreboard" }));
+        var supportsTyping = window.LiveGames[gameId].supportsTyping;
+        var n = 3;
+        if (supportsTyping) {
+          step.appendChild(el("div", { class: "live-label", text: "3 · How students answer" }));
+          step.appendChild(el("div", { class: "setup-modes" }, [
+            answerPill("options", "Tap the article", "Multiple choice — faster"),
+            answerPill("type", "Type the article", "Free recall — harder")
+          ]));
+          n = 4;
+        }
+        step.appendChild(el("div", { class: "live-label", text: n + " · Scoreboard" }));
         var modeRow = el("div", { class: "setup-modes" }, [
           modeBtn("fresh", "Start fresh", "Leaderboard resets to zero"),
           modeBtn("continue", "Continue", "Add to this class's running scores")
         ]);
         step.appendChild(modeRow);
         step.appendChild(el("button", { class: "btn primary big", text: "Start room ▶", on: { click: startRoom } }));
+      }
+
+      function answerPill(id, title, sub) {
+        return el("button", {
+          class: "mode-pill" + (answerMode === id ? " sel" : ""),
+          on: { click: function () { answerMode = id; renderStep(); } }
+        }, [el("b", { text: title }), el("span", { text: sub })]);
       }
 
       function modeBtn(id, title, sub) {
@@ -3166,7 +3316,8 @@ window.LiveMode = (function () {
           rosterId: roster.id, rosterName: roster.name, students: roster.students,
           gameId: gameId, gameName: adapter.meta.name, topicName: topic.name,
           status: "lobby", questionIndex: -1, totalQuestions: rounds.length,
-          round: null, reveal: null, scores: seed.scores, joined: {}, persistMode: persistMode
+          round: null, reveal: null, scores: seed.scores, joined: {}, persistMode: persistMode,
+          answerMode: answerMode
         }).then(function (code) {
           hostRun(code, adapter, rounds);
         }).catch(function (e) { alert("Could not start: " + e.message); });
@@ -3216,8 +3367,10 @@ window.LiveMode = (function () {
       window.LiveDB.updateSession(code, {
         status: "question", questionIndex: i, reveal: null,
         round: {
-          index: i, type: r.type, de: r.de || null, emoji: r.emoji || null, options: r.options,
+          index: i, type: r.type, de: r.de || null, emoji: r.emoji || null, options: r.options || null,
           sentence: r.sentence || null, blank: r.blank || null, clueWord: r.clueWord || null,
+          meaning: r.meaning || null, tiles: r.tiles || null,
+          answerMode: sess.answerMode || "options",
           startedAt: window.LiveDB.serverTs()
         }
       });

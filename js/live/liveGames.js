@@ -97,6 +97,7 @@
   var casesAdapter = {
     meta: { name: "Fall-Detektiv", emoji: "🕵️", contentType: "cases" },
     timeLimit: 20000,
+    supportsTyping: true, // teacher can choose tap-options or type-the-answer
     // The "topics" for this game are the three difficulty levels.
     getTopics: function () {
       return [
@@ -125,8 +126,19 @@
       ]);
     },
     playerContent: function (el, round, api) {
+      var sentence = el("div", { class: "cases-sentence phone" }, renderSentence(el, round.sentence, round.clueWord, false));
+      if (round.answerMode === "type") {
+        var input = el("input", { class: "type-input", attrs: { type: "text", placeholder: "type the article…", autocapitalize: "off", autocomplete: "off", spellcheck: "false" } });
+        var submit = function () { var v = (input.value || "").trim(); if (v) api.submit({ text: v }); };
+        input.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
+        setTimeout(function () { try { input.focus(); } catch (e) {} }, 50);
+        return el("div", { class: "cases-player" }, [
+          sentence,
+          el("div", { class: "type-row" }, [input, el("button", { class: "btn primary type-go", text: "Submit", on: { click: submit } })])
+        ]);
+      }
       return el("div", { class: "cases-player" }, [
-        el("div", { class: "cases-sentence phone" }, renderSentence(el, round.sentence, round.clueWord, false)),
+        sentence,
         el("div", { class: "live-q-options phone" }, round.options.map(function (opt, i) {
           return el("button", {
             class: "live-opt phone", attrs: { style: "--c:" + COLORS[i] },
@@ -136,8 +148,8 @@
       ]);
     },
     score: function (round, payload, elapsedMs, timeLimit) {
-      var correct = payload && payload.choice === round.answer;
-      if (!correct) return { correct: false, points: 0 };
+      var given = payload ? (payload.choice != null ? payload.choice : (payload.text || "").trim().toLowerCase()) : "";
+      if (given !== round.answer) return { correct: false, points: 0 };
       var frac = Math.max(0, 1 - elapsedMs / timeLimit);
       return { correct: true, points: Math.round(500 + 500 * frac) };
     },
@@ -145,10 +157,70 @@
     speakOnReveal: function (round) { return String(round.sentence).replace("___", round.correct); }
   };
 
+  /* ---- Wortmonster (Word Monster): build compound nouns from two tiles ---- */
+  var compoundAdapter = {
+    meta: { name: "Wortmonster", emoji: "🧟", contentType: "compounds" },
+    timeLimit: 20000,
+    getTopics: function () {
+      return [{ id: "all", name: "Wortmonster", english: "All compounds", emoji: "🧟" }];
+    },
+    buildRounds: function () {
+      var all = window.CompoundData || [];
+      return kit().sample(all, Math.min(10, all.length)).map(function (c) {
+        // tile set = the two correct parts + a few decoy parts from other words
+        var others = all.filter(function (x) { return x.compound !== c.compound; });
+        var decoys = kit().sample(others, 5).map(function (o) { return kit().shuffle([o.partA, o.partB])[0]; });
+        var seen = {}, tiles = [];
+        kit().shuffle([c.partA, c.partB].concat(decoys)).forEach(function (t) { if (!seen[t]) { seen[t] = 1; tiles.push(t); } });
+        return {
+          type: "compound", meaning: c.meaning, emoji: c.emoji, tiles: tiles,
+          partA: c.partA, partB: c.partB, compound: c.compound, gender: c.gender,
+          correct: c.compound,
+          explanation: c.gender + " — from " + c.gender + " " + c.partB
+        };
+      });
+    },
+    hostContent: function (el, round) {
+      return el("div", { class: "wm-host" }, [
+        el("div", { class: "cases-tag", text: "🧟 Build the German word" }),
+        round.emoji ? el("div", { class: "wm-emoji big", text: round.emoji }) : null,
+        el("div", { class: "wm-meaning big", text: round.meaning })
+      ]);
+    },
+    playerContent: function (el, round, api) {
+      var built = [], tileEls = {};
+      var answerRow = el("div", { class: "wm-answer" });
+      var bank = el("div", { class: "wm-bank" });
+      var submitBtn = el("button", { class: "btn primary wm-submit", text: "Submit", attrs: { disabled: "true" }, on: { click: function () { if (built.length === 2) api.submit({ parts: built.slice() }); } } });
+      function renderAnswer() {
+        answerRow.innerHTML = "";
+        built.forEach(function (t, i) { answerRow.appendChild(el("button", { class: "wm-tile chosen", text: t, on: { click: function () { unpick(i); } } })); });
+        submitBtn.disabled = built.length !== 2;
+      }
+      function pick(t, btn) { if (built.length >= 2 || btn.classList.contains("used")) return; built.push(t); btn.classList.add("used"); renderAnswer(); }
+      function unpick(i) { var t = built[i]; built.splice(i, 1); if (tileEls[t]) tileEls[t].classList.remove("used"); renderAnswer(); }
+      round.tiles.forEach(function (t) { var btn = el("button", { class: "wm-tile", text: t, on: { click: function () { pick(t, btn); } } }); tileEls[t] = btn; bank.appendChild(btn); });
+      return el("div", { class: "wm-player" }, [
+        el("div", { class: "wm-target" }, [round.emoji ? el("div", { class: "wm-emoji", text: round.emoji }) : null, el("div", { class: "wm-meaning", text: round.meaning })]),
+        el("div", { class: "wm-hint", text: "Tap two parts in order" }),
+        answerRow, bank, submitBtn
+      ]);
+    },
+    score: function (round, payload, elapsedMs, timeLimit) {
+      var p = payload && payload.parts;
+      var correct = p && p.length === 2 && p[0] === round.partA && p[1] === round.partB;
+      if (!correct) return { correct: false, points: 0 };
+      var frac = Math.max(0, 1 - elapsedMs / timeLimit);
+      return { correct: true, points: Math.round(500 + 500 * frac) };
+    },
+    correctLabel: function (round) { return round.gender + " " + round.compound; },
+    speakOnReveal: function (round) { return round.gender + " " + round.compound; }
+  };
+
   window.LiveGames = {
     quiz: choiceAdapter({ name: "Vocabulary Quiz", emoji: "🎯", contentType: "vocab" }),
     memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" }),
-    cases: casesAdapter
-    // Wortmonster adapter comes next
+    cases: casesAdapter,
+    wortmonster: compoundAdapter
   };
 })();
