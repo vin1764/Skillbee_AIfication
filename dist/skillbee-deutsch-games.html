@@ -2813,7 +2813,7 @@ window.LiveMode = (function () {
           el("div", { class: "live-choice-name", text: "Host a class" }),
           el("div", { class: "live-choice-sub", text: "Teacher — show on the smartboard" })
         ]),
-        el("button", { class: "live-choice-card join", on: { click: playerJoin } }, [
+        el("button", { class: "live-choice-card join", on: { click: function () { playerJoin(); } } }, [
           el("div", { class: "live-big-emoji", text: "📱" }),
           el("div", { class: "live-choice-name", text: "Join a game" }),
           el("div", { class: "live-choice-sub", text: "Student — enter the room code" })
@@ -3199,7 +3199,7 @@ window.LiveMode = (function () {
     stop();
     var codeInput = el("input", {
       class: "code-input",
-      attrs: { type: "text", maxlength: 4, placeholder: "CODE", autocapitalize: "characters", value: prefill || "" }
+      attrs: { type: "text", maxlength: 4, placeholder: "CODE", autocapitalize: "characters", value: typeof prefill === "string" ? prefill : "" }
     });
     codeInput.addEventListener("input", function () { codeInput.value = codeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); });
     function go() {
