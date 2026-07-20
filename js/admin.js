@@ -102,14 +102,9 @@
         body.appendChild(
           el("div", { class: "adm-tabs" }, [
             subBtn("vocab", "🔤 Words"),
-            subBtn("sentences", "🗣️ Sentences"),
-            subBtn("cases", "🕵️ Fall-Detektiv"),
-            subBtn("compounds", "🧟 Wortmonster")
+            subBtn("sentences", "🗣️ Sentences")
           ])
         );
-        if (bankTab === "cases") return renderCases(body);
-        if (bankTab === "compounds") return renderCompounds(body);
-
         body.appendChild(
           el("p", {
             class: "adm-hint",
@@ -258,12 +253,23 @@
       }
 
       /* ---------------- Games ---------------- */
+      // The two Live-only games keep their own content (not the shared word /
+      // sentence bank), so their cards open a dedicated editor.
+      var LIVE_GAMES = [
+        { id: "cases", name: "Fall-Detektiv", emoji: "🕵️", color: "#8b5cf6" },
+        { id: "compounds", name: "Wortmonster", emoji: "🧟", color: "#22c55e" }
+      ];
+      function caseTotal() {
+        var C = store.casesData();
+        return (C.accusative || []).length + (C.dative || []).length + (C.genitive || []).length;
+      }
+
       function renderGames(body) {
         if (!currentGame) {
           body.appendChild(
             el("p", {
               class: "adm-hint",
-              html: "Pick a game to choose exactly which topics it offers. You can also edit or add content here — those changes also update the shared bank."
+              html: "Pick a game to edit its content. For word/sentence games you also choose which topics they offer — those changes update the shared bank."
             })
           );
           var grid = el("div", { class: "adm-game-grid" });
@@ -283,7 +289,38 @@
               ])
             );
           });
+          // Live Class Mode games (Fall-Detektiv, Wortmonster) with their own banks.
+          LIVE_GAMES.forEach(function (g) {
+            var count = g.id === "cases" ? caseTotal() : store.compoundsData().length;
+            var label = g.id === "cases" ? " sentences" : " words";
+            grid.appendChild(
+              el("button", {
+                class: "adm-game-card",
+                attrs: { style: "--accent:" + g.color },
+                on: { click: function () { currentGame = g.id; render(); } }
+              }, [
+                el("div", { class: "adm-game-badge", text: "Live Class Mode" }),
+                el("div", { class: "adm-game-emoji", text: g.emoji }),
+                el("div", { class: "adm-game-name", text: g.name }),
+                el("div", { class: "adm-game-meta", text: count + label })
+              ])
+            );
+          });
           body.appendChild(grid);
+          return;
+        }
+
+        // Live-game editors (own content, no shared-bank topic picking).
+        if (currentGame === "cases" || currentGame === "compounds") {
+          var lg = currentGame === "cases" ? LIVE_GAMES[0] : LIVE_GAMES[1];
+          body.appendChild(
+            el("div", { class: "adm-subhead" }, [
+              el("button", { class: "back-link small", html: "← Games", on: { click: function () { currentGame = null; render(); } } }),
+              el("h3", { class: "adm-game-title", text: lg.emoji + " " + lg.name })
+            ])
+          );
+          if (currentGame === "cases") renderCases(body);
+          else renderCompounds(body);
           return;
         }
 

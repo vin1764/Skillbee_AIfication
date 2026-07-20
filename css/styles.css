@@ -305,6 +305,12 @@ kbd {
   box-shadow: var(--shadow); transition: transform 0.15s, box-shadow 0.15s;
 }
 .adm-game-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+.adm-game-card { position: relative; }
+.adm-game-badge {
+  position: absolute; top: 10px; right: 10px;
+  background: var(--accent); color: #fff; font-size: 0.62rem; font-weight: 800;
+  letter-spacing: 0.4px; text-transform: uppercase; padding: 3px 8px; border-radius: 999px;
+}
 .adm-game-emoji { font-size: 2rem; }
 .adm-game-name { font-weight: 800; margin-top: 6px; }
 .adm-game-meta { color: var(--accent); font-weight: 700; font-size: 0.85rem; margin-top: 4px; }
