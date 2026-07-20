@@ -305,6 +305,49 @@
         }));
       }
 
+      /* ---- Konjugations-Karussell: a verb's six present-tense forms ---- */
+      function renderVerbs(body) {
+        body.appendChild(
+          el("p", {
+            class: "adm-hint",
+            html:
+              "These verbs power <b>🎠 Konjugations-Karussell</b> in Live Class Mode. Fill in all six present-tense forms — " +
+              "the game shows the verb + a pronoun and asks students to pick the right one. Wrong options are built from the verb's " +
+              "other forms automatically. Changes save automatically."
+          })
+        );
+        var list = store.verbsData();
+        if (!list.length) body.appendChild(emptyState("No verbs yet."));
+        list.forEach(function (v, i) { body.appendChild(verbCard(v, list, i)); });
+        body.appendChild(addRowBtn("+ Verb", function () {
+          list.push({ inf: "", en: "", forms: { ich: "", du: "", er: "", wir: "", ihr: "", sie: "" } });
+          store.save();
+          render();
+        }));
+      }
+
+      function verbCard(v, list, index) {
+        if (!v.forms) v.forms = { ich: "", du: "", er: "", wir: "", ihr: "", sie: "" };
+        var card = el("div", { class: "adm-verb" });
+        card.appendChild(el("div", { class: "adm-case-line" }, [
+          input(v, "inf", "e.g. fahren", "adm-input"),
+          input(v, "en", "to drive", "adm-input"),
+          el("button", {
+            class: "adm-del", html: "🗑", attrs: { title: "Remove verb" },
+            on: { click: function () { list.splice(index, 1); store.save(); render(); } }
+          })
+        ]));
+        var forms = el("div", { class: "adm-verb-forms" });
+        [["ich", "ich"], ["du", "du"], ["er", "er/sie/es"], ["wir", "wir"], ["ihr", "ihr"], ["sie", "sie"]].forEach(function (pair) {
+          forms.appendChild(el("label", { class: "adm-verb-field" }, [
+            el("span", { class: "adm-verb-lbl", text: pair[1] }),
+            input(v.forms, pair[0], "", "adm-input")
+          ]));
+        });
+        card.appendChild(forms);
+        return card;
+      }
+
       // Join German-style: second part's first letter goes lower-case.
       function joinCompound(a, b) {
         b = String(b || "");
@@ -368,7 +411,8 @@
       var LIVE_GAMES = [
         { id: "cases", name: "Fall-Detektiv", emoji: "🕵️", color: "#8b5cf6" },
         { id: "compounds", name: "Wortmonster", emoji: "🧟", color: "#22c55e" },
-        { id: "plurals", name: "Plural-Palast", emoji: "🏰", color: "#e0731c" }
+        { id: "plurals", name: "Plural-Palast", emoji: "🏰", color: "#e0731c" },
+        { id: "verbs", name: "Konjugations-Karussell", emoji: "🎠", color: "#e11d74" }
       ];
       function caseTotal() {
         var C = store.casesData();
@@ -382,10 +426,14 @@
         if (id === "cases") return caseTotal();
         if (id === "compounds") return store.compoundsData().length;
         if (id === "plurals") return store.pluralsData().length;
+        if (id === "verbs") return store.verbsData().length;
         return 0;
       }
       function liveGameUnit(id) {
-        return id === "plurals" ? " nouns" : id === "cases" ? " sentences" : " words";
+        if (id === "plurals") return " nouns";
+        if (id === "cases") return " sentences";
+        if (id === "verbs") return " verbs";
+        return " words";
       }
 
       function renderGames(body) {
@@ -443,6 +491,7 @@
           if (currentGame === "cases") renderCases(body);
           else if (currentGame === "compounds") renderCompounds(body);
           else if (currentGame === "plurals") renderPlurals(body);
+          else if (currentGame === "verbs") renderVerbs(body);
           return;
         }
 

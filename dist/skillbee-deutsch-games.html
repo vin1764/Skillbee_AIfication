@@ -418,6 +418,12 @@ kbd {
 .adm-gender { cursor: pointer; }
 /* Plural-Palast editor */
 .adm-plural-row { grid-template-columns: 58px 1.2fr 0.85fr 1fr 1.3fr 40px; }
+/* Konjugations-Karussell editor */
+.adm-verb { border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 8px; background: #fff; }
+.adm-verb .adm-case-line > .adm-input:first-child { flex: 0 0 40%; }
+.adm-verb-forms { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; margin-top: 8px; }
+.adm-verb-field { display: flex; flex-direction: column; gap: 3px; }
+.adm-verb-lbl { font-size: 0.72rem; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; }
 @media (max-width: 560px) {
   .adm-compound-row { display: flex; flex-wrap: wrap; }
   .adm-compound-row > .adm-input, .adm-compound-row > .adm-gender { flex: 1 1 40%; }
@@ -528,6 +534,7 @@ kbd {
 .live-q { text-align: center; }
 .live-q-tag { color: var(--ink-soft); text-transform: uppercase; letter-spacing: 1px; font-weight: 800; font-size: 0.9rem; }
 .live-q-word { font-size: clamp(2rem, 6vw, 4rem); font-weight: 900; margin: 8px 0; }
+.live-q-en { color: var(--ink-soft); font-size: clamp(1rem, 2.4vw, 1.3rem); font-weight: 600; margin: -4px 0 10px; }
 .live-q-emoji { font-size: 3.5rem; margin-bottom: 10px; }
 .live-q-options.board { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
 /* Neutral, readable answer buttons — the colour + shape are just a position
@@ -1027,6 +1034,44 @@ const PLURALS = [
 window.PluralData = PLURALS;
 
 
+/* ==== js/data-verbs.js ==== */
+/* =====================================================================
+   Konjugations-Karussell (Conjugation Carousel) — present-tense verbs.
+   Each verb stores all six present-tense forms (most reliable for the
+   irregular stem-changers), plus an optional "naive" map: the du/er forms
+   a beginner would produce if they FORGOT the stem change (e.g. "fahrst"
+   instead of "fährst"). That naive form becomes the star distractor.
+     { inf, en, forms: {ich,du,er,wir,ihr,sie}, naive?: {du,er} }
+   Pronoun "er" covers er/sie/es; "sie" is the plural (they).
+   ===================================================================== */
+const VERBS = [
+  // --- regular ---
+  { inf: "spielen", en: "to play", forms: { ich: "spiele", du: "spielst", er: "spielt", wir: "spielen", ihr: "spielt", sie: "spielen" } },
+  { inf: "machen", en: "to do / make", forms: { ich: "mache", du: "machst", er: "macht", wir: "machen", ihr: "macht", sie: "machen" } },
+  { inf: "wohnen", en: "to live", forms: { ich: "wohne", du: "wohnst", er: "wohnt", wir: "wohnen", ihr: "wohnt", sie: "wohnen" } },
+  { inf: "lernen", en: "to learn", forms: { ich: "lerne", du: "lernst", er: "lernt", wir: "lernen", ihr: "lernt", sie: "lernen" } },
+  { inf: "kaufen", en: "to buy", forms: { ich: "kaufe", du: "kaufst", er: "kauft", wir: "kaufen", ihr: "kauft", sie: "kaufen" } },
+  { inf: "gehen", en: "to go", forms: { ich: "gehe", du: "gehst", er: "geht", wir: "gehen", ihr: "geht", sie: "gehen" } },
+  // --- stem-changing a -> ä ---
+  { inf: "fahren", en: "to drive", forms: { ich: "fahre", du: "fährst", er: "fährt", wir: "fahren", ihr: "fahrt", sie: "fahren" }, naive: { du: "fahrst", er: "fahrt" } },
+  { inf: "schlafen", en: "to sleep", forms: { ich: "schlafe", du: "schläfst", er: "schläft", wir: "schlafen", ihr: "schlaft", sie: "schlafen" }, naive: { du: "schlafst", er: "schlaft" } },
+  // --- stem-changing e -> i ---
+  { inf: "essen", en: "to eat", forms: { ich: "esse", du: "isst", er: "isst", wir: "essen", ihr: "esst", sie: "essen" } },
+  { inf: "geben", en: "to give", forms: { ich: "gebe", du: "gibst", er: "gibt", wir: "geben", ihr: "gebt", sie: "geben" }, naive: { du: "gebst", er: "gebt" } },
+  { inf: "nehmen", en: "to take", forms: { ich: "nehme", du: "nimmst", er: "nimmt", wir: "nehmen", ihr: "nehmt", sie: "nehmen" }, naive: { du: "nehmst", er: "nehmt" } },
+  { inf: "sprechen", en: "to speak", forms: { ich: "spreche", du: "sprichst", er: "spricht", wir: "sprechen", ihr: "sprecht", sie: "sprechen" }, naive: { du: "sprechst", er: "sprecht" } },
+  { inf: "helfen", en: "to help", forms: { ich: "helfe", du: "hilfst", er: "hilft", wir: "helfen", ihr: "helft", sie: "helfen" }, naive: { du: "helfst", er: "helft" } },
+  // --- stem-changing e -> ie ---
+  { inf: "sehen", en: "to see", forms: { ich: "sehe", du: "siehst", er: "sieht", wir: "sehen", ihr: "seht", sie: "sehen" }, naive: { du: "sehst", er: "seht" } },
+  { inf: "lesen", en: "to read", forms: { ich: "lese", du: "liest", er: "liest", wir: "lesen", ihr: "lest", sie: "lesen" } },
+  // --- highly irregular ---
+  { inf: "sein", en: "to be", forms: { ich: "bin", du: "bist", er: "ist", wir: "sind", ihr: "seid", sie: "sind" } },
+  { inf: "haben", en: "to have", forms: { ich: "habe", du: "hast", er: "hat", wir: "haben", ihr: "habt", sie: "haben" } }
+];
+
+window.VerbData = VERBS;
+
+
 /* ==== js/brand.js ==== */
 /* AUTO-GENERATED from assets/skillbee-logo-*.webp (official Skillbee brand assets).
    Regenerate with: node scratch_gen_brand.mjs  (not needed by teachers). */
@@ -1068,17 +1113,20 @@ window.SkillbeeBrand = {
   function defaultPlurals() {
     return clone(window.PluralData || []);
   }
+  function defaultVerbs() {
+    return clone(window.VerbData || []);
+  }
 
   function defaults() {
     return {
       vocab: clone(window.GameData.VOCAB_TOPICS),
       sentences: clone(window.GameData.SENTENCE_TOPICS),
-      // Fall-Detektiv (cases), Wortmonster (compounds) and Plural-Palast
-      // (plurals) content — seeded from the built-in banks but editable and
+      // Live-game banks — seeded from the built-in data but editable and
       // saved/synced like everything else.
       cases: defaultCases(),
       compounds: defaultCompounds(),
       plurals: defaultPlurals(),
+      verbs: defaultVerbs(),
       // Per-game topic selection. Missing entry / no "topics" list = the game
       // uses ALL topics of its type from the bank (the default).
       games: {}
@@ -1094,6 +1142,7 @@ window.SkillbeeBrand = {
     });
     if (!Array.isArray(d.compounds)) d.compounds = defaultCompounds();
     if (!Array.isArray(d.plurals)) d.plurals = defaultPlurals();
+    if (!Array.isArray(d.verbs)) d.verbs = defaultVerbs();
     if (!d.games || typeof d.games !== "object") d.games = {};
     return d;
   }
@@ -1232,6 +1281,10 @@ window.SkillbeeBrand = {
     /* Plural-Palast noun list. */
     pluralsData: function () {
       return this.data.plurals;
+    },
+    /* Konjugations-Karussell verb list. */
+    verbsData: function () {
+      return this.data.verbs;
     },
 
     /* Topics a given game should offer (its selected subset, or all by default). */
@@ -2790,6 +2843,49 @@ document.addEventListener("DOMContentLoaded", App.init);
         }));
       }
 
+      /* ---- Konjugations-Karussell: a verb's six present-tense forms ---- */
+      function renderVerbs(body) {
+        body.appendChild(
+          el("p", {
+            class: "adm-hint",
+            html:
+              "These verbs power <b>🎠 Konjugations-Karussell</b> in Live Class Mode. Fill in all six present-tense forms — " +
+              "the game shows the verb + a pronoun and asks students to pick the right one. Wrong options are built from the verb's " +
+              "other forms automatically. Changes save automatically."
+          })
+        );
+        var list = store.verbsData();
+        if (!list.length) body.appendChild(emptyState("No verbs yet."));
+        list.forEach(function (v, i) { body.appendChild(verbCard(v, list, i)); });
+        body.appendChild(addRowBtn("+ Verb", function () {
+          list.push({ inf: "", en: "", forms: { ich: "", du: "", er: "", wir: "", ihr: "", sie: "" } });
+          store.save();
+          render();
+        }));
+      }
+
+      function verbCard(v, list, index) {
+        if (!v.forms) v.forms = { ich: "", du: "", er: "", wir: "", ihr: "", sie: "" };
+        var card = el("div", { class: "adm-verb" });
+        card.appendChild(el("div", { class: "adm-case-line" }, [
+          input(v, "inf", "e.g. fahren", "adm-input"),
+          input(v, "en", "to drive", "adm-input"),
+          el("button", {
+            class: "adm-del", html: "🗑", attrs: { title: "Remove verb" },
+            on: { click: function () { list.splice(index, 1); store.save(); render(); } }
+          })
+        ]));
+        var forms = el("div", { class: "adm-verb-forms" });
+        [["ich", "ich"], ["du", "du"], ["er", "er/sie/es"], ["wir", "wir"], ["ihr", "ihr"], ["sie", "sie"]].forEach(function (pair) {
+          forms.appendChild(el("label", { class: "adm-verb-field" }, [
+            el("span", { class: "adm-verb-lbl", text: pair[1] }),
+            input(v.forms, pair[0], "", "adm-input")
+          ]));
+        });
+        card.appendChild(forms);
+        return card;
+      }
+
       // Join German-style: second part's first letter goes lower-case.
       function joinCompound(a, b) {
         b = String(b || "");
@@ -2853,7 +2949,8 @@ document.addEventListener("DOMContentLoaded", App.init);
       var LIVE_GAMES = [
         { id: "cases", name: "Fall-Detektiv", emoji: "🕵️", color: "#8b5cf6" },
         { id: "compounds", name: "Wortmonster", emoji: "🧟", color: "#22c55e" },
-        { id: "plurals", name: "Plural-Palast", emoji: "🏰", color: "#e0731c" }
+        { id: "plurals", name: "Plural-Palast", emoji: "🏰", color: "#e0731c" },
+        { id: "verbs", name: "Konjugations-Karussell", emoji: "🎠", color: "#e11d74" }
       ];
       function caseTotal() {
         var C = store.casesData();
@@ -2867,10 +2964,14 @@ document.addEventListener("DOMContentLoaded", App.init);
         if (id === "cases") return caseTotal();
         if (id === "compounds") return store.compoundsData().length;
         if (id === "plurals") return store.pluralsData().length;
+        if (id === "verbs") return store.verbsData().length;
         return 0;
       }
       function liveGameUnit(id) {
-        return id === "plurals" ? " nouns" : id === "cases" ? " sentences" : " words";
+        if (id === "plurals") return " nouns";
+        if (id === "cases") return " sentences";
+        if (id === "verbs") return " verbs";
+        return " words";
       }
 
       function renderGames(body) {
@@ -2928,6 +3029,7 @@ document.addEventListener("DOMContentLoaded", App.init);
           if (currentGame === "cases") renderCases(body);
           else if (currentGame === "compounds") renderCompounds(body);
           else if (currentGame === "plurals") renderPlurals(body);
+          else if (currentGame === "verbs") renderVerbs(body);
           return;
         }
 
@@ -3665,12 +3767,77 @@ document.addEventListener("DOMContentLoaded", App.init);
     speakOnReveal: function (round) { return "die " + round.correct; }
   };
 
+  /* ---- Konjugations-Karussell (Conjugation Carousel): conjugate a verb ---- */
+  var PRON_LABEL = { ich: "ich", du: "du", er: "er/sie/es", wir: "wir", ihr: "ihr", sie: "sie (they)" };
+  // Ask about du / er more often — that's where the stem changes (and errors) are.
+  var PRON_WEIGHTED = ["du", "du", "er", "er", "ich", "wir", "ihr", "sie"];
+
+  var verbAdapter = {
+    meta: { name: "Konjugations-Karussell", emoji: "🎠", contentType: "verbs" },
+    timeLimit: 15000, // fast-paced warm-up
+    getTopics: function () {
+      return [{ id: "all", name: "Konjugations-Karussell", english: "All verbs", emoji: "🎠" }];
+    },
+    buildRounds: function () {
+      var store = window.ContentStore;
+      var all = ((store && store.verbsData && store.verbsData()) || window.VerbData || [])
+        .filter(function (v) { return v && v.inf && v.forms && v.forms.du; });
+      return kit().sample(all, Math.min(10, all.length)).map(function (v) {
+        var pron = kit().shuffle(PRON_WEIGHTED.slice())[0];
+        var correct = v.forms[pron];
+        // Distractors: the star trap (naive "no stem change" form, for du/er) plus
+        // this verb's other pronoun-forms — all realistic mistakes.
+        var opts = [];
+        if (v.naive && v.naive[pron] && v.naive[pron] !== correct) opts.push(v.naive[pron]);
+        var others = Object.keys(v.forms).map(function (k) { return v.forms[k]; })
+          .filter(function (f) { return f !== correct; });
+        kit().shuffle(others).forEach(function (f) { if (opts.length < 3 && opts.indexOf(f) < 0) opts.push(f); });
+        return {
+          type: "verb", inf: v.inf, en: v.en || "", pron: pron, pronLabel: PRON_LABEL[pron] || pron,
+          options: kit().shuffle([correct].concat(opts.slice(0, 3))), answer: correct, correct: correct
+        };
+      });
+    },
+    hostContent: function (el, round) {
+      return el("div", { class: "live-q" }, [
+        el("div", { class: "live-q-tag", text: "🎠 Conjugate the verb" }),
+        el("div", { class: "live-q-word" }, [
+          document.createTextNode(round.inf + "  —  " + round.pronLabel + " "),
+          kit().speakerButton(round.inf)
+        ]),
+        round.en ? el("div", { class: "live-q-en", text: round.en }) : null,
+        el("div", { class: "live-q-options board" }, round.options.map(function (opt, i) {
+          return el("div", { class: "live-opt board", attrs: { style: "--c:" + COLORS[i] } }, [
+            el("span", { class: "opt-shape", text: SHAPES[i] }),
+            el("span", { class: "opt-text", text: opt })
+          ]);
+        }))
+      ]);
+    },
+    playerContent: function (el, round, api) {
+      return el("div", { class: "live-q-options phone" }, round.options.map(function (opt, i) {
+        return el("button", {
+          class: "live-opt phone", attrs: { style: "--c:" + COLORS[i] },
+          on: { click: function () { api.submit({ choice: opt }); } }
+        }, [el("span", { class: "opt-shape", text: SHAPES[i] }), el("span", { class: "opt-text", text: opt })]);
+      }));
+    },
+    score: function (round, payload, elapsedMs, timeLimit) {
+      if (!payload || payload.choice !== round.answer) return { correct: false, points: 0 };
+      var frac = Math.max(0, 1 - elapsedMs / timeLimit);
+      return { correct: true, points: Math.round(500 + 500 * frac) };
+    },
+    correctLabel: function (round) { return round.pron + " " + round.correct; },
+    speakOnReveal: function (round) { return round.pron + " " + round.correct; }
+  };
+
   window.LiveGames = {
     quiz: choiceAdapter({ name: "Vocabulary Quiz", emoji: "🎯", contentType: "vocab" }),
     memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" }),
     cases: casesAdapter,
     wortmonster: compoundAdapter,
-    plural: pluralAdapter
+    plural: pluralAdapter,
+    verben: verbAdapter
   };
 })();
 

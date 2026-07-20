@@ -315,11 +315,76 @@
     speakOnReveal: function (round) { return "die " + round.correct; }
   };
 
+  /* ---- Konjugations-Karussell (Conjugation Carousel): conjugate a verb ---- */
+  var PRON_LABEL = { ich: "ich", du: "du", er: "er/sie/es", wir: "wir", ihr: "ihr", sie: "sie (they)" };
+  // Ask about du / er more often — that's where the stem changes (and errors) are.
+  var PRON_WEIGHTED = ["du", "du", "er", "er", "ich", "wir", "ihr", "sie"];
+
+  var verbAdapter = {
+    meta: { name: "Konjugations-Karussell", emoji: "🎠", contentType: "verbs" },
+    timeLimit: 15000, // fast-paced warm-up
+    getTopics: function () {
+      return [{ id: "all", name: "Konjugations-Karussell", english: "All verbs", emoji: "🎠" }];
+    },
+    buildRounds: function () {
+      var store = window.ContentStore;
+      var all = ((store && store.verbsData && store.verbsData()) || window.VerbData || [])
+        .filter(function (v) { return v && v.inf && v.forms && v.forms.du; });
+      return kit().sample(all, Math.min(10, all.length)).map(function (v) {
+        var pron = kit().shuffle(PRON_WEIGHTED.slice())[0];
+        var correct = v.forms[pron];
+        // Distractors: the star trap (naive "no stem change" form, for du/er) plus
+        // this verb's other pronoun-forms — all realistic mistakes.
+        var opts = [];
+        if (v.naive && v.naive[pron] && v.naive[pron] !== correct) opts.push(v.naive[pron]);
+        var others = Object.keys(v.forms).map(function (k) { return v.forms[k]; })
+          .filter(function (f) { return f !== correct; });
+        kit().shuffle(others).forEach(function (f) { if (opts.length < 3 && opts.indexOf(f) < 0) opts.push(f); });
+        return {
+          type: "verb", inf: v.inf, en: v.en || "", pron: pron, pronLabel: PRON_LABEL[pron] || pron,
+          options: kit().shuffle([correct].concat(opts.slice(0, 3))), answer: correct, correct: correct
+        };
+      });
+    },
+    hostContent: function (el, round) {
+      return el("div", { class: "live-q" }, [
+        el("div", { class: "live-q-tag", text: "🎠 Conjugate the verb" }),
+        el("div", { class: "live-q-word" }, [
+          document.createTextNode(round.inf + "  —  " + round.pronLabel + " "),
+          kit().speakerButton(round.inf)
+        ]),
+        round.en ? el("div", { class: "live-q-en", text: round.en }) : null,
+        el("div", { class: "live-q-options board" }, round.options.map(function (opt, i) {
+          return el("div", { class: "live-opt board", attrs: { style: "--c:" + COLORS[i] } }, [
+            el("span", { class: "opt-shape", text: SHAPES[i] }),
+            el("span", { class: "opt-text", text: opt })
+          ]);
+        }))
+      ]);
+    },
+    playerContent: function (el, round, api) {
+      return el("div", { class: "live-q-options phone" }, round.options.map(function (opt, i) {
+        return el("button", {
+          class: "live-opt phone", attrs: { style: "--c:" + COLORS[i] },
+          on: { click: function () { api.submit({ choice: opt }); } }
+        }, [el("span", { class: "opt-shape", text: SHAPES[i] }), el("span", { class: "opt-text", text: opt })]);
+      }));
+    },
+    score: function (round, payload, elapsedMs, timeLimit) {
+      if (!payload || payload.choice !== round.answer) return { correct: false, points: 0 };
+      var frac = Math.max(0, 1 - elapsedMs / timeLimit);
+      return { correct: true, points: Math.round(500 + 500 * frac) };
+    },
+    correctLabel: function (round) { return round.pron + " " + round.correct; },
+    speakOnReveal: function (round) { return round.pron + " " + round.correct; }
+  };
+
   window.LiveGames = {
     quiz: choiceAdapter({ name: "Vocabulary Quiz", emoji: "🎯", contentType: "vocab" }),
     memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" }),
     cases: casesAdapter,
     wortmonster: compoundAdapter,
-    plural: pluralAdapter
+    plural: pluralAdapter,
+    verben: verbAdapter
   };
 })();

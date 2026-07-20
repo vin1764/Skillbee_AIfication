@@ -410,6 +410,12 @@ kbd {
 .adm-gender { cursor: pointer; }
 /* Plural-Palast editor */
 .adm-plural-row { grid-template-columns: 58px 1.2fr 0.85fr 1fr 1.3fr 40px; }
+/* Konjugations-Karussell editor */
+.adm-verb { border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 8px; background: #fff; }
+.adm-verb .adm-case-line > .adm-input:first-child { flex: 0 0 40%; }
+.adm-verb-forms { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; margin-top: 8px; }
+.adm-verb-field { display: flex; flex-direction: column; gap: 3px; }
+.adm-verb-lbl { font-size: 0.72rem; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; }
 @media (max-width: 560px) {
   .adm-compound-row { display: flex; flex-wrap: wrap; }
   .adm-compound-row > .adm-input, .adm-compound-row > .adm-gender { flex: 1 1 40%; }
@@ -520,6 +526,7 @@ kbd {
 .live-q { text-align: center; }
 .live-q-tag { color: var(--ink-soft); text-transform: uppercase; letter-spacing: 1px; font-weight: 800; font-size: 0.9rem; }
 .live-q-word { font-size: clamp(2rem, 6vw, 4rem); font-weight: 900; margin: 8px 0; }
+.live-q-en { color: var(--ink-soft); font-size: clamp(1rem, 2.4vw, 1.3rem); font-weight: 600; margin: -4px 0 10px; }
 .live-q-emoji { font-size: 3.5rem; margin-bottom: 10px; }
 .live-q-options.board { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
 /* Neutral, readable answer buttons — the colour + shape are just a position

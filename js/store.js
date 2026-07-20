@@ -29,17 +29,20 @@
   function defaultPlurals() {
     return clone(window.PluralData || []);
   }
+  function defaultVerbs() {
+    return clone(window.VerbData || []);
+  }
 
   function defaults() {
     return {
       vocab: clone(window.GameData.VOCAB_TOPICS),
       sentences: clone(window.GameData.SENTENCE_TOPICS),
-      // Fall-Detektiv (cases), Wortmonster (compounds) and Plural-Palast
-      // (plurals) content — seeded from the built-in banks but editable and
+      // Live-game banks — seeded from the built-in data but editable and
       // saved/synced like everything else.
       cases: defaultCases(),
       compounds: defaultCompounds(),
       plurals: defaultPlurals(),
+      verbs: defaultVerbs(),
       // Per-game topic selection. Missing entry / no "topics" list = the game
       // uses ALL topics of its type from the bank (the default).
       games: {}
@@ -55,6 +58,7 @@
     });
     if (!Array.isArray(d.compounds)) d.compounds = defaultCompounds();
     if (!Array.isArray(d.plurals)) d.plurals = defaultPlurals();
+    if (!Array.isArray(d.verbs)) d.verbs = defaultVerbs();
     if (!d.games || typeof d.games !== "object") d.games = {};
     return d;
   }
@@ -193,6 +197,10 @@
     /* Plural-Palast noun list. */
     pluralsData: function () {
       return this.data.plurals;
+    },
+    /* Konjugations-Karussell verb list. */
+    verbsData: function () {
+      return this.data.verbs;
     },
 
     /* Topics a given game should offer (its selected subset, or all by default). */
