@@ -263,10 +263,63 @@
     speakOnReveal: function (round) { return round.gender + " " + round.compound; }
   };
 
+  /* ---- Plural-Palast (Plural Palace): pick a noun's correct plural ---- */
+  var pluralAdapter = {
+    meta: { name: "Plural-Palast", emoji: "🏰", contentType: "plurals" },
+    timeLimit: 20000,
+    getTopics: function () {
+      return [{ id: "all", name: "Plural-Palast", english: "All nouns", emoji: "🏰" }];
+    },
+    buildRounds: function () {
+      var store = window.ContentStore;
+      var all = ((store && store.pluralsData && store.pluralsData()) || window.PluralData || [])
+        .filter(function (p) { return p && p.singular && p.plural; });
+      var autoPool = all.map(function (p) { return p.plural; });
+      return kit().sample(all, Math.min(10, all.length)).map(function (p) {
+        return {
+          type: "plural", de: p.singular, en: p.en || "", emoji: p.emoji || "",
+          options: kit().shuffle([p.plural].concat(wrongOptions(p.wrong, p.plural, autoPool, 3))),
+          answer: p.plural, correct: p.plural
+        };
+      });
+    },
+    hostContent: function (el, round) {
+      return el("div", { class: "live-q" }, [
+        el("div", { class: "live-q-tag", text: "🏰 What is the plural?" }),
+        el("div", { class: "live-q-word" }, [
+          document.createTextNode(round.de + " "),
+          kit().speakerButton(round.de)
+        ]),
+        el("div", { class: "live-q-options board" }, round.options.map(function (opt, i) {
+          return el("div", { class: "live-opt board", attrs: { style: "--c:" + COLORS[i] } }, [
+            el("span", { class: "opt-shape", text: SHAPES[i] }),
+            el("span", { class: "opt-text", text: opt })
+          ]);
+        }))
+      ]);
+    },
+    playerContent: function (el, round, api) {
+      return el("div", { class: "live-q-options phone" }, round.options.map(function (opt, i) {
+        return el("button", {
+          class: "live-opt phone", attrs: { style: "--c:" + COLORS[i] },
+          on: { click: function () { api.submit({ choice: opt }); } }
+        }, [el("span", { class: "opt-shape", text: SHAPES[i] }), el("span", { class: "opt-text", text: opt })]);
+      }));
+    },
+    score: function (round, payload, elapsedMs, timeLimit) {
+      if (!payload || payload.choice !== round.answer) return { correct: false, points: 0 };
+      var frac = Math.max(0, 1 - elapsedMs / timeLimit);
+      return { correct: true, points: Math.round(500 + 500 * frac) };
+    },
+    correctLabel: function (round) { return "die " + round.correct; },
+    speakOnReveal: function (round) { return "die " + round.correct; }
+  };
+
   window.LiveGames = {
     quiz: choiceAdapter({ name: "Vocabulary Quiz", emoji: "🎯", contentType: "vocab" }),
     memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" }),
     cases: casesAdapter,
-    wortmonster: compoundAdapter
+    wortmonster: compoundAdapter,
+    plural: pluralAdapter
   };
 })();

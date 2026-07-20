@@ -416,10 +416,14 @@ kbd {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .adm-gender { cursor: pointer; }
+/* Plural-Palast editor */
+.adm-plural-row { grid-template-columns: 58px 1.2fr 0.85fr 1fr 1.3fr 40px; }
 @media (max-width: 560px) {
   .adm-compound-row { display: flex; flex-wrap: wrap; }
   .adm-compound-row > .adm-input, .adm-compound-row > .adm-gender { flex: 1 1 40%; }
   .adm-compound-word { flex: 1 1 100%; text-align: left; }
+  .adm-plural-row { display: flex; flex-wrap: wrap; }
+  .adm-plural-row > .adm-input { flex: 1 1 42%; }
 }
 
 .adm-toast {
@@ -979,6 +983,50 @@ const COMPOUNDS = [
 window.CompoundData = COMPOUNDS;
 
 
+/* ==== js/data-plurals.js ==== */
+/* =====================================================================
+   Plural-Palast (Plural Palace) — noun plural bank.
+   German plurals follow no single rule (-e, -er, -(e)n, -s, umlaut shift,
+   or no change), so each entry stores the correct plural plus three
+   plausible wrong forms — realistic mistakes (wrong ending, or the
+   missing/added umlaut trap), never random nonsense.
+     { singular, en, emoji, plural, wrong: [3 wrong plural forms] }
+   The plural article is always "die"; options show the bare form so the
+   ending is what's being tested. Mass nouns (Milch, Wasser, …) are left
+   out — they have no everyday plural.
+   ===================================================================== */
+const PLURALS = [
+  // Tiere
+  { singular: "der Hund", en: "dog", emoji: "🐶", plural: "Hunde", wrong: ["Hunden", "Hünde", "Hunds"] },
+  { singular: "die Katze", en: "cat", emoji: "🐱", plural: "Katzen", wrong: ["Katze", "Kätzen", "Katzes"] },
+  { singular: "das Pferd", en: "horse", emoji: "🐴", plural: "Pferde", wrong: ["Pferden", "Pferder", "Pferds"] },
+  { singular: "der Vogel", en: "bird", emoji: "🐦", plural: "Vögel", wrong: ["Vogel", "Vögeln", "Vogels"] },
+  { singular: "der Fisch", en: "fish", emoji: "🐟", plural: "Fische", wrong: ["Fischen", "Fischer", "Fischs"] },
+  { singular: "die Kuh", en: "cow", emoji: "🐮", plural: "Kühe", wrong: ["Kuhe", "Kühen", "Kuhs"] },
+  { singular: "das Schwein", en: "pig", emoji: "🐷", plural: "Schweine", wrong: ["Schweinen", "Schweiner", "Schweins"] },
+  { singular: "der Bär", en: "bear", emoji: "🐻", plural: "Bären", wrong: ["Bäre", "Bärer", "Bärs"] },
+  { singular: "der Löwe", en: "lion", emoji: "🦁", plural: "Löwen", wrong: ["Löwe", "Löwer", "Löwes"] },
+  { singular: "der Elefant", en: "elephant", emoji: "🐘", plural: "Elefanten", wrong: ["Elefante", "Elefanter", "Elefants"] },
+  // Essen (countable only)
+  { singular: "das Brot", en: "bread", emoji: "🍞", plural: "Brote", wrong: ["Broten", "Bröter", "Brots"] },
+  { singular: "der Apfel", en: "apple", emoji: "🍎", plural: "Äpfel", wrong: ["Apfel", "Äpfeln", "Apfels"] },
+  { singular: "das Ei", en: "egg", emoji: "🥚", plural: "Eier", wrong: ["Eie", "Eien", "Eis"] },
+  { singular: "die Banane", en: "banana", emoji: "🍌", plural: "Bananen", wrong: ["Banane", "Bananes", "Bananer"] },
+  { singular: "der Kuchen", en: "cake", emoji: "🍰", plural: "Kuchen", wrong: ["Kuchene", "Küchen", "Kuchens"] },
+  // Familie
+  { singular: "die Mutter", en: "mother", emoji: "👩", plural: "Mütter", wrong: ["Mutter", "Muttern", "Mütters"] },
+  { singular: "der Vater", en: "father", emoji: "👨", plural: "Väter", wrong: ["Vater", "Vatern", "Väters"] },
+  { singular: "die Schwester", en: "sister", emoji: "👧", plural: "Schwestern", wrong: ["Schwestere", "Schwesters", "Schwesteren"] },
+  { singular: "der Bruder", en: "brother", emoji: "👦", plural: "Brüder", wrong: ["Bruder", "Brudern", "Brüders"] },
+  { singular: "die Oma", en: "grandma", emoji: "👵", plural: "Omas", wrong: ["Omen", "Oma", "Omaen"] },
+  { singular: "der Opa", en: "grandpa", emoji: "👴", plural: "Opas", wrong: ["Open", "Opa", "Opaen"] },
+  { singular: "das Kind", en: "child", emoji: "🧒", plural: "Kinder", wrong: ["Kinde", "Kinden", "Kinds"] },
+  { singular: "das Baby", en: "baby", emoji: "👶", plural: "Babys", wrong: ["Babies", "Baben", "Babe"] }
+];
+
+window.PluralData = PLURALS;
+
+
 /* ==== js/brand.js ==== */
 /* AUTO-GENERATED from assets/skillbee-logo-*.webp (official Skillbee brand assets).
    Regenerate with: node scratch_gen_brand.mjs  (not needed by teachers). */
@@ -1017,15 +1065,20 @@ window.SkillbeeBrand = {
   function defaultCompounds() {
     return clone(window.CompoundData || []);
   }
+  function defaultPlurals() {
+    return clone(window.PluralData || []);
+  }
 
   function defaults() {
     return {
       vocab: clone(window.GameData.VOCAB_TOPICS),
       sentences: clone(window.GameData.SENTENCE_TOPICS),
-      // Fall-Detektiv (case sentences) and Wortmonster (compound words) content,
-      // seeded from the built-in banks but editable + saved like everything else.
+      // Fall-Detektiv (cases), Wortmonster (compounds) and Plural-Palast
+      // (plurals) content — seeded from the built-in banks but editable and
+      // saved/synced like everything else.
       cases: defaultCases(),
       compounds: defaultCompounds(),
+      plurals: defaultPlurals(),
       // Per-game topic selection. Missing entry / no "topics" list = the game
       // uses ALL topics of its type from the bank (the default).
       games: {}
@@ -1040,6 +1093,7 @@ window.SkillbeeBrand = {
       if (!Array.isArray(d.cases[k])) d.cases[k] = [];
     });
     if (!Array.isArray(d.compounds)) d.compounds = defaultCompounds();
+    if (!Array.isArray(d.plurals)) d.plurals = defaultPlurals();
     if (!d.games || typeof d.games !== "object") d.games = {};
     return d;
   }
@@ -1174,6 +1228,10 @@ window.SkillbeeBrand = {
     /* Wortmonster compound-word list. */
     compoundsData: function () {
       return this.data.compounds;
+    },
+    /* Plural-Palast noun list. */
+    pluralsData: function () {
+      return this.data.plurals;
     },
 
     /* Topics a given game should offer (its selected subset, or all by default). */
@@ -2692,6 +2750,46 @@ document.addEventListener("DOMContentLoaded", App.init);
         }));
       }
 
+      /* ---- Plural-Palast: noun → correct plural (+ optional wrong forms) ---- */
+      function renderPlurals(body) {
+        body.appendChild(
+          el("p", {
+            class: "adm-hint",
+            html:
+              "These nouns power <b>🏰 Plural-Palast</b> in Live Class Mode. Give each noun (with der/die/das) its correct plural. " +
+              "<b>Wrong options</b> are optional — leave blank and the game auto-picks plausible wrong plurals; type your own (comma-separated) to control them. Changes save automatically."
+          })
+        );
+        var list = store.pluralsData();
+        body.appendChild(el("div", { class: "adm-row adm-row-head adm-plural-row" }, [
+          el("span", { text: "Icon" }),
+          el("span", { text: "Singular (with article)" }),
+          el("span", { text: "English" }),
+          el("span", { text: "Plural (correct)" }),
+          el("span", { text: "Wrong options (optional)" }),
+          el("span", {})
+        ]));
+        if (!list.length) body.appendChild(emptyState("No nouns yet."));
+        list.forEach(function (p, i) {
+          body.appendChild(el("div", { class: "adm-row adm-plural-row" }, [
+            input(p, "emoji", "🙂", "adm-emoji", 6),
+            input(p, "singular", "e.g. der Hund", "adm-input"),
+            input(p, "en", "dog", "adm-input"),
+            input(p, "plural", "e.g. Hunde", "adm-input"),
+            optionsInput(p, "wrong", "auto — or e.g. Hunden, Hünde"),
+            el("button", {
+              class: "adm-del", html: "✕", attrs: { title: "Remove" },
+              on: { click: function () { list.splice(i, 1); store.save(); render(); } }
+            })
+          ]));
+        });
+        body.appendChild(addRowBtn("+ Noun", function () {
+          list.push({ emoji: "", singular: "", en: "", plural: "", wrong: [] });
+          store.save();
+          render();
+        }));
+      }
+
       // Join German-style: second part's first letter goes lower-case.
       function joinCompound(a, b) {
         b = String(b || "");
@@ -2754,11 +2852,25 @@ document.addEventListener("DOMContentLoaded", App.init);
       // sentence bank), so their cards open a dedicated editor.
       var LIVE_GAMES = [
         { id: "cases", name: "Fall-Detektiv", emoji: "🕵️", color: "#8b5cf6" },
-        { id: "compounds", name: "Wortmonster", emoji: "🧟", color: "#22c55e" }
+        { id: "compounds", name: "Wortmonster", emoji: "🧟", color: "#22c55e" },
+        { id: "plurals", name: "Plural-Palast", emoji: "🏰", color: "#e0731c" }
       ];
       function caseTotal() {
         var C = store.casesData();
         return (C.accusative || []).length + (C.dative || []).length + (C.genitive || []).length;
+      }
+      function liveGameById(id) {
+        for (var i = 0; i < LIVE_GAMES.length; i++) if (LIVE_GAMES[i].id === id) return LIVE_GAMES[i];
+        return null;
+      }
+      function liveGameCount(id) {
+        if (id === "cases") return caseTotal();
+        if (id === "compounds") return store.compoundsData().length;
+        if (id === "plurals") return store.pluralsData().length;
+        return 0;
+      }
+      function liveGameUnit(id) {
+        return id === "plurals" ? " nouns" : id === "cases" ? " sentences" : " words";
       }
 
       function renderGames(body) {
@@ -2786,10 +2898,8 @@ document.addEventListener("DOMContentLoaded", App.init);
               ])
             );
           });
-          // Live Class Mode games (Fall-Detektiv, Wortmonster) with their own banks.
+          // Live Class Mode games (Fall-Detektiv, Wortmonster, Plural-Palast) with their own banks.
           LIVE_GAMES.forEach(function (g) {
-            var count = g.id === "cases" ? caseTotal() : store.compoundsData().length;
-            var label = g.id === "cases" ? " sentences" : " words";
             grid.appendChild(
               el("button", {
                 class: "adm-game-card",
@@ -2799,7 +2909,7 @@ document.addEventListener("DOMContentLoaded", App.init);
                 el("div", { class: "adm-game-badge", text: "Live Class Mode" }),
                 el("div", { class: "adm-game-emoji", text: g.emoji }),
                 el("div", { class: "adm-game-name", text: g.name }),
-                el("div", { class: "adm-game-meta", text: count + label })
+                el("div", { class: "adm-game-meta", text: liveGameCount(g.id) + liveGameUnit(g.id) })
               ])
             );
           });
@@ -2808,15 +2918,16 @@ document.addEventListener("DOMContentLoaded", App.init);
         }
 
         // Live-game editors (own content, no shared-bank topic picking).
-        if (currentGame === "cases" || currentGame === "compounds") {
-          var lg = currentGame === "cases" ? LIVE_GAMES[0] : LIVE_GAMES[1];
+        var lg = liveGameById(currentGame);
+        if (lg) {
           body.appendChild(
             el("div", { class: "adm-subhead" }, [
               el("h3", { class: "adm-game-title", text: lg.emoji + " " + lg.name })
             ])
           );
           if (currentGame === "cases") renderCases(body);
-          else renderCompounds(body);
+          else if (currentGame === "compounds") renderCompounds(body);
+          else if (currentGame === "plurals") renderPlurals(body);
           return;
         }
 
@@ -3502,11 +3613,64 @@ document.addEventListener("DOMContentLoaded", App.init);
     speakOnReveal: function (round) { return round.gender + " " + round.compound; }
   };
 
+  /* ---- Plural-Palast (Plural Palace): pick a noun's correct plural ---- */
+  var pluralAdapter = {
+    meta: { name: "Plural-Palast", emoji: "🏰", contentType: "plurals" },
+    timeLimit: 20000,
+    getTopics: function () {
+      return [{ id: "all", name: "Plural-Palast", english: "All nouns", emoji: "🏰" }];
+    },
+    buildRounds: function () {
+      var store = window.ContentStore;
+      var all = ((store && store.pluralsData && store.pluralsData()) || window.PluralData || [])
+        .filter(function (p) { return p && p.singular && p.plural; });
+      var autoPool = all.map(function (p) { return p.plural; });
+      return kit().sample(all, Math.min(10, all.length)).map(function (p) {
+        return {
+          type: "plural", de: p.singular, en: p.en || "", emoji: p.emoji || "",
+          options: kit().shuffle([p.plural].concat(wrongOptions(p.wrong, p.plural, autoPool, 3))),
+          answer: p.plural, correct: p.plural
+        };
+      });
+    },
+    hostContent: function (el, round) {
+      return el("div", { class: "live-q" }, [
+        el("div", { class: "live-q-tag", text: "🏰 What is the plural?" }),
+        el("div", { class: "live-q-word" }, [
+          document.createTextNode(round.de + " "),
+          kit().speakerButton(round.de)
+        ]),
+        el("div", { class: "live-q-options board" }, round.options.map(function (opt, i) {
+          return el("div", { class: "live-opt board", attrs: { style: "--c:" + COLORS[i] } }, [
+            el("span", { class: "opt-shape", text: SHAPES[i] }),
+            el("span", { class: "opt-text", text: opt })
+          ]);
+        }))
+      ]);
+    },
+    playerContent: function (el, round, api) {
+      return el("div", { class: "live-q-options phone" }, round.options.map(function (opt, i) {
+        return el("button", {
+          class: "live-opt phone", attrs: { style: "--c:" + COLORS[i] },
+          on: { click: function () { api.submit({ choice: opt }); } }
+        }, [el("span", { class: "opt-shape", text: SHAPES[i] }), el("span", { class: "opt-text", text: opt })]);
+      }));
+    },
+    score: function (round, payload, elapsedMs, timeLimit) {
+      if (!payload || payload.choice !== round.answer) return { correct: false, points: 0 };
+      var frac = Math.max(0, 1 - elapsedMs / timeLimit);
+      return { correct: true, points: Math.round(500 + 500 * frac) };
+    },
+    correctLabel: function (round) { return "die " + round.correct; },
+    speakOnReveal: function (round) { return "die " + round.correct; }
+  };
+
   window.LiveGames = {
     quiz: choiceAdapter({ name: "Vocabulary Quiz", emoji: "🎯", contentType: "vocab" }),
     memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" }),
     cases: casesAdapter,
-    wortmonster: compoundAdapter
+    wortmonster: compoundAdapter,
+    plural: pluralAdapter
   };
 })();
 

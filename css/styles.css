@@ -408,10 +408,14 @@ kbd {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .adm-gender { cursor: pointer; }
+/* Plural-Palast editor */
+.adm-plural-row { grid-template-columns: 58px 1.2fr 0.85fr 1fr 1.3fr 40px; }
 @media (max-width: 560px) {
   .adm-compound-row { display: flex; flex-wrap: wrap; }
   .adm-compound-row > .adm-input, .adm-compound-row > .adm-gender { flex: 1 1 40%; }
   .adm-compound-word { flex: 1 1 100%; text-align: left; }
+  .adm-plural-row { display: flex; flex-wrap: wrap; }
+  .adm-plural-row > .adm-input { flex: 1 1 42%; }
 }
 
 .adm-toast {

@@ -265,6 +265,46 @@
         }));
       }
 
+      /* ---- Plural-Palast: noun → correct plural (+ optional wrong forms) ---- */
+      function renderPlurals(body) {
+        body.appendChild(
+          el("p", {
+            class: "adm-hint",
+            html:
+              "These nouns power <b>🏰 Plural-Palast</b> in Live Class Mode. Give each noun (with der/die/das) its correct plural. " +
+              "<b>Wrong options</b> are optional — leave blank and the game auto-picks plausible wrong plurals; type your own (comma-separated) to control them. Changes save automatically."
+          })
+        );
+        var list = store.pluralsData();
+        body.appendChild(el("div", { class: "adm-row adm-row-head adm-plural-row" }, [
+          el("span", { text: "Icon" }),
+          el("span", { text: "Singular (with article)" }),
+          el("span", { text: "English" }),
+          el("span", { text: "Plural (correct)" }),
+          el("span", { text: "Wrong options (optional)" }),
+          el("span", {})
+        ]));
+        if (!list.length) body.appendChild(emptyState("No nouns yet."));
+        list.forEach(function (p, i) {
+          body.appendChild(el("div", { class: "adm-row adm-plural-row" }, [
+            input(p, "emoji", "🙂", "adm-emoji", 6),
+            input(p, "singular", "e.g. der Hund", "adm-input"),
+            input(p, "en", "dog", "adm-input"),
+            input(p, "plural", "e.g. Hunde", "adm-input"),
+            optionsInput(p, "wrong", "auto — or e.g. Hunden, Hünde"),
+            el("button", {
+              class: "adm-del", html: "✕", attrs: { title: "Remove" },
+              on: { click: function () { list.splice(i, 1); store.save(); render(); } }
+            })
+          ]));
+        });
+        body.appendChild(addRowBtn("+ Noun", function () {
+          list.push({ emoji: "", singular: "", en: "", plural: "", wrong: [] });
+          store.save();
+          render();
+        }));
+      }
+
       // Join German-style: second part's first letter goes lower-case.
       function joinCompound(a, b) {
         b = String(b || "");
@@ -327,11 +367,25 @@
       // sentence bank), so their cards open a dedicated editor.
       var LIVE_GAMES = [
         { id: "cases", name: "Fall-Detektiv", emoji: "🕵️", color: "#8b5cf6" },
-        { id: "compounds", name: "Wortmonster", emoji: "🧟", color: "#22c55e" }
+        { id: "compounds", name: "Wortmonster", emoji: "🧟", color: "#22c55e" },
+        { id: "plurals", name: "Plural-Palast", emoji: "🏰", color: "#e0731c" }
       ];
       function caseTotal() {
         var C = store.casesData();
         return (C.accusative || []).length + (C.dative || []).length + (C.genitive || []).length;
+      }
+      function liveGameById(id) {
+        for (var i = 0; i < LIVE_GAMES.length; i++) if (LIVE_GAMES[i].id === id) return LIVE_GAMES[i];
+        return null;
+      }
+      function liveGameCount(id) {
+        if (id === "cases") return caseTotal();
+        if (id === "compounds") return store.compoundsData().length;
+        if (id === "plurals") return store.pluralsData().length;
+        return 0;
+      }
+      function liveGameUnit(id) {
+        return id === "plurals" ? " nouns" : id === "cases" ? " sentences" : " words";
       }
 
       function renderGames(body) {
@@ -359,10 +413,8 @@
               ])
             );
           });
-          // Live Class Mode games (Fall-Detektiv, Wortmonster) with their own banks.
+          // Live Class Mode games (Fall-Detektiv, Wortmonster, Plural-Palast) with their own banks.
           LIVE_GAMES.forEach(function (g) {
-            var count = g.id === "cases" ? caseTotal() : store.compoundsData().length;
-            var label = g.id === "cases" ? " sentences" : " words";
             grid.appendChild(
               el("button", {
                 class: "adm-game-card",
@@ -372,7 +424,7 @@
                 el("div", { class: "adm-game-badge", text: "Live Class Mode" }),
                 el("div", { class: "adm-game-emoji", text: g.emoji }),
                 el("div", { class: "adm-game-name", text: g.name }),
-                el("div", { class: "adm-game-meta", text: count + label })
+                el("div", { class: "adm-game-meta", text: liveGameCount(g.id) + liveGameUnit(g.id) })
               ])
             );
           });
@@ -381,15 +433,16 @@
         }
 
         // Live-game editors (own content, no shared-bank topic picking).
-        if (currentGame === "cases" || currentGame === "compounds") {
-          var lg = currentGame === "cases" ? LIVE_GAMES[0] : LIVE_GAMES[1];
+        var lg = liveGameById(currentGame);
+        if (lg) {
           body.appendChild(
             el("div", { class: "adm-subhead" }, [
               el("h3", { class: "adm-game-title", text: lg.emoji + " " + lg.name })
             ])
           );
           if (currentGame === "cases") renderCases(body);
-          else renderCompounds(body);
+          else if (currentGame === "compounds") renderCompounds(body);
+          else if (currentGame === "plurals") renderPlurals(body);
           return;
         }
 
