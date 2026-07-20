@@ -58,6 +58,17 @@ service cloud.firestore {
       }
     }
 
+    // ---- Shared content bank (words, sentences, cases, compounds) ----
+    // Synced across every device so teachers don't pass files around. No
+    // accounts, so validated-but-open (edits are gated by the teacher PIN in
+    // the app); a single small document, well under Firestore's 1MB limit.
+    match /content/{doc} {
+      allow read: if true;
+      allow write: if request.resource.data.data is map &&
+        request.resource.data.updatedAt is number &&
+        request.resource.data.clientId is string;
+    }
+
     // ---- App config: the teacher PIN (stored hashed, not plaintext) ----
     match /config/{doc} {
       allow read: if true;

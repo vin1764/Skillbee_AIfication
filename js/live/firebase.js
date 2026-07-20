@@ -158,6 +158,23 @@
       return db.collection("config").doc("teacher").set(data, { merge: true });
     },
 
+    /* ---------------- shared content bank (cloud sync) ---------------- */
+    getContent: function () {
+      return db.collection("content").doc("bank").get().then(function (d) {
+        return d.exists ? d.data() : null;
+      });
+    },
+    setContent: function (payload) {
+      // Full overwrite — the whole content bank is written each time.
+      return db.collection("content").doc("bank").set(payload);
+    },
+    listenContent: function (cb) {
+      return db.collection("content").doc("bank").onSnapshot(
+        function (d) { cb(d.exists ? d.data() : null); },
+        function () { /* ignore transient listen errors */ }
+      );
+    },
+
     /* ---------------- cumulative leaderboards ---------------- */
     getLeaderboard: function (rosterId) {
       return db.collection("leaderboards").doc(rosterId).get().then(function (d) {

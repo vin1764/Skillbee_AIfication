@@ -282,8 +282,20 @@ kbd {
 .admin { animation: fadeIn 0.25s ease; }
 .adm-head { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
 .adm-title { margin: 0; font-size: clamp(1.3rem, 3vw, 1.8rem); flex: 1 1 auto; }
-.adm-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.adm-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .btn.small { padding: 8px 12px; font-size: 0.9rem; border-radius: 10px; }
+.adm-sync {
+  display: inline-flex; align-items: center; font-size: 0.8rem; font-weight: 800;
+  padding: 7px 11px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap;
+}
+.adm-sync.ok { color: #1a7f37; background: #eafaf0; border-color: #bce8cd; }
+.adm-sync.busy { color: #8a6d00; background: #fff7e0; border-color: #f0e0a0; }
+.adm-sync.off { color: var(--ink-soft); background: #f2f4f8; }
+.adm-remote-banner {
+  display: flex; align-items: center; gap: 12px; justify-content: center;
+  background: #fff3cf; border: 1px solid #f0d98a; color: var(--brand-ink);
+  padding: 10px 14px; border-radius: 12px; margin-bottom: 12px; font-weight: 700;
+}
 .adm-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
 .adm-tab {
   background: #fff; border: 1px solid var(--line); border-radius: 999px;

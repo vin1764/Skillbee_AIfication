@@ -2,14 +2,19 @@
    ContentStore — lets teachers edit the game content from inside the app.
    ---------------------------------------------------------------------
    • The built-in content in data.js is the "default".
-   • Teacher edits are saved in the browser (localStorage), so they persist
-     on that computer even after closing the tab.
-   • Export/Import moves content between computers (or to the shared link).
+   • Teacher edits are saved in the browser (localStorage) AND synced to the
+     cloud (the same Firebase as Live Mode), so an edit on one device shows
+     up on every device — including the smartboard used for hosting.
+   • Offline (no Firebase), it falls back to localStorage on that device.
+   • Backup/Restore (JSON) stays available as an optional safety net.
    The games and the topic picker read their content from here, so any edit
    shows up immediately.
    ===================================================================== */
 (function () {
   var KEY = "skillbee_deutsch_content_v1";
+  var TS_KEY = "skillbee_deutsch_content_ts_v1";
+  // A per-tab id so a device ignores the echo of its own cloud writes.
+  var CLIENT_ID = "c" + Math.random().toString(36).slice(2, 10);
 
   function clone(x) {
     return JSON.parse(JSON.stringify(x));
@@ -50,6 +55,15 @@
 
   var store = {
     data: null,
+    _ts: 0,                 // last-change timestamp (ms) used to order edits
+    syncState: "local",     // local | saving | synced | offline
+    editing: false,         // true while the content editor is open
+    pendingRemote: null,    // a newer cloud version that arrived mid-edit
+    cloudUnsub: null,
+    _pushTimer: null,
+    onSync: null,           // called after cloud content is adopted (re-render)
+    onSyncState: null,      // called when syncState changes (update the chip)
+    onRemotePending: null,  // called when a newer cloud version arrives mid-edit
 
     load: function () {
       try {
@@ -58,6 +72,7 @@
           var parsed = JSON.parse(raw);
           if (parsed && Array.isArray(parsed.vocab) && Array.isArray(parsed.sentences)) {
             this.data = ensureSections(parsed);
+            this._ts = Number(localStorage.getItem(TS_KEY)) || 0;
             return;
           }
         }
@@ -65,22 +80,81 @@
         /* localStorage may be unavailable (e.g. sandboxed) — fall back to defaults */
       }
       this.data = defaults();
+      this._ts = 0;
     },
 
-    save: function () {
+    _saveLocal: function () {
       try {
         localStorage.setItem(KEY, JSON.stringify(this.data));
+        localStorage.setItem(TS_KEY, String(this._ts));
         return true;
-      } catch (e) {
-        return false; // still edited in-memory for this session
-      }
+      } catch (e) { return false; }
+    },
+
+    // Called on every edit: save on this device, then sync to the cloud.
+    save: function () {
+      this._ts = Date.now();
+      var ok = this._saveLocal();
+      this._scheduleCloudPush();
+      return ok;
     },
 
     reset: function () {
       this.data = defaults();
-      try {
-        localStorage.removeItem(KEY);
-      } catch (e) {}
+      this._ts = Date.now();
+      this._saveLocal();
+      this._scheduleCloudPush();
+    },
+
+    /* ---------------- cloud sync (uses the same Firebase as Live Mode) ---------------- */
+    _online: function () {
+      return !!(window.LiveDB && window.LiveDB.available());
+    },
+    _setState: function (s) {
+      this.syncState = s;
+      if (this.onSyncState) this.onSyncState(s);
+    },
+    _scheduleCloudPush: function () {
+      if (!this._online()) { this._setState("offline"); return; }
+      var self = this;
+      this._setState("saving");
+      if (this._pushTimer) clearTimeout(this._pushTimer);
+      this._pushTimer = setTimeout(function () { self._pushCloud(); }, 1200);
+    },
+    _pushCloud: function () {
+      if (!this._online()) { this._setState("offline"); return; }
+      var self = this;
+      window.LiveDB.setContent({ data: this.data, updatedAt: this._ts, clientId: CLIENT_ID })
+        .then(function () { self._setState("synced"); })
+        .catch(function () { self._setState("offline"); });
+    },
+    // Start listening once Firebase is ready (called from App.init).
+    initCloud: function () {
+      if (!this._online()) { this._setState("offline"); return; }
+      var self = this;
+      this._setState("synced");
+      this.cloudUnsub = window.LiveDB.listenContent(function (doc) {
+        if (!doc) { self._pushCloud(); return; }          // empty cloud → seed it
+        if (doc.clientId === CLIENT_ID) return;            // our own write, echoed
+        if (!doc.data || (doc.updatedAt || 0) <= self._ts) return; // not newer
+        if (self.editing) {                                // don't clobber active edits
+          self.pendingRemote = doc;
+          if (self.onRemotePending) self.onRemotePending();
+          return;
+        }
+        self._adoptRemote(doc);
+      });
+    },
+    _adoptRemote: function (doc) {
+      this.data = ensureSections(doc.data);
+      this._ts = doc.updatedAt || Date.now();
+      this._saveLocal();
+      this.pendingRemote = null;
+      this._setState("synced");
+      if (this.onSync) this.onSync();
+    },
+    applyPendingRemote: function () {
+      if (this.pendingRemote) this._adoptRemote(this.pendingRemote);
     },
 
     isCustomized: function () {
@@ -186,7 +260,9 @@
         throw new Error("The file is not in the right format.");
       }
       this.data = ensureSections(parsed);
-      this.save();
+      this._ts = Date.now();
+      this._saveLocal();
+      this._scheduleCloudPush();
     }
   };
 

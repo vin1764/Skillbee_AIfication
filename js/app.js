@@ -422,6 +422,8 @@ const App = (function () {
     root.appendChild(el("main", { class: "screen", attrs: { id: "screen" } }));
     // Warm up voices list for speech synthesis.
     if ("speechSynthesis" in window) window.speechSynthesis.getVoices();
+    // Start cloud content sync now that Firebase (if present) has loaded.
+    if (window.ContentStore && window.ContentStore.initCloud) window.ContentStore.initCloud();
     showModeSelect();
   }
 

@@ -16,6 +16,49 @@
       var mode = "games"; // "bank" | "games" — Games is the default view
       var bankTab = "vocab"; // "vocab" | "sentences" (within the bank)
       var currentGame = null; // gameId when configuring one game
+      var syncChipEl = null;
+
+      /* ---- cloud sync hooks ---- */
+      // Mark the editor open so incoming cloud updates don't clobber active edits.
+      store.editing = true;
+      store.onSyncState = function (s) { updateSyncChip(s); };
+      store.onSync = function () { render(); };
+      store.onRemotePending = function () { showRemoteBanner(); };
+
+      function updateSyncChip(s) {
+        if (!syncChipEl) return;
+        var map = {
+          synced: ["☁️ Synced", "ok"],
+          saving: ["☁️ Saving…", "busy"],
+          offline: ["💾 This device", "off"],
+          local: ["💾 This device", "off"]
+        };
+        var m = map[s] || map.local;
+        syncChipEl.textContent = m[0];
+        syncChipEl.className = "adm-sync " + m[1];
+      }
+
+      function showRemoteBanner() {
+        if (container.querySelector(".adm-remote-banner")) return;
+        container.insertBefore(
+          el("div", { class: "adm-remote-banner" }, [
+            el("span", { text: "📥 Another device updated the content." }),
+            el("button", { class: "btn small", text: "Load it", on: { click: function () { store.applyPendingRemote(); render(); } } })
+          ]),
+          container.firstChild
+        );
+      }
+
+      // Leaving the editor: release the edit lock and pick up anything that
+      // arrived while we were editing.
+      function exitAdmin() {
+        store.editing = false;
+        store.onSync = null;
+        store.onSyncState = null;
+        store.onRemotePending = null;
+        if (store.applyPendingRemote) store.applyPendingRemote();
+        api.onExit();
+      }
 
       function typeOfGame(g) {
         return g.contentType === "sentences" ? "sentences" : "vocab";
@@ -74,17 +117,19 @@
         // One back button (pinned top-left): steps up a level when inside a
         // single game's editor, otherwise leaves the content editor.
         var inGame = mode === "games" && currentGame;
+        syncChipEl = el("span", { class: "adm-sync", attrs: { title: "Content is saved to your Firebase and shared with every device" }, text: "☁️ Synced" });
         container.appendChild(
           el("div", { class: "adm-head" }, [
             el("button", {
               class: "back-link",
               html: inGame ? "← Games" : "← Menu",
-              on: { click: inGame ? function () { currentGame = null; render(); } : api.onExit }
+              on: { click: inGame ? function () { currentGame = null; render(); } : exitAdmin }
             }),
             el("h2", { class: "adm-title", html: "🛠️ Manage content" }),
             el("div", { class: "adm-tools" }, [
-              el("button", { class: "btn small", html: "⬇ Export", attrs: { title: "Save everything to a file" }, on: { click: doExport } }),
-              el("button", { class: "btn small", html: "⬆ Import", attrs: { title: "Load from a file" }, on: { click: doImport } }),
+              syncChipEl,
+              el("button", { class: "btn small ghost", html: "⬇ Backup", attrs: { title: "Download a copy (optional safety backup)" }, on: { click: doExport } }),
+              el("button", { class: "btn small ghost", html: "⬆ Restore", attrs: { title: "Load content from a backup file" }, on: { click: doImport } }),
               (window.TeacherGate && window.TeacherGate.gated())
                 ? el("button", { class: "btn small ghost", html: "🔒 PIN", attrs: { title: "Change teacher PIN" }, on: { click: function () { window.TeacherGate.changePin(); } } })
                 : null,
@@ -92,6 +137,7 @@
             ])
           ])
         );
+        updateSyncChip(store.syncState);
 
         container.appendChild(
           el("div", { class: "adm-tabs adm-modes" }, [

@@ -30,6 +30,28 @@ wrote (the file `firestore.rules` in this project).
 That's it. If you ever see a message like "Missing or insufficient permissions" during a game,
 it usually means the rules need re-publishing — tell me and I'll help.
 
+> **⚠️ Re-publish after the content-sync update.** The rules now also cover the shared
+> **content bank** (so your words/sentences sync across devices). If you set the rules up before
+> that feature, just repeat the 5 steps above with the latest `firestore.rules` — otherwise the
+> content editor will keep working on each device but won't sync between them.
+
+---
+
+## 1b. Content syncs automatically (no more files)
+
+Your words, sentences, Fall-Detektiv sentences and Wortmonster words are stored in your Firebase,
+just like the live games. That means:
+
+- Edit content on your laptop and it instantly appears on the classroom smartboard and on every
+  other teacher's device — **no files to export or email around**.
+- The content editor shows a small **☁️ Synced** badge so you know it saved.
+- If two people edit at the same time, whoever saves last wins; if someone else changes the content
+  while you're in the editor, you'll see a **"Load it"** banner instead of being interrupted.
+- **⬇ Backup / ⬆ Restore** (a JSON file) is still there as an optional safety copy — you don't need
+  it for day-to-day use.
+- Offline (the downloadable single-file version) has no internet, so there it just saves on that one
+  device.
+
 ---
 
 ## 2. Hosting — how teachers and students reach the game
