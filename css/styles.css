@@ -410,6 +410,12 @@ kbd {
 .adm-gender { cursor: pointer; }
 /* Plural-Palast editor */
 .adm-plural-row { grid-template-columns: 58px 1.2fr 0.85fr 1fr 1.3fr 40px; }
+/* Hör gut zu! editor */
+.adm-listen-row { grid-template-columns: 1fr 0.9fr 1.6fr 40px; }
+@media (max-width: 560px) {
+  .adm-listen-row { display: flex; flex-wrap: wrap; }
+  .adm-listen-row > .adm-input { flex: 1 1 42%; }
+}
 /* Konjugations-Karussell editor */
 .adm-verb { border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 8px; background: #fff; }
 .adm-verb .adm-case-line > .adm-input:first-child { flex: 0 0 40%; }
@@ -529,6 +535,9 @@ kbd {
 .live-q-en { color: var(--ink-soft); font-size: clamp(1rem, 2.4vw, 1.3rem); font-weight: 600; margin: -4px 0 10px; }
 .clock-wrap { display: flex; justify-content: center; margin: 6px 0 16px; }
 .clock-svg { width: min(42vh, 320px); height: auto; display: block; filter: drop-shadow(0 6px 16px rgba(42, 56, 196, 0.18)); }
+.listen-audio { display: flex; flex-direction: column; align-items: center; gap: 14px; margin: 10px 0 20px; }
+.listen-emoji { font-size: clamp(3rem, 10vw, 5.5rem); }
+.listen-play[disabled] { opacity: 0.6; }
 .live-q-emoji { font-size: 3.5rem; margin-bottom: 10px; }
 .live-q-options.board { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
 /* Neutral, readable answer buttons — the colour + shape are just a position

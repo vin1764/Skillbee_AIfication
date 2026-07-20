@@ -305,6 +305,42 @@
         }));
       }
 
+      /* ---- Hör gut zu!: spoken word + look-alike options ---- */
+      function renderListening(body) {
+        body.appendChild(
+          el("p", {
+            class: "adm-hint",
+            html:
+              "These words power <b>👂 Hör gut zu!</b> in Live Class Mode. The smartboard <b>says the word out loud</b> (no text) and students pick it from four look-alikes. " +
+              "The <b>look-alike options</b> should be words that sound confusingly similar (near-homophones, minimal pairs, umlaut variants). Changes save automatically."
+          })
+        );
+        var list = store.listeningData();
+        body.appendChild(el("div", { class: "adm-row adm-row-head adm-listen-row" }, [
+          el("span", { text: "Word (spoken)" }),
+          el("span", { text: "Meaning" }),
+          el("span", { text: "Look-alike options (3)" }),
+          el("span", {})
+        ]));
+        if (!list.length) body.appendChild(emptyState("No words yet."));
+        list.forEach(function (w, i) {
+          body.appendChild(el("div", { class: "adm-row adm-listen-row" }, [
+            input(w, "word", "e.g. Kirche", "adm-input"),
+            input(w, "meaning", "church", "adm-input"),
+            optionsInput(w, "distractors", "e.g. Kirsche, Küche, Kiste"),
+            el("button", {
+              class: "adm-del", html: "✕", attrs: { title: "Remove" },
+              on: { click: function () { list.splice(i, 1); store.save(); render(); } }
+            })
+          ]));
+        });
+        body.appendChild(addRowBtn("+ Word", function () {
+          list.push({ word: "", meaning: "", distractors: [] });
+          store.save();
+          render();
+        }));
+      }
+
       /* ---- Konjugations-Karussell: a verb's six present-tense forms ---- */
       function renderVerbs(body) {
         body.appendChild(
@@ -412,7 +448,8 @@
         { id: "cases", name: "Fall-Detektiv", emoji: "🕵️", color: "#8b5cf6" },
         { id: "compounds", name: "Wortmonster", emoji: "🧟", color: "#22c55e" },
         { id: "plurals", name: "Plural-Palast", emoji: "🏰", color: "#e0731c" },
-        { id: "verbs", name: "Konjugations-Karussell", emoji: "🎠", color: "#e11d74" }
+        { id: "verbs", name: "Konjugations-Karussell", emoji: "🎠", color: "#e11d74" },
+        { id: "listening", name: "Hör gut zu!", emoji: "👂", color: "#0ea5b7" }
       ];
       function caseTotal() {
         var C = store.casesData();
@@ -427,6 +464,7 @@
         if (id === "compounds") return store.compoundsData().length;
         if (id === "plurals") return store.pluralsData().length;
         if (id === "verbs") return store.verbsData().length;
+        if (id === "listening") return store.listeningData().length;
         return 0;
       }
       function liveGameUnit(id) {
@@ -492,6 +530,7 @@
           else if (currentGame === "compounds") renderCompounds(body);
           else if (currentGame === "plurals") renderPlurals(body);
           else if (currentGame === "verbs") renderVerbs(body);
+          else if (currentGame === "listening") renderListening(body);
           return;
         }
 

@@ -20,6 +20,7 @@ const jsFiles = [
   "js/data-compounds.js",
   "js/data-plurals.js",
   "js/data-verbs.js",
+  "js/data-listening.js",
   "js/brand.js",
   "js/store.js",
   "js/teacher.js",

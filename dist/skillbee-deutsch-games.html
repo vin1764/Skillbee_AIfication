@@ -418,6 +418,12 @@ kbd {
 .adm-gender { cursor: pointer; }
 /* Plural-Palast editor */
 .adm-plural-row { grid-template-columns: 58px 1.2fr 0.85fr 1fr 1.3fr 40px; }
+/* Hör gut zu! editor */
+.adm-listen-row { grid-template-columns: 1fr 0.9fr 1.6fr 40px; }
+@media (max-width: 560px) {
+  .adm-listen-row { display: flex; flex-wrap: wrap; }
+  .adm-listen-row > .adm-input { flex: 1 1 42%; }
+}
 /* Konjugations-Karussell editor */
 .adm-verb { border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 8px; background: #fff; }
 .adm-verb .adm-case-line > .adm-input:first-child { flex: 0 0 40%; }
@@ -537,6 +543,9 @@ kbd {
 .live-q-en { color: var(--ink-soft); font-size: clamp(1rem, 2.4vw, 1.3rem); font-weight: 600; margin: -4px 0 10px; }
 .clock-wrap { display: flex; justify-content: center; margin: 6px 0 16px; }
 .clock-svg { width: min(42vh, 320px); height: auto; display: block; filter: drop-shadow(0 6px 16px rgba(42, 56, 196, 0.18)); }
+.listen-audio { display: flex; flex-direction: column; align-items: center; gap: 14px; margin: 10px 0 20px; }
+.listen-emoji { font-size: clamp(3rem, 10vw, 5.5rem); }
+.listen-play[disabled] { opacity: 0.6; }
 .live-q-emoji { font-size: 3.5rem; margin-bottom: 10px; }
 .live-q-options.board { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
 /* Neutral, readable answer buttons — the colour + shape are just a position
@@ -1074,6 +1083,33 @@ const VERBS = [
 window.VerbData = VERBS;
 
 
+/* ==== js/data-listening.js ==== */
+/* =====================================================================
+   Hör gut zu! (Listen Carefully!) — listening-comprehension bank.
+   The word is SPOKEN (no text shown); phones show four look-alike written
+   options and tap the one they heard. Distractors are near-homophones,
+   minimal pairs or umlaut variants — genuinely confusable by ear (true
+   homophones like Meer/mehr are avoided, since you can't tell them apart).
+     { word, meaning, distractors: [3 confusable words] }
+   Audio is spoken on the smartboard via the browser's German voice, so no
+   pre-generated files or API keys are needed.
+   ===================================================================== */
+const LISTENING = [
+  { word: "Kirche", meaning: "church", distractors: ["Kirsche", "Küche", "Kiste"] },
+  { word: "Kuchen", meaning: "cake", distractors: ["Küche", "Kirche", "Kuh"] },
+  { word: "Wein", meaning: "wine", distractors: ["Wien", "weinen", "mein"] },
+  { word: "schön", meaning: "beautiful", distractors: ["schon", "Sohn", "Bohne"] },
+  { word: "Mutter", meaning: "mother", distractors: ["Mütter", "Butter", "Motte"] },
+  { word: "Bär", meaning: "bear", distractors: ["Beere", "Bier", "Birne"] },
+  { word: "Vater", meaning: "father", distractors: ["Väter", "Futter", "Wetter"] },
+  { word: "Tisch", meaning: "table", distractors: ["Fisch", "Tasche", "Tische"] },
+  { word: "Hut", meaning: "hat", distractors: ["Hüte", "Hund", "gut"] },
+  { word: "Miete", meaning: "rent", distractors: ["Mitte", "Mütze", "Motte"] }
+];
+
+window.ListeningData = LISTENING;
+
+
 /* ==== js/brand.js ==== */
 /* AUTO-GENERATED from assets/skillbee-logo-*.webp (official Skillbee brand assets).
    Regenerate with: node scratch_gen_brand.mjs  (not needed by teachers). */
@@ -1118,6 +1154,9 @@ window.SkillbeeBrand = {
   function defaultVerbs() {
     return clone(window.VerbData || []);
   }
+  function defaultListening() {
+    return clone(window.ListeningData || []);
+  }
 
   function defaults() {
     return {
@@ -1129,6 +1168,7 @@ window.SkillbeeBrand = {
       compounds: defaultCompounds(),
       plurals: defaultPlurals(),
       verbs: defaultVerbs(),
+      listening: defaultListening(),
       // Per-game topic selection. Missing entry / no "topics" list = the game
       // uses ALL topics of its type from the bank (the default).
       games: {}
@@ -1145,6 +1185,7 @@ window.SkillbeeBrand = {
     if (!Array.isArray(d.compounds)) d.compounds = defaultCompounds();
     if (!Array.isArray(d.plurals)) d.plurals = defaultPlurals();
     if (!Array.isArray(d.verbs)) d.verbs = defaultVerbs();
+    if (!Array.isArray(d.listening)) d.listening = defaultListening();
     if (!d.games || typeof d.games !== "object") d.games = {};
     return d;
   }
@@ -1287,6 +1328,10 @@ window.SkillbeeBrand = {
     /* Konjugations-Karussell verb list. */
     verbsData: function () {
       return this.data.verbs;
+    },
+    /* Hör gut zu! listening word list. */
+    listeningData: function () {
+      return this.data.listening;
     },
 
     /* Topics a given game should offer (its selected subset, or all by default). */
@@ -2845,6 +2890,42 @@ document.addEventListener("DOMContentLoaded", App.init);
         }));
       }
 
+      /* ---- Hör gut zu!: spoken word + look-alike options ---- */
+      function renderListening(body) {
+        body.appendChild(
+          el("p", {
+            class: "adm-hint",
+            html:
+              "These words power <b>👂 Hör gut zu!</b> in Live Class Mode. The smartboard <b>says the word out loud</b> (no text) and students pick it from four look-alikes. " +
+              "The <b>look-alike options</b> should be words that sound confusingly similar (near-homophones, minimal pairs, umlaut variants). Changes save automatically."
+          })
+        );
+        var list = store.listeningData();
+        body.appendChild(el("div", { class: "adm-row adm-row-head adm-listen-row" }, [
+          el("span", { text: "Word (spoken)" }),
+          el("span", { text: "Meaning" }),
+          el("span", { text: "Look-alike options (3)" }),
+          el("span", {})
+        ]));
+        if (!list.length) body.appendChild(emptyState("No words yet."));
+        list.forEach(function (w, i) {
+          body.appendChild(el("div", { class: "adm-row adm-listen-row" }, [
+            input(w, "word", "e.g. Kirche", "adm-input"),
+            input(w, "meaning", "church", "adm-input"),
+            optionsInput(w, "distractors", "e.g. Kirsche, Küche, Kiste"),
+            el("button", {
+              class: "adm-del", html: "✕", attrs: { title: "Remove" },
+              on: { click: function () { list.splice(i, 1); store.save(); render(); } }
+            })
+          ]));
+        });
+        body.appendChild(addRowBtn("+ Word", function () {
+          list.push({ word: "", meaning: "", distractors: [] });
+          store.save();
+          render();
+        }));
+      }
+
       /* ---- Konjugations-Karussell: a verb's six present-tense forms ---- */
       function renderVerbs(body) {
         body.appendChild(
@@ -2952,7 +3033,8 @@ document.addEventListener("DOMContentLoaded", App.init);
         { id: "cases", name: "Fall-Detektiv", emoji: "🕵️", color: "#8b5cf6" },
         { id: "compounds", name: "Wortmonster", emoji: "🧟", color: "#22c55e" },
         { id: "plurals", name: "Plural-Palast", emoji: "🏰", color: "#e0731c" },
-        { id: "verbs", name: "Konjugations-Karussell", emoji: "🎠", color: "#e11d74" }
+        { id: "verbs", name: "Konjugations-Karussell", emoji: "🎠", color: "#e11d74" },
+        { id: "listening", name: "Hör gut zu!", emoji: "👂", color: "#0ea5b7" }
       ];
       function caseTotal() {
         var C = store.casesData();
@@ -2967,6 +3049,7 @@ document.addEventListener("DOMContentLoaded", App.init);
         if (id === "compounds") return store.compoundsData().length;
         if (id === "plurals") return store.pluralsData().length;
         if (id === "verbs") return store.verbsData().length;
+        if (id === "listening") return store.listeningData().length;
         return 0;
       }
       function liveGameUnit(id) {
@@ -3032,6 +3115,7 @@ document.addEventListener("DOMContentLoaded", App.init);
           else if (currentGame === "compounds") renderCompounds(body);
           else if (currentGame === "plurals") renderPlurals(body);
           else if (currentGame === "verbs") renderVerbs(body);
+          else if (currentGame === "listening") renderListening(body);
           return;
         }
 
@@ -3943,6 +4027,70 @@ document.addEventListener("DOMContentLoaded", App.init);
     speakOnReveal: function (round) { return round.correct; }
   };
 
+  /* ---- Hör gut zu! (Listen Carefully!): pick the word you heard ---- */
+  // The smartboard speaks the word (browser German voice); phones show 4
+  // look-alike options. The teacher may play it once more (one replay).
+  var listenAdapter = {
+    meta: { name: "Hör gut zu!", emoji: "👂", contentType: "listening" },
+    timeLimit: 20000,
+    getTopics: function () {
+      return [{ id: "all", name: "Hör gut zu!", english: "All words", emoji: "👂" }];
+    },
+    buildRounds: function () {
+      var store = window.ContentStore;
+      var all = ((store && store.listeningData && store.listeningData()) || window.ListeningData || [])
+        .filter(function (w) { return w && w.word; });
+      var autoPool = all.map(function (w) { return w.word; });
+      return kit().sample(all, Math.min(10, all.length)).map(function (w) {
+        return {
+          type: "listen", word: w.word, meaning: w.meaning || "", explanation: w.meaning || "",
+          options: kit().shuffle([w.word].concat(wrongOptions(w.distractors, w.word, autoPool, 3))),
+          answer: w.word, correct: w.word
+        };
+      });
+    },
+    hostContent: function (el, round) {
+      if (round._plays == null) round._plays = 0;
+      var btn;
+      function label() {
+        if (round._plays === 0) return "🔊 Play the word";
+        if (round._plays === 1) return "🔁 Play again (1 left)";
+        return "✓ Played twice";
+      }
+      function refresh() { btn.innerHTML = label(); btn.disabled = round._plays >= 2; }
+      btn = el("button", {
+        class: "btn primary big listen-play",
+        on: { click: function () { if (round._plays < 2) { round._plays++; try { kit().speak(round.word); } catch (e) {} refresh(); } } }
+      });
+      refresh();
+      return el("div", { class: "live-q" }, [
+        el("div", { class: "live-q-tag", text: "👂 Which word did you hear?" }),
+        el("div", { class: "listen-audio" }, [el("div", { class: "listen-emoji", text: "🎧" }), btn]),
+        el("div", { class: "live-q-options board" }, round.options.map(function (opt, i) {
+          return el("div", { class: "live-opt board", attrs: { style: "--c:" + COLORS[i] } }, [
+            el("span", { class: "opt-shape", text: SHAPES[i] }),
+            el("span", { class: "opt-text", text: opt })
+          ]);
+        }))
+      ]);
+    },
+    playerContent: function (el, round, api) {
+      return el("div", { class: "live-q-options phone" }, round.options.map(function (opt, i) {
+        return el("button", {
+          class: "live-opt phone", attrs: { style: "--c:" + COLORS[i] },
+          on: { click: function () { api.submit({ choice: opt }); } }
+        }, [el("span", { class: "opt-shape", text: SHAPES[i] }), el("span", { class: "opt-text", text: opt })]);
+      }));
+    },
+    score: function (round, payload, elapsedMs, timeLimit) {
+      if (!payload || payload.choice !== round.answer) return { correct: false, points: 0 };
+      var frac = Math.max(0, 1 - elapsedMs / timeLimit);
+      return { correct: true, points: Math.round(500 + 500 * frac) };
+    },
+    correctLabel: function (round) { return round.correct; },
+    speakOnReveal: function (round) { return round.correct; }
+  };
+
   window.LiveGames = {
     quiz: choiceAdapter({ name: "Vocabulary Quiz", emoji: "🎯", contentType: "vocab" }),
     memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" }),
@@ -3950,7 +4098,8 @@ document.addEventListener("DOMContentLoaded", App.init);
     wortmonster: compoundAdapter,
     plural: pluralAdapter,
     verben: verbAdapter,
-    uhrzeit: timeAdapter
+    uhrzeit: timeAdapter,
+    listen: listenAdapter
   };
 })();
 

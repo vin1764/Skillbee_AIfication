@@ -489,6 +489,70 @@
     speakOnReveal: function (round) { return round.correct; }
   };
 
+  /* ---- Hör gut zu! (Listen Carefully!): pick the word you heard ---- */
+  // The smartboard speaks the word (browser German voice); phones show 4
+  // look-alike options. The teacher may play it once more (one replay).
+  var listenAdapter = {
+    meta: { name: "Hör gut zu!", emoji: "👂", contentType: "listening" },
+    timeLimit: 20000,
+    getTopics: function () {
+      return [{ id: "all", name: "Hör gut zu!", english: "All words", emoji: "👂" }];
+    },
+    buildRounds: function () {
+      var store = window.ContentStore;
+      var all = ((store && store.listeningData && store.listeningData()) || window.ListeningData || [])
+        .filter(function (w) { return w && w.word; });
+      var autoPool = all.map(function (w) { return w.word; });
+      return kit().sample(all, Math.min(10, all.length)).map(function (w) {
+        return {
+          type: "listen", word: w.word, meaning: w.meaning || "", explanation: w.meaning || "",
+          options: kit().shuffle([w.word].concat(wrongOptions(w.distractors, w.word, autoPool, 3))),
+          answer: w.word, correct: w.word
+        };
+      });
+    },
+    hostContent: function (el, round) {
+      if (round._plays == null) round._plays = 0;
+      var btn;
+      function label() {
+        if (round._plays === 0) return "🔊 Play the word";
+        if (round._plays === 1) return "🔁 Play again (1 left)";
+        return "✓ Played twice";
+      }
+      function refresh() { btn.innerHTML = label(); btn.disabled = round._plays >= 2; }
+      btn = el("button", {
+        class: "btn primary big listen-play",
+        on: { click: function () { if (round._plays < 2) { round._plays++; try { kit().speak(round.word); } catch (e) {} refresh(); } } }
+      });
+      refresh();
+      return el("div", { class: "live-q" }, [
+        el("div", { class: "live-q-tag", text: "👂 Which word did you hear?" }),
+        el("div", { class: "listen-audio" }, [el("div", { class: "listen-emoji", text: "🎧" }), btn]),
+        el("div", { class: "live-q-options board" }, round.options.map(function (opt, i) {
+          return el("div", { class: "live-opt board", attrs: { style: "--c:" + COLORS[i] } }, [
+            el("span", { class: "opt-shape", text: SHAPES[i] }),
+            el("span", { class: "opt-text", text: opt })
+          ]);
+        }))
+      ]);
+    },
+    playerContent: function (el, round, api) {
+      return el("div", { class: "live-q-options phone" }, round.options.map(function (opt, i) {
+        return el("button", {
+          class: "live-opt phone", attrs: { style: "--c:" + COLORS[i] },
+          on: { click: function () { api.submit({ choice: opt }); } }
+        }, [el("span", { class: "opt-shape", text: SHAPES[i] }), el("span", { class: "opt-text", text: opt })]);
+      }));
+    },
+    score: function (round, payload, elapsedMs, timeLimit) {
+      if (!payload || payload.choice !== round.answer) return { correct: false, points: 0 };
+      var frac = Math.max(0, 1 - elapsedMs / timeLimit);
+      return { correct: true, points: Math.round(500 + 500 * frac) };
+    },
+    correctLabel: function (round) { return round.correct; },
+    speakOnReveal: function (round) { return round.correct; }
+  };
+
   window.LiveGames = {
     quiz: choiceAdapter({ name: "Vocabulary Quiz", emoji: "🎯", contentType: "vocab" }),
     memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" }),
@@ -496,6 +560,7 @@
     wortmonster: compoundAdapter,
     plural: pluralAdapter,
     verben: verbAdapter,
-    uhrzeit: timeAdapter
+    uhrzeit: timeAdapter,
+    listen: listenAdapter
   };
 })();

@@ -32,6 +32,9 @@
   function defaultVerbs() {
     return clone(window.VerbData || []);
   }
+  function defaultListening() {
+    return clone(window.ListeningData || []);
+  }
 
   function defaults() {
     return {
@@ -43,6 +46,7 @@
       compounds: defaultCompounds(),
       plurals: defaultPlurals(),
       verbs: defaultVerbs(),
+      listening: defaultListening(),
       // Per-game topic selection. Missing entry / no "topics" list = the game
       // uses ALL topics of its type from the bank (the default).
       games: {}
@@ -59,6 +63,7 @@
     if (!Array.isArray(d.compounds)) d.compounds = defaultCompounds();
     if (!Array.isArray(d.plurals)) d.plurals = defaultPlurals();
     if (!Array.isArray(d.verbs)) d.verbs = defaultVerbs();
+    if (!Array.isArray(d.listening)) d.listening = defaultListening();
     if (!d.games || typeof d.games !== "object") d.games = {};
     return d;
   }
@@ -201,6 +206,10 @@
     /* Konjugations-Karussell verb list. */
     verbsData: function () {
       return this.data.verbs;
+    },
+    /* Hör gut zu! listening word list. */
+    listeningData: function () {
+      return this.data.listening;
     },
 
     /* Topics a given game should offer (its selected subset, or all by default). */
