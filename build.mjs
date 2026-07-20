@@ -7,6 +7,7 @@
    You only need this if you change the games; teachers never run it.
    ===================================================================== */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { createHash } from "node:crypto";
 
 // Neutral fallback; app.js swaps in the official Skillbee badge (from brand.js) at runtime.
 const FAVICON =
@@ -74,4 +75,16 @@ ${js}
 `
 );
 
+// 3) Cache-busting: stamp index.html's local asset URLs with a content hash so
+//    that a normal page reload always fetches the newest code (no hard-refresh
+//    needed). The hash only changes when the CSS/JS actually change.
+const version = createHash("sha1").update(css + js).digest("hex").slice(0, 8);
+let indexHtml = readFileSync("index.html", "utf8");
+indexHtml = indexHtml.replace(
+  /((?:href|src)="(?:css|js)\/[^"?]+)(?:\?v=[a-f0-9]+)?"/g,
+  `$1?v=${version}"`
+);
+writeFileSync("index.html", indexHtml);
+
 console.log("Built dist/skillbee-deutsch-games.html and dist/artifact.html");
+console.log("Stamped index.html assets with ?v=" + version);
