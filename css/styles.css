@@ -460,12 +460,19 @@ kbd {
 .adm-gender { cursor: pointer; }
 /* Plural-Palast editor */
 .adm-plural-row { grid-template-columns: 58px 1.2fr 0.85fr 1fr 1.3fr 40px; }
-/* Hör gut zu! editor */
-.adm-listen-row { grid-template-columns: 1fr 0.9fr 1.6fr 40px; }
-@media (max-width: 560px) {
-  .adm-listen-row { display: flex; flex-wrap: wrap; }
-  .adm-listen-row > .adm-input { flex: 1 1 42%; }
+/* Hör gut zu! editor — stacked rows so a single word OR a whole sentence fits */
+.adm-listen-item { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; background: #fff; }
+.adm-listen-line { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; }
+.adm-listen-line:last-child { margin-bottom: 0; }
+.adm-listen-lbl { flex: 0 0 74px; padding-top: 9px; font-weight: 700; color: var(--ink-soft); font-size: 0.8rem; }
+.adm-listen-line > .adm-input { flex: 1; }
+.adm-ta {
+  flex: 1; width: 100%; border: 1px solid var(--line); border-radius: 10px;
+  padding: 8px 10px; font: inherit; font-size: 0.98rem; line-height: 1.4;
+  resize: vertical; min-height: 40px; overflow: hidden;
 }
+.adm-ta:focus { outline: 2px solid var(--skb); outline-offset: -1px; }
+@media (max-width: 560px) { .adm-listen-lbl { flex-basis: 60px; } }
 /* Konjugations-Karussell editor */
 .adm-verb { border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 8px; background: #fff; }
 .adm-verb .adm-case-line > .adm-input:first-child { flex: 0 0 40%; }
@@ -598,8 +605,14 @@ kbd {
   font-weight: 800; color: var(--ink); background: var(--card);
   border: 2px solid var(--line); border-left: 10px solid var(--c); box-shadow: var(--shadow);
 }
-.live-opt .opt-shape { font-size: 1.4rem; color: var(--c); line-height: 1; }
+.live-opt .opt-shape { font-size: 1.4rem; color: var(--c); line-height: 1; flex: 0 0 auto; }
 .live-opt.board { font-size: clamp(1.1rem, 2.4vw, 1.6rem); }
+/* answers wrap for long text — options may be whole sentences (Hör gut zu!) */
+.opt-text { flex: 1; overflow-wrap: anywhere; line-height: 1.3; }
+.reveal-value { overflow-wrap: anywhere; }
+
+/* audio-speed preview row in the Live host setup */
+.setup-preview { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 2px 0 6px; }
 
 /* reveal */
 .reveal-answer { background: #eafaf7; border: 2px solid var(--good); border-radius: 18px; padding: 22px; margin: 10px auto; max-width: 560px; }

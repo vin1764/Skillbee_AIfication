@@ -91,6 +91,34 @@
         });
       }
 
+      /* A textarea bound two-way to obj[field] (a string). Grows for long text /
+         sentences, so the same editor works for a single word or a full sentence. */
+      function textareaInput(obj, field, placeholder, cls) {
+        var ta = el("textarea", {
+          class: cls || "adm-ta",
+          text: obj[field] == null ? "" : String(obj[field]),
+          attrs: { placeholder: placeholder || "", rows: 1 },
+          on: { input: function (e) { obj[field] = e.target.value; autoGrow(e.target); store.save(); } }
+        });
+        return ta;
+      }
+      /* A textarea for a list stored as an array — ONE ENTRY PER LINE (so options
+         may themselves be sentences that contain commas). */
+      function linesInput(obj, field, placeholder, cls) {
+        return el("textarea", {
+          class: cls || "adm-ta",
+          text: (obj[field] || []).join("\n"),
+          attrs: { placeholder: placeholder || "", rows: 1 },
+          on: { input: function (e) {
+            var arr = e.target.value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+            if (arr.length) obj[field] = arr; else delete obj[field];
+            autoGrow(e.target);
+            store.save();
+          } }
+        });
+      }
+      function autoGrow(ta) { try { ta.style.height = "auto"; ta.style.height = (ta.scrollHeight + 2) + "px"; } catch (e) {} }
+
       function toast(msg) {
         var t = el("div", { class: "adm-toast", text: msg });
         document.body.appendChild(t);
@@ -263,34 +291,40 @@
           el("p", {
             class: "adm-hint",
             html:
-              "These words power <b>👂 Hör gut zu!</b> in Live Class Mode. The smartboard <b>says the word out loud</b> (no text) and students pick it from four look-alikes. " +
-              "The <b>look-alike options</b> should be words that sound confusingly similar (near-homophones, minimal pairs, umlaut variants). Changes save automatically."
+              "These power <b>👂 Hör gut zu!</b> in Live Class Mode. The smartboard <b>says each one out loud</b> (no text) and students pick it from four look-alikes. " +
+              "A prompt can be a single <b>word</b> or a whole <b>sentence</b> — mix both freely. The <b>look-alike options</b> (one per line) should sound confusingly similar " +
+              "(near-homophones, minimal pairs, or sentences that differ in a small detail). Changes save automatically."
           })
         );
         var list = ex.items;
-        body.appendChild(el("div", { class: "adm-row adm-row-head adm-listen-row" }, [
-          el("span", { text: "Word (spoken)" }),
-          el("span", { text: "Meaning" }),
-          el("span", { text: "Look-alike options (3)" }),
-          el("span", {})
-        ]));
-        if (!list.length) body.appendChild(emptyState("No words yet."));
-        list.forEach(function (w, i) {
-          body.appendChild(el("div", { class: "adm-row adm-listen-row" }, [
-            input(w, "word", "e.g. Kirche", "adm-input"),
-            input(w, "meaning", "church", "adm-input"),
-            optionsInput(w, "distractors", "e.g. Kirsche, Küche, Kiste"),
-            el("button", {
-              class: "adm-del", html: "✕", attrs: { title: "Remove" },
-              on: { click: function () { list.splice(i, 1); store.save(); render(); } }
-            })
-          ]));
-        });
-        body.appendChild(addRowBtn("+ Word", function () {
+        if (!list.length) body.appendChild(emptyState("Nothing here yet — add the first prompt below."));
+        list.forEach(function (w, i) { body.appendChild(listenCard(w, list, i)); });
+        body.appendChild(addRowBtn("+ Prompt", function () {
           list.push({ word: "", meaning: "", distractors: [] });
           store.save();
           render();
         }));
+      }
+
+      function listenCard(w, list, index) {
+        var card = el("div", { class: "adm-listen-item" });
+        card.appendChild(el("div", { class: "adm-listen-line" }, [
+          el("span", { class: "adm-listen-lbl", text: "Spoken" }),
+          textareaInput(w, "word", "e.g. Kirche — or a whole sentence students must catch", "adm-ta grow"),
+          el("button", {
+            class: "adm-del", html: "✕", attrs: { title: "Remove" },
+            on: { click: function () { list.splice(index, 1); store.save(); render(); } }
+          })
+        ]));
+        card.appendChild(el("div", { class: "adm-listen-line" }, [
+          el("span", { class: "adm-listen-lbl", text: "Meaning" }),
+          input(w, "meaning", "what it means (shown at the reveal)", "adm-input grow")
+        ]));
+        card.appendChild(el("div", { class: "adm-listen-line" }, [
+          el("span", { class: "adm-listen-lbl", text: "Look-alikes" }),
+          linesInput(w, "distractors", "one per line — leave blank to auto-pick from the other prompts", "adm-ta grow")
+        ]));
+        return card;
       }
 
       /* ---- Konjugations-Karussell: a verb's six present-tense forms ---- */
@@ -460,6 +494,7 @@
         if (kind === "sentences") return " sentences";
         if (id === "plurals") return " nouns";
         if (id === "verbs") return " verbs";
+        if (id === "listening") return " prompts";
         return " words";
       }
 

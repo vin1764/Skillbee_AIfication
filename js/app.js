@@ -45,15 +45,16 @@ const App = (function () {
     el,
 
     /* Speak German out loud. Routed through VoiceBox so the voice chosen in
-       Settings is used everywhere; falls back to plain browser speech. */
-    speak(text, lang = "de-DE") {
-      if (window.VoiceBox) return window.VoiceBox.speak(text);
+       Settings is used everywhere; falls back to plain browser speech.
+       opts.rate scales the playback speed (1 = normal). */
+    speak(text, opts) {
+      if (window.VoiceBox) return window.VoiceBox.speak(text, opts);
       try {
         if (!("speechSynthesis" in window)) return;
         window.speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
-        u.lang = lang;
-        u.rate = 0.95;
+        u.lang = "de-DE";
+        u.rate = 0.95 * ((opts && opts.rate) || 1);
         const voices = window.speechSynthesis.getVoices();
         const de = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith("de"));
         if (de) u.voice = de;

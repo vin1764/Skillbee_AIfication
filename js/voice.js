@@ -59,13 +59,13 @@
     } catch (e) { return []; }
   }
 
-  function speakBrowser(text) {
+  function speakBrowser(text, rate) {
     try {
       if (!("speechSynthesis" in window)) return;
       window.speechSynthesis.cancel();
       var u = new SpeechSynthesisUtterance(text);
       u.lang = "de-DE";
-      u.rate = 0.95;
+      u.rate = 0.95 * (rate || 1);
       var vs = browserVoices(), pick = null;
       if (chosen && chosen.indexOf("browser:") === 0) {
         var want = chosen.slice(8);
@@ -78,24 +78,28 @@
   }
 
   // Play a specific voice's Azure file if it exists; returns true if it started.
-  function playAzureFile(voiceId, text) {
+  // `rate` (1 = normal) sets the mp3 playback speed.
+  function playAzureFile(voiceId, text, rate) {
     if (!manifest || !manifest.files) return false;
     var h = fileFor(voiceId, text);
     if (!manifest.files[h]) return false;
     try {
       var a = new Audio("audio/" + h + ".mp3");
-      a.play().catch(function () { speakBrowser(text); });
+      if (rate && rate !== 1) { try { a.playbackRate = rate; } catch (e) {} }
+      a.play().catch(function () { speakBrowser(text, rate); });
       return true;
     } catch (e) { return false; }
   }
 
-  function speak(text) {
+  // speak(text, opts) — opts.rate scales the playback speed (1 = normal).
+  function speak(text, opts) {
     text = String(text == null ? "" : text).trim();
     if (!text) return;
+    var rate = (opts && opts.rate) || 1;
     if (chosen && chosen.indexOf("azure:") === 0) {
-      if (playAzureFile(chosen, text)) return; // pre-generated file
+      if (playAzureFile(chosen, text, rate)) return; // pre-generated file
     }
-    speakBrowser(text); // fallback / browser voice
+    speakBrowser(text, rate); // fallback / browser voice
   }
 
   function azureReady() { return !!(manifest && manifest.files); }

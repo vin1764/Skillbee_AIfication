@@ -468,12 +468,19 @@ kbd {
 .adm-gender { cursor: pointer; }
 /* Plural-Palast editor */
 .adm-plural-row { grid-template-columns: 58px 1.2fr 0.85fr 1fr 1.3fr 40px; }
-/* Hör gut zu! editor */
-.adm-listen-row { grid-template-columns: 1fr 0.9fr 1.6fr 40px; }
-@media (max-width: 560px) {
-  .adm-listen-row { display: flex; flex-wrap: wrap; }
-  .adm-listen-row > .adm-input { flex: 1 1 42%; }
+/* Hör gut zu! editor — stacked rows so a single word OR a whole sentence fits */
+.adm-listen-item { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; background: #fff; }
+.adm-listen-line { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; }
+.adm-listen-line:last-child { margin-bottom: 0; }
+.adm-listen-lbl { flex: 0 0 74px; padding-top: 9px; font-weight: 700; color: var(--ink-soft); font-size: 0.8rem; }
+.adm-listen-line > .adm-input { flex: 1; }
+.adm-ta {
+  flex: 1; width: 100%; border: 1px solid var(--line); border-radius: 10px;
+  padding: 8px 10px; font: inherit; font-size: 0.98rem; line-height: 1.4;
+  resize: vertical; min-height: 40px; overflow: hidden;
 }
+.adm-ta:focus { outline: 2px solid var(--skb); outline-offset: -1px; }
+@media (max-width: 560px) { .adm-listen-lbl { flex-basis: 60px; } }
 /* Konjugations-Karussell editor */
 .adm-verb { border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 8px; background: #fff; }
 .adm-verb .adm-case-line > .adm-input:first-child { flex: 0 0 40%; }
@@ -606,8 +613,14 @@ kbd {
   font-weight: 800; color: var(--ink); background: var(--card);
   border: 2px solid var(--line); border-left: 10px solid var(--c); box-shadow: var(--shadow);
 }
-.live-opt .opt-shape { font-size: 1.4rem; color: var(--c); line-height: 1; }
+.live-opt .opt-shape { font-size: 1.4rem; color: var(--c); line-height: 1; flex: 0 0 auto; }
 .live-opt.board { font-size: clamp(1.1rem, 2.4vw, 1.6rem); }
+/* answers wrap for long text — options may be whole sentences (Hör gut zu!) */
+.opt-text { flex: 1; overflow-wrap: anywhere; line-height: 1.3; }
+.reveal-value { overflow-wrap: anywhere; }
+
+/* audio-speed preview row in the Live host setup */
+.setup-preview { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 2px 0 6px; }
 
 /* reveal */
 .reveal-answer { background: #eafaf7; border: 2px solid var(--good); border-radius: 18px; padding: 22px; margin: 10px auto; max-width: 560px; }
@@ -1780,15 +1793,16 @@ const App = (function () {
     el,
 
     /* Speak German out loud. Routed through VoiceBox so the voice chosen in
-       Settings is used everywhere; falls back to plain browser speech. */
-    speak(text, lang = "de-DE") {
-      if (window.VoiceBox) return window.VoiceBox.speak(text);
+       Settings is used everywhere; falls back to plain browser speech.
+       opts.rate scales the playback speed (1 = normal). */
+    speak(text, opts) {
+      if (window.VoiceBox) return window.VoiceBox.speak(text, opts);
       try {
         if (!("speechSynthesis" in window)) return;
         window.speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
-        u.lang = lang;
-        u.rate = 0.95;
+        u.lang = "de-DE";
+        u.rate = 0.95 * ((opts && opts.rate) || 1);
         const voices = window.speechSynthesis.getVoices();
         const de = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith("de"));
         if (de) u.voice = de;
@@ -2239,13 +2253,13 @@ document.addEventListener("DOMContentLoaded", App.init);
     } catch (e) { return []; }
   }
 
-  function speakBrowser(text) {
+  function speakBrowser(text, rate) {
     try {
       if (!("speechSynthesis" in window)) return;
       window.speechSynthesis.cancel();
       var u = new SpeechSynthesisUtterance(text);
       u.lang = "de-DE";
-      u.rate = 0.95;
+      u.rate = 0.95 * (rate || 1);
       var vs = browserVoices(), pick = null;
       if (chosen && chosen.indexOf("browser:") === 0) {
         var want = chosen.slice(8);
@@ -2258,24 +2272,28 @@ document.addEventListener("DOMContentLoaded", App.init);
   }
 
   // Play a specific voice's Azure file if it exists; returns true if it started.
-  function playAzureFile(voiceId, text) {
+  // `rate` (1 = normal) sets the mp3 playback speed.
+  function playAzureFile(voiceId, text, rate) {
     if (!manifest || !manifest.files) return false;
     var h = fileFor(voiceId, text);
     if (!manifest.files[h]) return false;
     try {
       var a = new Audio("audio/" + h + ".mp3");
-      a.play().catch(function () { speakBrowser(text); });
+      if (rate && rate !== 1) { try { a.playbackRate = rate; } catch (e) {} }
+      a.play().catch(function () { speakBrowser(text, rate); });
       return true;
     } catch (e) { return false; }
   }
 
-  function speak(text) {
+  // speak(text, opts) — opts.rate scales the playback speed (1 = normal).
+  function speak(text, opts) {
     text = String(text == null ? "" : text).trim();
     if (!text) return;
+    var rate = (opts && opts.rate) || 1;
     if (chosen && chosen.indexOf("azure:") === 0) {
-      if (playAzureFile(chosen, text)) return; // pre-generated file
+      if (playAzureFile(chosen, text, rate)) return; // pre-generated file
     }
-    speakBrowser(text); // fallback / browser voice
+    speakBrowser(text, rate); // fallback / browser voice
   }
 
   function azureReady() { return !!(manifest && manifest.files); }
@@ -3068,6 +3086,34 @@ document.addEventListener("DOMContentLoaded", App.init);
         });
       }
 
+      /* A textarea bound two-way to obj[field] (a string). Grows for long text /
+         sentences, so the same editor works for a single word or a full sentence. */
+      function textareaInput(obj, field, placeholder, cls) {
+        var ta = el("textarea", {
+          class: cls || "adm-ta",
+          text: obj[field] == null ? "" : String(obj[field]),
+          attrs: { placeholder: placeholder || "", rows: 1 },
+          on: { input: function (e) { obj[field] = e.target.value; autoGrow(e.target); store.save(); } }
+        });
+        return ta;
+      }
+      /* A textarea for a list stored as an array — ONE ENTRY PER LINE (so options
+         may themselves be sentences that contain commas). */
+      function linesInput(obj, field, placeholder, cls) {
+        return el("textarea", {
+          class: cls || "adm-ta",
+          text: (obj[field] || []).join("\n"),
+          attrs: { placeholder: placeholder || "", rows: 1 },
+          on: { input: function (e) {
+            var arr = e.target.value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+            if (arr.length) obj[field] = arr; else delete obj[field];
+            autoGrow(e.target);
+            store.save();
+          } }
+        });
+      }
+      function autoGrow(ta) { try { ta.style.height = "auto"; ta.style.height = (ta.scrollHeight + 2) + "px"; } catch (e) {} }
+
       function toast(msg) {
         var t = el("div", { class: "adm-toast", text: msg });
         document.body.appendChild(t);
@@ -3240,34 +3286,40 @@ document.addEventListener("DOMContentLoaded", App.init);
           el("p", {
             class: "adm-hint",
             html:
-              "These words power <b>👂 Hör gut zu!</b> in Live Class Mode. The smartboard <b>says the word out loud</b> (no text) and students pick it from four look-alikes. " +
-              "The <b>look-alike options</b> should be words that sound confusingly similar (near-homophones, minimal pairs, umlaut variants). Changes save automatically."
+              "These power <b>👂 Hör gut zu!</b> in Live Class Mode. The smartboard <b>says each one out loud</b> (no text) and students pick it from four look-alikes. " +
+              "A prompt can be a single <b>word</b> or a whole <b>sentence</b> — mix both freely. The <b>look-alike options</b> (one per line) should sound confusingly similar " +
+              "(near-homophones, minimal pairs, or sentences that differ in a small detail). Changes save automatically."
           })
         );
         var list = ex.items;
-        body.appendChild(el("div", { class: "adm-row adm-row-head adm-listen-row" }, [
-          el("span", { text: "Word (spoken)" }),
-          el("span", { text: "Meaning" }),
-          el("span", { text: "Look-alike options (3)" }),
-          el("span", {})
-        ]));
-        if (!list.length) body.appendChild(emptyState("No words yet."));
-        list.forEach(function (w, i) {
-          body.appendChild(el("div", { class: "adm-row adm-listen-row" }, [
-            input(w, "word", "e.g. Kirche", "adm-input"),
-            input(w, "meaning", "church", "adm-input"),
-            optionsInput(w, "distractors", "e.g. Kirsche, Küche, Kiste"),
-            el("button", {
-              class: "adm-del", html: "✕", attrs: { title: "Remove" },
-              on: { click: function () { list.splice(i, 1); store.save(); render(); } }
-            })
-          ]));
-        });
-        body.appendChild(addRowBtn("+ Word", function () {
+        if (!list.length) body.appendChild(emptyState("Nothing here yet — add the first prompt below."));
+        list.forEach(function (w, i) { body.appendChild(listenCard(w, list, i)); });
+        body.appendChild(addRowBtn("+ Prompt", function () {
           list.push({ word: "", meaning: "", distractors: [] });
           store.save();
           render();
         }));
+      }
+
+      function listenCard(w, list, index) {
+        var card = el("div", { class: "adm-listen-item" });
+        card.appendChild(el("div", { class: "adm-listen-line" }, [
+          el("span", { class: "adm-listen-lbl", text: "Spoken" }),
+          textareaInput(w, "word", "e.g. Kirche — or a whole sentence students must catch", "adm-ta grow"),
+          el("button", {
+            class: "adm-del", html: "✕", attrs: { title: "Remove" },
+            on: { click: function () { list.splice(index, 1); store.save(); render(); } }
+          })
+        ]));
+        card.appendChild(el("div", { class: "adm-listen-line" }, [
+          el("span", { class: "adm-listen-lbl", text: "Meaning" }),
+          input(w, "meaning", "what it means (shown at the reveal)", "adm-input grow")
+        ]));
+        card.appendChild(el("div", { class: "adm-listen-line" }, [
+          el("span", { class: "adm-listen-lbl", text: "Look-alikes" }),
+          linesInput(w, "distractors", "one per line — leave blank to auto-pick from the other prompts", "adm-ta grow")
+        ]));
+        return card;
       }
 
       /* ---- Konjugations-Karussell: a verb's six present-tense forms ---- */
@@ -3437,6 +3489,7 @@ document.addEventListener("DOMContentLoaded", App.init);
         if (kind === "sentences") return " sentences";
         if (id === "plurals") return " nouns";
         if (id === "verbs") return " verbs";
+        if (id === "listening") return " prompts";
         return " words";
       }
 
@@ -4408,12 +4461,13 @@ document.addEventListener("DOMContentLoaded", App.init);
     meta: { name: "Hör gut zu!", emoji: "👂", contentType: "listening" },
     timeLimit: 20000,
     pickLabel: "Exercise",
+    audioSpeed: true, // host can choose the playback speed at setup
     getTopics: function () {
       var store = window.ContentStore;
       var list = (store && store.exercisesFor) ? store.exercisesFor("listening") : [];
       return list.map(function (e) {
         var n = (e.items || []).length;
-        return { id: e.id, name: e.name, emoji: "👂", english: n + (n === 1 ? " word" : " words") };
+        return { id: e.id, name: e.name, emoji: "👂", english: n + (n === 1 ? " prompt" : " prompts") };
       });
     },
     buildRounds: function (topic) {
@@ -4434,18 +4488,18 @@ document.addEventListener("DOMContentLoaded", App.init);
       if (round._plays == null) round._plays = 0;
       var btn;
       function label() {
-        if (round._plays === 0) return "🔊 Play the word";
+        if (round._plays === 0) return "🔊 Play the audio";
         if (round._plays === 1) return "🔁 Play again (1 left)";
         return "✓ Played twice";
       }
       function refresh() { btn.innerHTML = label(); btn.disabled = round._plays >= 2; }
       btn = el("button", {
         class: "btn primary big listen-play",
-        on: { click: function () { if (round._plays < 2) { round._plays++; try { kit().speak(round.word); } catch (e) {} refresh(); } } }
+        on: { click: function () { if (round._plays < 2) { round._plays++; try { kit().speak(round.word, { rate: round.speed || 1 }); } catch (e) {} refresh(); } } }
       });
       refresh();
       return el("div", { class: "live-q" }, [
-        el("div", { class: "live-q-tag", text: "👂 Which word did you hear?" }),
+        el("div", { class: "live-q-tag", text: "👂 Which one did you hear?" }),
         el("div", { class: "listen-audio" }, [el("div", { class: "listen-emoji", text: "🎧" }), btn]),
         el("div", { class: "live-q-options board" }, round.options.map(function (opt, i) {
           return el("div", { class: "live-opt board", attrs: { style: "--c:" + COLORS[i] } }, [
@@ -4671,8 +4725,14 @@ window.LiveMode = (function () {
   //         onStart({ gameId, topic, answerMode, persistMode, adapter, rounds }) }
   function gamePicker(opts) {
     stop();
-    var gameId = null, topic = null, persistMode = "fresh", answerMode = "options";
+    var gameId = null, topic = null, persistMode = "fresh", answerMode = "options", speed = 1;
     var gameIds = Object.keys(window.LiveGames);
+    var SPEEDS = [
+      { v: 0.75, label: "Slow", sub: "0.75×" },
+      { v: 1, label: "Normal", sub: "1×" },
+      { v: 1.25, label: "Fast", sub: "1.25×" },
+      { v: 1.5, label: "Faster", sub: "1.5×" }
+    ];
 
     var wrap = screen("", [
       el("button", { class: "back-link", html: "← Back", on: { click: opts.back } }),
@@ -4717,17 +4777,35 @@ window.LiveMode = (function () {
         }
       }
 
-      // 3) answer mode (games that support typing) + scoreboard + start
+      // 3) answer mode / audio speed (per game) + scoreboard + start
       if (gameId && topic) {
-        var supportsTyping = window.LiveGames[gameId].supportsTyping;
+        var gAdapter3 = window.LiveGames[gameId];
         var n = 3;
-        if (supportsTyping) {
-          step.appendChild(el("div", { class: "live-label", text: "3 · How students answer" }));
+        if (gAdapter3.supportsTyping) {
+          step.appendChild(el("div", { class: "live-label", text: n + " · How students answer" }));
           step.appendChild(el("div", { class: "setup-modes" }, [
             answerPill("options", "Tap the article", "Multiple choice — faster"),
             answerPill("type", "Type the article", "Free recall — harder")
           ]));
-          n = 4;
+          n++;
+        }
+        if (gAdapter3.audioSpeed) {
+          step.appendChild(el("div", { class: "live-label", text: n + " · Audio speed" }));
+          var speedRow = el("div", { class: "setup-modes" }, SPEEDS.map(function (s) {
+            return el("button", {
+              class: "mode-pill" + (speed === s.v ? " sel" : ""),
+              on: { click: function () { speed = s.v; renderStep(); } }
+            }, [el("b", { text: s.label }), el("span", { text: s.sub })]);
+          }));
+          step.appendChild(speedRow);
+          step.appendChild(el("div", { class: "setup-preview" }, [
+            el("button", {
+              class: "btn ghost", html: "▶ Preview at " + speed + "×",
+              on: { click: function () { previewAudio(); } }
+            }),
+            el("span", { class: "live-muted", text: "Hear a sample at this speed before you start." })
+          ]));
+          n++;
         }
         step.appendChild(el("div", { class: "live-label", text: n + " · Scoreboard" }));
         var modeRow = el("div", { class: "setup-modes" }, [
@@ -4751,6 +4829,18 @@ window.LiveMode = (function () {
           on: { click: function () { persistMode = id; renderStep(); } }
         }, [el("b", { text: title }), el("span", { text: sub })]);
       }
+
+      // Play a sample from the chosen exercise (or a fallback) at the selected speed.
+      function previewAudio() {
+        var sample = "Guten Morgen";
+        try {
+          var ex = store.exercise && store.exercise(gameId === "listen" ? "listening" : gameId, topic && topic.id);
+          var items = (ex && (ex.items || ex.words)) || [];
+          var texts = items.map(function (it) { return it && (it.word || it.de); }).filter(Boolean);
+          if (texts.length) sample = texts[Math.floor(Math.random() * texts.length)];
+        } catch (e) {}
+        kit.speak(sample, { rate: speed });
+      }
     }
     renderStep();
 
@@ -4758,7 +4848,8 @@ window.LiveMode = (function () {
       var adapter = window.LiveGames[gameId];
       var rounds = adapter.buildRounds(topic);
       if (!rounds.length) { alert("This topic has no usable content."); return; }
-      opts.onStart({ gameId: gameId, topic: topic, answerMode: answerMode, persistMode: persistMode, adapter: adapter, rounds: rounds });
+      if (adapter.audioSpeed) rounds.forEach(function (r) { r.speed = speed; });
+      opts.onStart({ gameId: gameId, topic: topic, answerMode: answerMode, persistMode: persistMode, adapter: adapter, rounds: rounds, speed: speed });
     }
   }
 

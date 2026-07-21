@@ -183,8 +183,14 @@ window.LiveMode = (function () {
   //         onStart({ gameId, topic, answerMode, persistMode, adapter, rounds }) }
   function gamePicker(opts) {
     stop();
-    var gameId = null, topic = null, persistMode = "fresh", answerMode = "options";
+    var gameId = null, topic = null, persistMode = "fresh", answerMode = "options", speed = 1;
     var gameIds = Object.keys(window.LiveGames);
+    var SPEEDS = [
+      { v: 0.75, label: "Slow", sub: "0.75×" },
+      { v: 1, label: "Normal", sub: "1×" },
+      { v: 1.25, label: "Fast", sub: "1.25×" },
+      { v: 1.5, label: "Faster", sub: "1.5×" }
+    ];
 
     var wrap = screen("", [
       el("button", { class: "back-link", html: "← Back", on: { click: opts.back } }),
@@ -229,17 +235,35 @@ window.LiveMode = (function () {
         }
       }
 
-      // 3) answer mode (games that support typing) + scoreboard + start
+      // 3) answer mode / audio speed (per game) + scoreboard + start
       if (gameId && topic) {
-        var supportsTyping = window.LiveGames[gameId].supportsTyping;
+        var gAdapter3 = window.LiveGames[gameId];
         var n = 3;
-        if (supportsTyping) {
-          step.appendChild(el("div", { class: "live-label", text: "3 · How students answer" }));
+        if (gAdapter3.supportsTyping) {
+          step.appendChild(el("div", { class: "live-label", text: n + " · How students answer" }));
           step.appendChild(el("div", { class: "setup-modes" }, [
             answerPill("options", "Tap the article", "Multiple choice — faster"),
             answerPill("type", "Type the article", "Free recall — harder")
           ]));
-          n = 4;
+          n++;
+        }
+        if (gAdapter3.audioSpeed) {
+          step.appendChild(el("div", { class: "live-label", text: n + " · Audio speed" }));
+          var speedRow = el("div", { class: "setup-modes" }, SPEEDS.map(function (s) {
+            return el("button", {
+              class: "mode-pill" + (speed === s.v ? " sel" : ""),
+              on: { click: function () { speed = s.v; renderStep(); } }
+            }, [el("b", { text: s.label }), el("span", { text: s.sub })]);
+          }));
+          step.appendChild(speedRow);
+          step.appendChild(el("div", { class: "setup-preview" }, [
+            el("button", {
+              class: "btn ghost", html: "▶ Preview at " + speed + "×",
+              on: { click: function () { previewAudio(); } }
+            }),
+            el("span", { class: "live-muted", text: "Hear a sample at this speed before you start." })
+          ]));
+          n++;
         }
         step.appendChild(el("div", { class: "live-label", text: n + " · Scoreboard" }));
         var modeRow = el("div", { class: "setup-modes" }, [
@@ -263,6 +287,18 @@ window.LiveMode = (function () {
           on: { click: function () { persistMode = id; renderStep(); } }
         }, [el("b", { text: title }), el("span", { text: sub })]);
       }
+
+      // Play a sample from the chosen exercise (or a fallback) at the selected speed.
+      function previewAudio() {
+        var sample = "Guten Morgen";
+        try {
+          var ex = store.exercise && store.exercise(gameId === "listen" ? "listening" : gameId, topic && topic.id);
+          var items = (ex && (ex.items || ex.words)) || [];
+          var texts = items.map(function (it) { return it && (it.word || it.de); }).filter(Boolean);
+          if (texts.length) sample = texts[Math.floor(Math.random() * texts.length)];
+        } catch (e) {}
+        kit.speak(sample, { rate: speed });
+      }
     }
     renderStep();
 
@@ -270,7 +306,8 @@ window.LiveMode = (function () {
       var adapter = window.LiveGames[gameId];
       var rounds = adapter.buildRounds(topic);
       if (!rounds.length) { alert("This topic has no usable content."); return; }
-      opts.onStart({ gameId: gameId, topic: topic, answerMode: answerMode, persistMode: persistMode, adapter: adapter, rounds: rounds });
+      if (adapter.audioSpeed) rounds.forEach(function (r) { r.speed = speed; });
+      opts.onStart({ gameId: gameId, topic: topic, answerMode: answerMode, persistMode: persistMode, adapter: adapter, rounds: rounds, speed: speed });
     }
   }
 

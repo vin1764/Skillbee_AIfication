@@ -520,12 +520,13 @@
     meta: { name: "Hör gut zu!", emoji: "👂", contentType: "listening" },
     timeLimit: 20000,
     pickLabel: "Exercise",
+    audioSpeed: true, // host can choose the playback speed at setup
     getTopics: function () {
       var store = window.ContentStore;
       var list = (store && store.exercisesFor) ? store.exercisesFor("listening") : [];
       return list.map(function (e) {
         var n = (e.items || []).length;
-        return { id: e.id, name: e.name, emoji: "👂", english: n + (n === 1 ? " word" : " words") };
+        return { id: e.id, name: e.name, emoji: "👂", english: n + (n === 1 ? " prompt" : " prompts") };
       });
     },
     buildRounds: function (topic) {
@@ -546,18 +547,18 @@
       if (round._plays == null) round._plays = 0;
       var btn;
       function label() {
-        if (round._plays === 0) return "🔊 Play the word";
+        if (round._plays === 0) return "🔊 Play the audio";
         if (round._plays === 1) return "🔁 Play again (1 left)";
         return "✓ Played twice";
       }
       function refresh() { btn.innerHTML = label(); btn.disabled = round._plays >= 2; }
       btn = el("button", {
         class: "btn primary big listen-play",
-        on: { click: function () { if (round._plays < 2) { round._plays++; try { kit().speak(round.word); } catch (e) {} refresh(); } } }
+        on: { click: function () { if (round._plays < 2) { round._plays++; try { kit().speak(round.word, { rate: round.speed || 1 }); } catch (e) {} refresh(); } } }
       });
       refresh();
       return el("div", { class: "live-q" }, [
-        el("div", { class: "live-q-tag", text: "👂 Which word did you hear?" }),
+        el("div", { class: "live-q-tag", text: "👂 Which one did you hear?" }),
         el("div", { class: "listen-audio" }, [el("div", { class: "listen-emoji", text: "🎧" }), btn]),
         el("div", { class: "live-q-options board" }, round.options.map(function (opt, i) {
           return el("div", { class: "live-opt board", attrs: { style: "--c:" + COLORS[i] } }, [
