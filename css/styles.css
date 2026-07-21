@@ -128,15 +128,19 @@ kbd {
 .picker-title { font-size: clamp(1.5rem, 4vw, 2.2rem); margin: 6px 0; }
 .picker-sub { color: var(--ink-soft); margin: 0; }
 /* One standard back button, pinned to the upper-left of every screen. */
+/* Pinned just BELOW the sticky top bar (≈66px tall) so it never collides with it. */
 .back-link {
-  position: fixed; top: 60px; left: clamp(14px, 4vw, 40px); z-index: 15;
-  background: #fff; border: 1px solid var(--line); border-radius: 10px;
-  padding: 8px 14px; font-weight: 700; color: var(--ink); box-shadow: var(--shadow);
+  position: fixed; top: 76px; left: clamp(14px, 4vw, 40px); z-index: 15;
+  background: #fff; border: 0; border-radius: 12px;
+  padding: 8px 15px; font-weight: 800; color: var(--accent);
+  box-shadow: 0 4px 0 var(--line-deep), inset 0 0 0 2px var(--line);
+  transition: transform 0.06s, box-shadow 0.06s;
 }
-.back-link.small { padding: 8px 14px; font-size: 0.92rem; }
-.back-link:hover { border-color: var(--accent); color: var(--accent); }
-/* Reserve room for the pinned button only on screens that actually have one. */
-.screen:has(.back-link) { padding-top: 64px; }
+.back-link.small { padding: 7px 13px; font-size: 0.92rem; }
+.back-link:hover { box-shadow: 0 4px 0 var(--line-deep), inset 0 0 0 2px var(--accent); }
+.back-link:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--line-deep), inset 0 0 0 2px var(--accent); }
+/* Reserve room for the pinned button on screens that have one. */
+.screen:has(.back-link) { padding-top: 66px; }
 
 .topic-grid {
   display: grid; gap: 14px;
