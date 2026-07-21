@@ -352,6 +352,34 @@ kbd {
 /* emoji + description row atop a words/sentences exercise editor */
 .adm-ex-head { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
 .adm-ex-head .adm-input { flex: 1; max-width: 360px; }
+/* exercise-list action buttons (New / Copy from another game) */
+.adm-ex-bar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+
+/* "Copy from another game" modal */
+.adm-overlay {
+  position: fixed; inset: 0; z-index: 1000; padding: 16px;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex; align-items: center; justify-content: center;
+}
+.adm-modal {
+  background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+  padding: 20px; width: 100%; max-width: 460px; max-height: 80vh; overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+.adm-modal-title { font-weight: 800; font-size: 1.1rem; margin-bottom: 6px; }
+.adm-copy-list { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+.adm-copy-group {
+  font-weight: 800; color: var(--ink-soft); font-size: 0.78rem;
+  text-transform: uppercase; letter-spacing: 0.4px; margin-top: 8px;
+}
+.adm-copy-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  text-align: left; background: #fff; border: 1px solid var(--line);
+  border-radius: 12px; padding: 10px 14px; cursor: pointer;
+}
+.adm-copy-row:hover { border-color: var(--skb); }
+.adm-copy-count { color: var(--ink-soft); font-size: 0.82rem; white-space: nowrap; }
+.adm-copy-cancel { margin-top: 6px; }
 
 .adm-subhead { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .adm-game-title { margin: 0; font-size: 1.2rem; }

@@ -129,9 +129,17 @@
   function defaultExercises() {
     var vt = (window.GameData && window.GameData.VOCAB_TOPICS) || [];
     var st = (window.GameData && window.GameData.SENTENCE_TOPICS) || [];
-    var words = function () { return vt.map(function (t) { return topicToExercise(t, "words"); }); };
+    // Each word game starts from a DIFFERENT subset of the built-in topics, so
+    // Quiz / Memory / Hangman aren't identical out of the box (teachers add more).
+    var pickWords = function (ids) {
+      var chosen = ids ? vt.filter(function (t) { return ids.indexOf(t.id) >= 0; }) : vt;
+      if (!chosen.length) chosen = vt; // never seed a word game empty on a typo
+      return chosen.map(function (t) { return topicToExercise(t, "words"); });
+    };
     return {
-      quiz: words(), memory: words(), hangman: words(),
+      quiz: pickWords(null), // the full set
+      memory: pickWords(["tiere", "essen", "farben", "familie"]),
+      hangman: pickWords(["tiere", "essen", "familie", "verben"]),
       scramble: st.map(function (t) { return topicToExercise(t, "sentences"); }),
       cases: [caseExercise("Exercise 1", defaultCases())],
       compounds: [listExercise("Exercise 1", defaultCompounds())],
@@ -338,6 +346,17 @@
       for (var i = 0; i < arr.length; i++) if (arr[i].id === id) { arr.splice(i, 1); break; }
       if (!arr.length) arr.push(this._blankExercise(gameKey, "Exercise 1")); // keep at least one
       this.save();
+    },
+    // Copy an exercise from another content-compatible game into this one.
+    copyExerciseFrom: function (destKey, srcKey, srcId) {
+      if (gameKind(destKey) !== gameKind(srcKey)) return null;
+      var src = this.exercise(srcKey, srcId);
+      if (!src) return null;
+      var copy = clone(src);
+      copy.id = exId();
+      this.exercisesFor(destKey).push(copy);
+      this.save();
+      return copy;
     },
 
     /* Back-compat accessors — the FIRST exercise's content (used as a fallback

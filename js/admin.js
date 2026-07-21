@@ -408,6 +408,45 @@
         for (var i = 0; i < all.length; i++) if (all[i].id === id) return all[i];
         return null;
       }
+      // Games you can copy an exercise FROM into `gameId`. Only the word games
+      // (Quiz / Memory / Hangman) share a compatible content shape.
+      var WORD_COPY_GROUP = ["quiz", "memory", "hangman"];
+      function copySourcesFor(gameId) {
+        if (WORD_COPY_GROUP.indexOf(gameId) < 0) return [];
+        return WORD_COPY_GROUP.filter(function (g) { return g !== gameId && store.exercisesFor(g).length > 0; });
+      }
+      // Modal: pick an exercise from another word game to copy into `destGame`.
+      function openCopyPicker(destGame) {
+        var overlay = el("div", { class: "adm-overlay" });
+        function close() { overlay.remove(); }
+        overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
+        var card = el("div", { class: "adm-modal" });
+        card.appendChild(el("div", { class: "adm-modal-title", text: "Copy into " + destGame.emoji + " " + destGame.name }));
+        card.appendChild(el("p", { class: "adm-hint", html: "Pick an exercise from another word game — it's copied here as a new exercise (the original stays put)." }));
+        var listWrap = el("div", { class: "adm-copy-list" });
+        copySourcesFor(destGame.id).forEach(function (srcId) {
+          var srcGame = gameById(srcId);
+          listWrap.appendChild(el("div", { class: "adm-copy-group", text: srcGame.emoji + " " + srcGame.name }));
+          store.exercisesFor(srcId).forEach(function (e) {
+            var count = exerciseItemCount("words", e);
+            listWrap.appendChild(el("button", {
+              class: "adm-copy-row",
+              on: { click: function () {
+                var copy = store.copyExerciseFrom(destGame.id, srcId, e.id);
+                close();
+                if (copy) { currentExercise = copy.id; render(); toast("Copied “" + e.name + "” ✓"); }
+              } }
+            }, [
+              el("span", { class: "adm-copy-name", text: (e.emoji ? e.emoji + " " : "") + e.name }),
+              el("span", { class: "adm-copy-count", text: count + " words" })
+            ]));
+          });
+        });
+        card.appendChild(listWrap);
+        card.appendChild(el("button", { class: "btn ghost adm-copy-cancel", text: "Cancel", on: { click: close } }));
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+      }
       // Count the content rows inside a single exercise, given the game's kind.
       function exerciseItemCount(kind, ex) {
         if (!ex) return 0;
@@ -469,11 +508,21 @@
           wrap.appendChild(card);
         });
         body.appendChild(wrap);
-        body.appendChild(el("button", {
-          class: "btn primary adm-add",
-          html: "+ New exercise",
-          on: { click: function () { var e = store.addExercise(game.id); currentExercise = e.id; render(); } }
-        }));
+        var actions = el("div", { class: "adm-ex-bar" }, [
+          el("button", {
+            class: "btn primary",
+            html: "+ New exercise",
+            on: { click: function () { var e = store.addExercise(game.id); currentExercise = e.id; render(); } }
+          })
+        ]);
+        if (copySourcesFor(game.id).length) {
+          actions.appendChild(el("button", {
+            class: "btn ghost",
+            html: "⧉ Copy from another game",
+            on: { click: function () { openCopyPicker(game); } }
+          }));
+        }
+        body.appendChild(actions);
       }
 
       function renderGames(body) {

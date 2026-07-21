@@ -360,6 +360,34 @@ kbd {
 /* emoji + description row atop a words/sentences exercise editor */
 .adm-ex-head { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
 .adm-ex-head .adm-input { flex: 1; max-width: 360px; }
+/* exercise-list action buttons (New / Copy from another game) */
+.adm-ex-bar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+
+/* "Copy from another game" modal */
+.adm-overlay {
+  position: fixed; inset: 0; z-index: 1000; padding: 16px;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex; align-items: center; justify-content: center;
+}
+.adm-modal {
+  background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+  padding: 20px; width: 100%; max-width: 460px; max-height: 80vh; overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+.adm-modal-title { font-weight: 800; font-size: 1.1rem; margin-bottom: 6px; }
+.adm-copy-list { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+.adm-copy-group {
+  font-weight: 800; color: var(--ink-soft); font-size: 0.78rem;
+  text-transform: uppercase; letter-spacing: 0.4px; margin-top: 8px;
+}
+.adm-copy-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  text-align: left; background: #fff; border: 1px solid var(--line);
+  border-radius: 12px; padding: 10px 14px; cursor: pointer;
+}
+.adm-copy-row:hover { border-color: var(--skb); }
+.adm-copy-count { color: var(--ink-soft); font-size: 0.82rem; white-space: nowrap; }
+.adm-copy-cancel { margin-top: 6px; }
 
 .adm-subhead { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .adm-game-title { margin: 0; font-size: 1.2rem; }
@@ -1302,9 +1330,17 @@ window.SkillbeeBrand = {
   function defaultExercises() {
     var vt = (window.GameData && window.GameData.VOCAB_TOPICS) || [];
     var st = (window.GameData && window.GameData.SENTENCE_TOPICS) || [];
-    var words = function () { return vt.map(function (t) { return topicToExercise(t, "words"); }); };
+    // Each word game starts from a DIFFERENT subset of the built-in topics, so
+    // Quiz / Memory / Hangman aren't identical out of the box (teachers add more).
+    var pickWords = function (ids) {
+      var chosen = ids ? vt.filter(function (t) { return ids.indexOf(t.id) >= 0; }) : vt;
+      if (!chosen.length) chosen = vt; // never seed a word game empty on a typo
+      return chosen.map(function (t) { return topicToExercise(t, "words"); });
+    };
     return {
-      quiz: words(), memory: words(), hangman: words(),
+      quiz: pickWords(null), // the full set
+      memory: pickWords(["tiere", "essen", "farben", "familie"]),
+      hangman: pickWords(["tiere", "essen", "familie", "verben"]),
       scramble: st.map(function (t) { return topicToExercise(t, "sentences"); }),
       cases: [caseExercise("Exercise 1", defaultCases())],
       compounds: [listExercise("Exercise 1", defaultCompounds())],
@@ -1511,6 +1547,17 @@ window.SkillbeeBrand = {
       for (var i = 0; i < arr.length; i++) if (arr[i].id === id) { arr.splice(i, 1); break; }
       if (!arr.length) arr.push(this._blankExercise(gameKey, "Exercise 1")); // keep at least one
       this.save();
+    },
+    // Copy an exercise from another content-compatible game into this one.
+    copyExerciseFrom: function (destKey, srcKey, srcId) {
+      if (gameKind(destKey) !== gameKind(srcKey)) return null;
+      var src = this.exercise(srcKey, srcId);
+      if (!src) return null;
+      var copy = clone(src);
+      copy.id = exId();
+      this.exercisesFor(destKey).push(copy);
+      this.save();
+      return copy;
     },
 
     /* Back-compat accessors — the FIRST exercise's content (used as a fallback
@@ -3338,6 +3385,45 @@ document.addEventListener("DOMContentLoaded", App.init);
         for (var i = 0; i < all.length; i++) if (all[i].id === id) return all[i];
         return null;
       }
+      // Games you can copy an exercise FROM into `gameId`. Only the word games
+      // (Quiz / Memory / Hangman) share a compatible content shape.
+      var WORD_COPY_GROUP = ["quiz", "memory", "hangman"];
+      function copySourcesFor(gameId) {
+        if (WORD_COPY_GROUP.indexOf(gameId) < 0) return [];
+        return WORD_COPY_GROUP.filter(function (g) { return g !== gameId && store.exercisesFor(g).length > 0; });
+      }
+      // Modal: pick an exercise from another word game to copy into `destGame`.
+      function openCopyPicker(destGame) {
+        var overlay = el("div", { class: "adm-overlay" });
+        function close() { overlay.remove(); }
+        overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
+        var card = el("div", { class: "adm-modal" });
+        card.appendChild(el("div", { class: "adm-modal-title", text: "Copy into " + destGame.emoji + " " + destGame.name }));
+        card.appendChild(el("p", { class: "adm-hint", html: "Pick an exercise from another word game — it's copied here as a new exercise (the original stays put)." }));
+        var listWrap = el("div", { class: "adm-copy-list" });
+        copySourcesFor(destGame.id).forEach(function (srcId) {
+          var srcGame = gameById(srcId);
+          listWrap.appendChild(el("div", { class: "adm-copy-group", text: srcGame.emoji + " " + srcGame.name }));
+          store.exercisesFor(srcId).forEach(function (e) {
+            var count = exerciseItemCount("words", e);
+            listWrap.appendChild(el("button", {
+              class: "adm-copy-row",
+              on: { click: function () {
+                var copy = store.copyExerciseFrom(destGame.id, srcId, e.id);
+                close();
+                if (copy) { currentExercise = copy.id; render(); toast("Copied “" + e.name + "” ✓"); }
+              } }
+            }, [
+              el("span", { class: "adm-copy-name", text: (e.emoji ? e.emoji + " " : "") + e.name }),
+              el("span", { class: "adm-copy-count", text: count + " words" })
+            ]));
+          });
+        });
+        card.appendChild(listWrap);
+        card.appendChild(el("button", { class: "btn ghost adm-copy-cancel", text: "Cancel", on: { click: close } }));
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+      }
       // Count the content rows inside a single exercise, given the game's kind.
       function exerciseItemCount(kind, ex) {
         if (!ex) return 0;
@@ -3399,11 +3485,21 @@ document.addEventListener("DOMContentLoaded", App.init);
           wrap.appendChild(card);
         });
         body.appendChild(wrap);
-        body.appendChild(el("button", {
-          class: "btn primary adm-add",
-          html: "+ New exercise",
-          on: { click: function () { var e = store.addExercise(game.id); currentExercise = e.id; render(); } }
-        }));
+        var actions = el("div", { class: "adm-ex-bar" }, [
+          el("button", {
+            class: "btn primary",
+            html: "+ New exercise",
+            on: { click: function () { var e = store.addExercise(game.id); currentExercise = e.id; render(); } }
+          })
+        ]);
+        if (copySourcesFor(game.id).length) {
+          actions.appendChild(el("button", {
+            class: "btn ghost",
+            html: "⧉ Copy from another game",
+            on: { click: function () { openCopyPicker(game); } }
+          }));
+        }
+        body.appendChild(actions);
       }
 
       function renderGames(body) {
