@@ -112,12 +112,14 @@ kbd {
 /* emoji sits in a rounded-square tile — the shape of the Skillbee app badge */
 .game-emoji {
   display: inline-grid; place-items: center; width: 56px; height: 56px;
-  border-radius: 16px; background: var(--skb-tint); font-size: 1.7rem; line-height: 1;
-  margin-bottom: 12px; box-shadow: 0 5px 12px rgba(7, 21, 80, 0.10);
+  border-radius: 16px; font-size: 1.7rem; line-height: 1; margin-bottom: 12px;
+  box-shadow: 0 5px 12px rgba(7, 21, 80, 0.08);
+  background: var(--skb-tint);
+  background: color-mix(in srgb, var(--accent) 16%, #fff);
 }
 .game-name { font-size: 1.25rem; font-weight: 800; margin-bottom: 6px; }
 .game-desc { color: var(--ink-soft); font-size: 0.95rem; min-height: 2.6em; }
-.game-play { margin-top: 12px; font-weight: 800; color: var(--accent); }
+.game-play { margin-top: 12px; font-weight: 800; color: var(--skb); }
 
 .home-foot { text-align: center; color: var(--ink-soft); margin-top: 34px; font-size: 0.9rem; }
 
@@ -344,12 +346,16 @@ kbd {
 .adm-game-card:active { transform: translateY(3px); box-shadow: 0 3px 0 var(--line-deep); }
 .adm-game-badge {
   position: absolute; top: 10px; right: 10px;
-  background: var(--accent); color: #fff; font-size: 0.62rem; font-weight: 800;
-  letter-spacing: 0.4px; text-transform: uppercase; padding: 3px 8px; border-radius: 999px;
+  background: var(--skb-tint); color: var(--skb); font-size: 0.58rem; font-weight: 800;
+  letter-spacing: 0.4px; text-transform: uppercase; padding: 4px 9px; border-radius: 999px;
 }
-.adm-game-emoji { display: inline-grid; place-items: center; width: 46px; height: 46px; border-radius: 13px; background: var(--skb-tint); font-size: 1.5rem; }
+.adm-game-emoji {
+  display: inline-grid; place-items: center; width: 46px; height: 46px; border-radius: 13px; font-size: 1.5rem;
+  background: var(--skb-tint);
+  background: color-mix(in srgb, var(--accent) 15%, #fff);
+}
 .adm-game-name { font-weight: 800; margin-top: 8px; }
-.adm-game-meta { color: var(--accent); font-weight: 700; font-size: 0.85rem; margin-top: 4px; }
+.adm-game-meta { color: var(--skb); font-weight: 800; font-size: 0.85rem; margin-top: 4px; }
 
 /* exercise list (per Live game) */
 .adm-ex-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
@@ -569,11 +575,19 @@ kbd {
 
 /* landing: Host / Join */
 .live-choice { display: grid; gap: 18px; grid-template-columns: 1fr 1fr; margin-top: 20px; }
-.live-choice-card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 30px 18px; box-shadow: var(--shadow); transition: transform 0.15s; }
-.live-choice-card.host { border-top: 6px solid var(--skb); }
-.live-choice-card.join { border-top: 6px solid #ff924c; }
-.live-choice-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
-.live-choice-name { font-weight: 900; font-size: 1.3rem; margin-top: 10px; }
+.live-choice-card {
+  background: var(--card); border: 2px solid var(--line); border-radius: 20px;
+  padding: 30px 18px; box-shadow: 0 8px 0 var(--line-deep);
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+.live-choice-card:hover { transform: translateY(-3px); }
+.live-choice-card:active { transform: translateY(4px); box-shadow: 0 4px 0 var(--line-deep); }
+.live-choice-card .live-big-emoji {
+  display: inline-grid; place-items: center; width: 68px; height: 68px; border-radius: 18px;
+  background: var(--skb-tint); font-size: 2.4rem; margin: 0 auto 8px;
+}
+.live-choice-card.join .live-big-emoji { background: #FFEEDF; }
+.live-choice-name { font-weight: 900; font-size: 1.3rem; margin-top: 6px; }
 .live-choice-sub { color: var(--ink-soft); font-size: 0.9rem; margin-top: 4px; }
 
 /* rosters */

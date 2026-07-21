@@ -51,6 +51,9 @@ window.LiveMode = (function () {
     stop();
     show(screen("live-center", [
       el("button", { class: "back-link", html: "← Back", on: { click: goBack } }),
+      el("div", { class: "live-big-emoji", text: "📡" }),
+      el("h2", { class: "live-title", text: "Live Class Mode" }),
+      el("p", { class: "live-sub", text: "Play together in real time — one screen hosts, phones join with a room code." }),
       el("div", { class: "live-choice" }, [
         el("button", { class: "live-choice-card host", on: { click: function () { if (window.TeacherGate) window.TeacherGate.require(hostRosters); else hostRosters(); } } }, [
           el("div", { class: "live-big-emoji", text: "🖥️" }),
