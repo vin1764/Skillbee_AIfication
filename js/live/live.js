@@ -257,11 +257,9 @@ window.LiveMode = (function () {
           }));
           step.appendChild(speedRow);
           step.appendChild(el("div", { class: "setup-preview" }, [
-            el("button", {
-              class: "btn ghost", html: "▶ Preview at " + speed + "×",
-              on: { click: function () { previewAudio(); } }
-            }),
-            el("span", { class: "live-muted", text: "Hear a sample at this speed before you start." })
+            el("span", { class: "live-muted", text: "Preview at " + speed + "×:" }),
+            el("button", { class: "btn ghost", html: "▶ Word", attrs: { title: "Hear a word at this speed" }, on: { click: function () { preview("word"); } } }),
+            el("button", { class: "btn ghost", html: "▶ Sentence", attrs: { title: "Hear a full sentence at this speed" }, on: { click: function () { preview("sentence"); } } })
           ]));
           n++;
         }
@@ -288,16 +286,25 @@ window.LiveMode = (function () {
         }, [el("b", { text: title }), el("span", { text: sub })]);
       }
 
-      // Play a sample from the chosen exercise (or a fallback) at the selected speed.
-      function previewAudio() {
-        var sample = "Guten Morgen";
+      // Play a sample WORD or SENTENCE at the selected speed, so the teacher can
+      // judge the pace for both short prompts and connected speech. Samples come
+      // from the chosen exercise (split by whether they contain a space), with a
+      // sensible fallback if the exercise has none of that kind yet.
+      function preview(kind) {
+        var words = [], sentences = [];
         try {
           var ex = store.exercise && store.exercise(gameId === "listen" ? "listening" : gameId, topic && topic.id);
           var items = (ex && (ex.items || ex.words)) || [];
-          var texts = items.map(function (it) { return it && (it.word || it.de); }).filter(Boolean);
-          if (texts.length) sample = texts[Math.floor(Math.random() * texts.length)];
+          items.forEach(function (it) {
+            var t = it && (it.word || it.de);
+            if (!t) return;
+            (/\s/.test(String(t).trim()) ? sentences : words).push(t);
+          });
         } catch (e) {}
-        kit.speak(sample, { rate: speed });
+        var pool = kind === "sentence" ? sentences : words;
+        var fallback = kind === "sentence" ? "Heute lernen wir zusammen ein bisschen Deutsch." : "Kirche";
+        var text = pool.length ? pool[Math.floor(Math.random() * pool.length)] : fallback;
+        kit.speak(text, { rate: speed });
       }
     }
     renderStep();
