@@ -123,20 +123,22 @@
     meta: { name: "Fall-Detektiv", emoji: "🕵️", contentType: "cases" },
     timeLimit: 20000,
     supportsTyping: true, // teacher can choose tap-options or type-the-answer
-    // The "topics" for this game are the three difficulty levels.
+    pickLabel: "Exercise",
+    // The "topics" for this game are the teacher's exercises.
     getTopics: function () {
-      return [
-        { id: "l1", name: "Level 1", english: "Accusative", emoji: "1️⃣", level: 1 },
-        { id: "l2", name: "Level 2", english: "+ Dative", emoji: "2️⃣", level: 2 },
-        { id: "l3", name: "Level 3", english: "+ Genitive", emoji: "3️⃣", level: 3 }
-      ];
+      var store = window.ContentStore;
+      var list = (store && store.exercisesFor) ? store.exercisesFor("cases") : [];
+      return list.map(function (e) {
+        var n = (e.accusative || []).length + (e.dative || []).length + (e.genitive || []).length;
+        return { id: e.id, name: e.name, emoji: "🕵️", english: n + (n === 1 ? " sentence" : " sentences") };
+      });
     },
     buildRounds: function (topic) {
       var store = window.ContentStore;
-      var C = (store && store.casesData && store.casesData()) || window.CaseData || { accusative: [], dative: [], genitive: [] };
-      var pool = (C.accusative || []).slice();
-      if (topic.level >= 2) pool = pool.concat(C.dative || []);
-      if (topic.level >= 3) pool = pool.concat(C.genitive || []);
+      var e = (store && store.exercise) ? store.exercise("cases", topic && topic.id) : null;
+      var C = e || window.CaseData || { accusative: [], dative: [], genitive: [] };
+      // An exercise mixes all three cases it contains (its own difficulty scope).
+      var pool = (C.accusative || []).concat(C.dative || []).concat(C.genitive || []);
       // Skip half-finished rows a teacher may have added in the editor.
       pool = pool.filter(function (s) {
         return s && s.sentence && String(s.sentence).indexOf("___") >= 0 && s.correct;
@@ -198,12 +200,19 @@
   var compoundAdapter = {
     meta: { name: "Wortmonster", emoji: "🧟", contentType: "compounds" },
     timeLimit: 20000,
+    pickLabel: "Exercise",
     getTopics: function () {
-      return [{ id: "all", name: "Wortmonster", english: "All compounds", emoji: "🧟" }];
-    },
-    buildRounds: function () {
       var store = window.ContentStore;
-      var raw = (store && store.compoundsData && store.compoundsData()) || window.CompoundData || [];
+      var list = (store && store.exercisesFor) ? store.exercisesFor("compounds") : [];
+      return list.map(function (e) {
+        var n = (e.items || []).length;
+        return { id: e.id, name: e.name, emoji: "🧟", english: n + (n === 1 ? " word" : " words") };
+      });
+    },
+    buildRounds: function (topic) {
+      var store = window.ContentStore;
+      var e = (store && store.exercise) ? store.exercise("compounds", topic && topic.id) : null;
+      var raw = (e && e.items) || window.CompoundData || [];
       // Keep only usable rows and make sure each has a compound (parts join directly).
       var all = raw.filter(function (c) { return c && c.partA && c.partB; }).map(function (c) {
         return {
@@ -267,12 +276,19 @@
   var pluralAdapter = {
     meta: { name: "Plural-Palast", emoji: "🏰", contentType: "plurals" },
     timeLimit: 20000,
+    pickLabel: "Exercise",
     getTopics: function () {
-      return [{ id: "all", name: "Plural-Palast", english: "All nouns", emoji: "🏰" }];
-    },
-    buildRounds: function () {
       var store = window.ContentStore;
-      var all = ((store && store.pluralsData && store.pluralsData()) || window.PluralData || [])
+      var list = (store && store.exercisesFor) ? store.exercisesFor("plurals") : [];
+      return list.map(function (e) {
+        var n = (e.items || []).length;
+        return { id: e.id, name: e.name, emoji: "🏰", english: n + (n === 1 ? " noun" : " nouns") };
+      });
+    },
+    buildRounds: function (topic) {
+      var store = window.ContentStore;
+      var e = (store && store.exercise) ? store.exercise("plurals", topic && topic.id) : null;
+      var all = ((e && e.items) || window.PluralData || [])
         .filter(function (p) { return p && p.singular && p.plural; });
       var autoPool = all.map(function (p) { return p.plural; });
       return kit().sample(all, Math.min(10, all.length)).map(function (p) {
@@ -323,12 +339,19 @@
   var verbAdapter = {
     meta: { name: "Konjugations-Karussell", emoji: "🎠", contentType: "verbs" },
     timeLimit: 15000, // fast-paced warm-up
+    pickLabel: "Exercise",
     getTopics: function () {
-      return [{ id: "all", name: "Konjugations-Karussell", english: "All verbs", emoji: "🎠" }];
-    },
-    buildRounds: function () {
       var store = window.ContentStore;
-      var all = ((store && store.verbsData && store.verbsData()) || window.VerbData || [])
+      var list = (store && store.exercisesFor) ? store.exercisesFor("verbs") : [];
+      return list.map(function (e) {
+        var n = (e.items || []).length;
+        return { id: e.id, name: e.name, emoji: "🎠", english: n + (n === 1 ? " verb" : " verbs") };
+      });
+    },
+    buildRounds: function (topic) {
+      var store = window.ContentStore;
+      var e = (store && store.exercise) ? store.exercise("verbs", topic && topic.id) : null;
+      var all = ((e && e.items) || window.VerbData || [])
         .filter(function (v) { return v && v.inf && v.forms && v.forms.du; });
       return kit().sample(all, Math.min(10, all.length)).map(function (v) {
         var pron = kit().shuffle(PRON_WEIGHTED.slice())[0];
@@ -495,12 +518,19 @@
   var listenAdapter = {
     meta: { name: "Hör gut zu!", emoji: "👂", contentType: "listening" },
     timeLimit: 20000,
+    pickLabel: "Exercise",
     getTopics: function () {
-      return [{ id: "all", name: "Hör gut zu!", english: "All words", emoji: "👂" }];
-    },
-    buildRounds: function () {
       var store = window.ContentStore;
-      var all = ((store && store.listeningData && store.listeningData()) || window.ListeningData || [])
+      var list = (store && store.exercisesFor) ? store.exercisesFor("listening") : [];
+      return list.map(function (e) {
+        var n = (e.items || []).length;
+        return { id: e.id, name: e.name, emoji: "👂", english: n + (n === 1 ? " word" : " words") };
+      });
+    },
+    buildRounds: function (topic) {
+      var store = window.ContentStore;
+      var e = (store && store.exercise) ? store.exercise("listening", topic && topic.id) : null;
+      var all = ((e && e.items) || window.ListeningData || [])
         .filter(function (w) { return w && w.word; });
       var autoPool = all.map(function (w) { return w.word; });
       return kit().sample(all, Math.min(10, all.length)).map(function (w) {

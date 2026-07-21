@@ -16,6 +16,7 @@
       var mode = "games"; // "bank" | "games" — Games is the default view
       var bankTab = "vocab"; // "vocab" | "sentences" (within the bank)
       var currentGame = null; // gameId when configuring one game
+      var currentExercise = null; // exercise id when editing one exercise (Live games)
       var syncChipEl = null;
 
       /* ---- cloud sync hooks ---- */
@@ -114,17 +115,20 @@
       function render() {
         container.innerHTML = "";
 
-        // One back button (pinned top-left): steps up a level when inside a
-        // single game's editor, otherwise leaves the content editor.
+        // One back button (pinned top-left): steps up through exercise → game →
+        // menu depending on how deep we are.
+        var inExercise = mode === "games" && currentGame && liveGameById(currentGame) && currentExercise;
         var inGame = mode === "games" && currentGame;
+        var backHtml = inExercise ? "← Exercises" : inGame ? "← Games" : "← Menu";
+        var backFn = inExercise
+          ? function () { currentExercise = null; render(); }
+          : inGame
+            ? function () { currentGame = null; currentExercise = null; render(); }
+            : exitAdmin;
         syncChipEl = el("span", { class: "adm-sync", attrs: { title: "Content is saved to your Firebase and shared with every device" }, text: "☁️ Synced" });
         container.appendChild(
           el("div", { class: "adm-head" }, [
-            el("button", {
-              class: "back-link",
-              html: inGame ? "← Games" : "← Menu",
-              on: { click: inGame ? function () { currentGame = null; render(); } : exitAdmin }
-            }),
+            el("button", { class: "back-link", html: backHtml, on: { click: backFn } }),
             el("h2", { class: "adm-title", html: "🛠️ Manage content" }),
             el("div", { class: "adm-tools" }, [
               syncChipEl,
@@ -160,6 +164,7 @@
             click: function () {
               mode = id;
               currentGame = null;
+              currentExercise = null;
               render();
             }
           }
@@ -190,17 +195,17 @@
         });
       }
 
-      /* ---- Fall-Detektiv: case sentences, grouped by case (= difficulty level) ---- */
-      function renderCases(body) {
+      /* ---- Fall-Detektiv: case sentences, grouped by case within one exercise ---- */
+      function renderCases(body, ex) {
         body.appendChild(
           el("p", {
             class: "adm-hint",
             html:
               "These sentences power <b>🕵️ Fall-Detektiv</b> in Live Class Mode. Put <code>___</code> where the article belongs, then give the correct article. " +
-              "Levels stack: <b>Level 1</b> uses Accusative, <b>Level 2</b> adds Dative, <b>Level 3</b> adds Genitive. Changes save automatically."
+              "Group them by case below; when the class plays this exercise, <b>all</b> its sentences are used. Changes save automatically."
           })
         );
-        var C = store.casesData();
+        var C = ex;
         [
           ["accusative", "Accusative — Level 1", "🥇"],
           ["dative", "Dative — Level 2", "🥈"],
@@ -237,7 +242,7 @@
       }
 
       /* ---- Wortmonster: compound words (Part 1 + Part 2) ---- */
-      function renderCompounds(body) {
+      function renderCompounds(body, ex) {
         body.appendChild(
           el("p", {
             class: "adm-hint",
@@ -246,7 +251,7 @@
               "and the gender (der/die/das) comes from Part 2. Changes save automatically."
           })
         );
-        var list = store.compoundsData();
+        var list = ex.items;
         body.appendChild(el("div", { class: "adm-row adm-row-head adm-compound-row" }, [
           el("span", { text: "Icon" }),
           el("span", { text: "Part 1" }),
@@ -266,7 +271,7 @@
       }
 
       /* ---- Plural-Palast: noun → correct plural (+ optional wrong forms) ---- */
-      function renderPlurals(body) {
+      function renderPlurals(body, ex) {
         body.appendChild(
           el("p", {
             class: "adm-hint",
@@ -275,7 +280,7 @@
               "<b>Wrong options</b> are optional — leave blank and the game auto-picks plausible wrong plurals; type your own (comma-separated) to control them. Changes save automatically."
           })
         );
-        var list = store.pluralsData();
+        var list = ex.items;
         body.appendChild(el("div", { class: "adm-row adm-row-head adm-plural-row" }, [
           el("span", { text: "Icon" }),
           el("span", { text: "Singular (with article)" }),
@@ -306,7 +311,7 @@
       }
 
       /* ---- Hör gut zu!: spoken word + look-alike options ---- */
-      function renderListening(body) {
+      function renderListening(body, ex) {
         body.appendChild(
           el("p", {
             class: "adm-hint",
@@ -315,7 +320,7 @@
               "The <b>look-alike options</b> should be words that sound confusingly similar (near-homophones, minimal pairs, umlaut variants). Changes save automatically."
           })
         );
-        var list = store.listeningData();
+        var list = ex.items;
         body.appendChild(el("div", { class: "adm-row adm-row-head adm-listen-row" }, [
           el("span", { text: "Word (spoken)" }),
           el("span", { text: "Meaning" }),
@@ -342,7 +347,7 @@
       }
 
       /* ---- Konjugations-Karussell: a verb's six present-tense forms ---- */
-      function renderVerbs(body) {
+      function renderVerbs(body, ex) {
         body.appendChild(
           el("p", {
             class: "adm-hint",
@@ -352,7 +357,7 @@
               "other forms automatically. Changes save automatically."
           })
         );
-        var list = store.verbsData();
+        var list = ex.items;
         if (!list.length) body.appendChild(emptyState("No verbs yet."));
         list.forEach(function (v, i) { body.appendChild(verbCard(v, list, i)); });
         body.appendChild(addRowBtn("+ Verb", function () {
@@ -451,27 +456,73 @@
         { id: "verbs", name: "Konjugations-Karussell", emoji: "🎠", color: "#e11d74" },
         { id: "listening", name: "Hör gut zu!", emoji: "👂", color: "#0ea5b7" }
       ];
-      function caseTotal() {
-        var C = store.casesData();
-        return (C.accusative || []).length + (C.dative || []).length + (C.genitive || []).length;
-      }
       function liveGameById(id) {
         for (var i = 0; i < LIVE_GAMES.length; i++) if (LIVE_GAMES[i].id === id) return LIVE_GAMES[i];
         return null;
       }
-      function liveGameCount(id) {
-        if (id === "cases") return caseTotal();
-        if (id === "compounds") return store.compoundsData().length;
-        if (id === "plurals") return store.pluralsData().length;
-        if (id === "verbs") return store.verbsData().length;
-        if (id === "listening") return store.listeningData().length;
-        return 0;
+      // Count the content rows inside a single exercise.
+      function exerciseItemCount(id, ex) {
+        if (!ex) return 0;
+        if (id === "cases") return (ex.accusative || []).length + (ex.dative || []).length + (ex.genitive || []).length;
+        return (ex.items || []).length;
       }
       function liveGameUnit(id) {
         if (id === "plurals") return " nouns";
         if (id === "cases") return " sentences";
         if (id === "verbs") return " verbs";
         return " words";
+      }
+
+      /* ---- The list of exercises for one Live game (create / rename / copy / delete) ---- */
+      function renderExerciseList(body, lg) {
+        body.appendChild(
+          el("p", {
+            class: "adm-hint",
+            html:
+              "Each <b>exercise</b> is its own set of content. Build a new exercise for each lesson — your earlier ones stay saved, so you never have to delete previous work. " +
+              "In Live Class Mode you choose which exercise the class plays."
+          })
+        );
+        var list = store.exercisesFor(lg.id);
+        var wrap = el("div", { class: "adm-ex-list" });
+        list.forEach(function (e) {
+          var count = exerciseItemCount(lg.id, e);
+          var card = el("div", { class: "adm-ex-card" });
+          card.appendChild(el("button", {
+            class: "adm-ex-main",
+            attrs: { title: "Edit this exercise" },
+            on: { click: function () { currentExercise = e.id; render(); } }
+          }, [
+            el("div", { class: "adm-ex-name", text: e.name }),
+            el("div", { class: "adm-ex-count", text: count + liveGameUnit(lg.id) })
+          ]));
+          card.appendChild(el("div", { class: "adm-ex-actions" }, [
+            el("button", {
+              class: "adm-ex-btn", html: "✎", attrs: { title: "Rename exercise" },
+              on: { click: function () {
+                var name = window.prompt("Rename exercise:", e.name);
+                if (name != null) { store.renameExercise(lg.id, e.id, name); render(); }
+              } }
+            }),
+            el("button", {
+              class: "adm-ex-btn", html: "⧉", attrs: { title: "Duplicate — copy this exercise's content into a new one" },
+              on: { click: function () { if (store.duplicateExercise(lg.id, e.id)) { render(); toast("Exercise duplicated ✓"); } } }
+            }),
+            el("button", {
+              class: "adm-ex-btn danger", html: "🗑", attrs: { title: "Delete exercise" },
+              on: { click: function () {
+                if (confirmDelete("Delete the exercise “" + e.name + "” and all its content?")) { store.deleteExercise(lg.id, e.id); render(); }
+              } }
+            })
+          ]));
+          wrap.appendChild(card);
+        });
+        body.appendChild(wrap);
+        body.appendChild(el("button", {
+          class: "btn primary adm-add",
+          html: "+ New exercise",
+          on: { click: function () { var e = store.addExercise(lg.id); currentExercise = e.id; render(); } }
+        }));
       }
 
       function renderGames(body) {
@@ -510,7 +561,7 @@
                 el("div", { class: "adm-game-badge", text: "Live Class Mode" }),
                 el("div", { class: "adm-game-emoji", text: g.emoji }),
                 el("div", { class: "adm-game-name", text: g.name }),
-                el("div", { class: "adm-game-meta", text: liveGameCount(g.id) + liveGameUnit(g.id) })
+                el("div", { class: "adm-game-meta", text: (function () { var n = store.exercisesFor(g.id).length; return n + (n === 1 ? " exercise" : " exercises"); })() })
               ])
             );
           });
@@ -518,19 +569,22 @@
           return;
         }
 
-        // Live-game editors (own content, no shared-bank topic picking).
+        // Live-game editors: first pick/create an exercise, then edit its content.
         var lg = liveGameById(currentGame);
         if (lg) {
+          if (!currentExercise) { renderExerciseList(body, lg); return; }
+          var ex = store.exercise(currentGame, currentExercise);
+          if (!ex) { currentExercise = null; return renderGames(body); }
           body.appendChild(
             el("div", { class: "adm-subhead" }, [
-              el("h3", { class: "adm-game-title", text: lg.emoji + " " + lg.name })
+              el("h3", { class: "adm-game-title", text: lg.emoji + " " + lg.name + "  ·  " + ex.name })
             ])
           );
-          if (currentGame === "cases") renderCases(body);
-          else if (currentGame === "compounds") renderCompounds(body);
-          else if (currentGame === "plurals") renderPlurals(body);
-          else if (currentGame === "verbs") renderVerbs(body);
-          else if (currentGame === "listening") renderListening(body);
+          if (currentGame === "cases") renderCases(body, ex);
+          else if (currentGame === "compounds") renderCompounds(body, ex);
+          else if (currentGame === "plurals") renderPlurals(body, ex);
+          else if (currentGame === "verbs") renderVerbs(body, ex);
+          else if (currentGame === "listening") renderListening(body, ex);
           return;
         }
 
@@ -728,6 +782,7 @@
             try {
               store.importJSON(String(reader.result));
               currentGame = null;
+              currentExercise = null;
               render();
               toast("Content imported ✓");
             } catch (e) {
@@ -743,6 +798,7 @@
         if (confirmDelete("Reset all content back to the defaults? Your changes will be lost.")) {
           store.reset();
           currentGame = null;
+          currentExercise = null;
           render();
           toast("Reset to defaults");
         }

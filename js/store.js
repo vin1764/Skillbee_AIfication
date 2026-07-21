@@ -36,34 +36,85 @@
     return clone(window.ListeningData || []);
   }
 
+  /* ---------------------------------------------------------------------
+     Exercises — the 5 Live-Class content games (Fall-Detektiv, Wortmonster,
+     Plural-Palast, Konjugations-Karussell, Hör gut zu!) each hold a LIST of
+     named "exercises" rather than one flat bank. A teacher can build a fresh
+     exercise for every lesson while keeping the previous ones. "cases" keeps
+     three case sub-lists per exercise; the others keep a flat "items" list.
+     --------------------------------------------------------------------- */
+  function exId() {
+    return "ex-" + Date.now().toString(36) + "-" + Math.floor(Math.random() * 1e4).toString(36);
+  }
+  // A fresh exercise for the case game (three sub-lists). `seed` may be a legacy
+  // { accusative, dative, genitive } object whose content is migrated in.
+  function caseExercise(name, seed) {
+    seed = seed || {};
+    return {
+      id: exId(), name: name || "Exercise 1",
+      accusative: Array.isArray(seed.accusative) ? clone(seed.accusative) : [],
+      dative: Array.isArray(seed.dative) ? clone(seed.dative) : [],
+      genitive: Array.isArray(seed.genitive) ? clone(seed.genitive) : []
+    };
+  }
+  // A fresh exercise for a flat-list game. `items` may be a legacy array migrated in.
+  function listExercise(name, items) {
+    return { id: exId(), name: name || "Exercise 1", items: Array.isArray(items) ? clone(items) : [] };
+  }
+  function normalizeCaseEx(e) {
+    if (!e.id) e.id = exId();
+    if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
+    ["accusative", "dative", "genitive"].forEach(function (k) { if (!Array.isArray(e[k])) e[k] = []; });
+  }
+  function normalizeListEx(e) {
+    if (!e.id) e.id = exId();
+    if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
+    if (!Array.isArray(e.items)) e.items = [];
+  }
+
+  function defaultExercises() {
+    return {
+      cases: [caseExercise("Exercise 1", defaultCases())],
+      compounds: [listExercise("Exercise 1", defaultCompounds())],
+      plurals: [listExercise("Exercise 1", defaultPlurals())],
+      verbs: [listExercise("Exercise 1", defaultVerbs())],
+      listening: [listExercise("Exercise 1", defaultListening())]
+    };
+  }
+
   function defaults() {
     return {
       vocab: clone(window.GameData.VOCAB_TOPICS),
       sentences: clone(window.GameData.SENTENCE_TOPICS),
-      // Live-game banks — seeded from the built-in data but editable and
-      // saved/synced like everything else.
-      cases: defaultCases(),
-      compounds: defaultCompounds(),
-      plurals: defaultPlurals(),
-      verbs: defaultVerbs(),
-      listening: defaultListening(),
+      // Live-game content, seeded from the built-in data but editable and
+      // saved/synced like everything else. Each game holds named exercises.
+      exercises: defaultExercises(),
       // Per-game topic selection. Missing entry / no "topics" list = the game
       // uses ALL topics of its type from the bank (the default).
       games: {}
     };
   }
 
-  // Make sure an older saved store (from before these games existed) gains the
-  // new sections instead of showing empty editors.
+  // Make sure an older saved store gains the new sections instead of showing
+  // empty editors. Legacy flat banks (d.cases / d.compounds / …) are migrated
+  // into a first exercise, then dropped so exercises are the single source.
   function ensureSections(d) {
-    if (!d.cases || typeof d.cases !== "object") d.cases = defaultCases();
-    ["accusative", "dative", "genitive"].forEach(function (k) {
-      if (!Array.isArray(d.cases[k])) d.cases[k] = [];
+    if (!d.exercises || typeof d.exercises !== "object") d.exercises = {};
+    var ex = d.exercises;
+
+    if (!Array.isArray(ex.cases)) ex.cases = [caseExercise("Exercise 1", d.cases)];
+    else if (!ex.cases.length) ex.cases = [caseExercise("Exercise 1", null)];
+    ex.cases.forEach(normalizeCaseEx);
+
+    ["compounds", "plurals", "verbs", "listening"].forEach(function (k) {
+      if (!Array.isArray(ex[k])) ex[k] = [listExercise("Exercise 1", d[k])];
+      else if (!ex[k].length) ex[k] = [listExercise("Exercise 1", null)];
+      ex[k].forEach(normalizeListEx);
     });
-    if (!Array.isArray(d.compounds)) d.compounds = defaultCompounds();
-    if (!Array.isArray(d.plurals)) d.plurals = defaultPlurals();
-    if (!Array.isArray(d.verbs)) d.verbs = defaultVerbs();
-    if (!Array.isArray(d.listening)) d.listening = defaultListening();
+
+    // Legacy flat fields are now represented as exercises — drop them.
+    delete d.cases; delete d.compounds; delete d.plurals; delete d.verbs; delete d.listening;
+
     if (!d.games || typeof d.games !== "object") d.games = {};
     return d;
   }
@@ -191,26 +242,59 @@
       return type === "sentences" ? this.data.sentences : this.data.vocab;
     },
 
-    /* Fall-Detektiv case sentences, grouped by case (accusative/dative/genitive). */
+    /* -------- Exercises (Live-Class content games) -------- */
+    // The list of exercises for one game ("cases" | "compounds" | ...).
+    exercisesFor: function (gameKey) {
+      var arr = this.data.exercises && this.data.exercises[gameKey];
+      return Array.isArray(arr) ? arr : [];
+    },
+    // One exercise by id (falls back to the first exercise of that game).
+    exercise: function (gameKey, id) {
+      var arr = this.exercisesFor(gameKey);
+      if (id) { for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i]; }
+      return arr[0] || null;
+    },
+    _blankExercise: function (gameKey, name) {
+      return gameKey === "cases" ? caseExercise(name, null) : listExercise(name, null);
+    },
+    addExercise: function (gameKey, name) {
+      var arr = this.exercisesFor(gameKey);
+      var e = this._blankExercise(gameKey, name || "Exercise " + (arr.length + 1));
+      arr.push(e);
+      this.save();
+      return e;
+    },
+    duplicateExercise: function (gameKey, id) {
+      var src = this.exercise(gameKey, id);
+      if (!src) return null;
+      var copy = clone(src);
+      copy.id = exId();
+      copy.name = (src.name || "Exercise") + " (copy)";
+      this.exercisesFor(gameKey).push(copy);
+      this.save();
+      return copy;
+    },
+    renameExercise: function (gameKey, id, name) {
+      var e = this.exercise(gameKey, id);
+      if (e) { e.name = String(name || "").trim() || e.name; this.save(); }
+    },
+    deleteExercise: function (gameKey, id) {
+      var arr = this.exercisesFor(gameKey);
+      for (var i = 0; i < arr.length; i++) if (arr[i].id === id) { arr.splice(i, 1); break; }
+      if (!arr.length) arr.push(this._blankExercise(gameKey, "Exercise 1")); // keep at least one
+      this.save();
+    },
+
+    /* Back-compat accessors — the FIRST exercise's content (used as a fallback
+       when no specific exercise is chosen, e.g. by the audio helper). */
     casesData: function () {
-      return this.data.cases;
+      var e = this.exercise("cases");
+      return e ? { accusative: e.accusative, dative: e.dative, genitive: e.genitive } : { accusative: [], dative: [], genitive: [] };
     },
-    /* Wortmonster compound-word list. */
-    compoundsData: function () {
-      return this.data.compounds;
-    },
-    /* Plural-Palast noun list. */
-    pluralsData: function () {
-      return this.data.plurals;
-    },
-    /* Konjugations-Karussell verb list. */
-    verbsData: function () {
-      return this.data.verbs;
-    },
-    /* Hör gut zu! listening word list. */
-    listeningData: function () {
-      return this.data.listening;
-    },
+    compoundsData: function () { var e = this.exercise("compounds"); return e ? e.items : []; },
+    pluralsData: function () { var e = this.exercise("plurals"); return e ? e.items : []; },
+    verbsData: function () { var e = this.exercise("verbs"); return e ? e.items : []; },
+    listeningData: function () { var e = this.exercise("listening"); return e ? e.items : []; },
 
     /* Topics a given game should offer (its selected subset, or all by default). */
     topicsForGame: function (gameId, type) {

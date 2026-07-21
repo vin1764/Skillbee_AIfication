@@ -214,7 +214,8 @@ window.LiveMode = (function () {
         var gAdapter = window.LiveGames[gameId];
         var type = gAdapter.meta.contentType;
         var topics = gAdapter.getTopics ? gAdapter.getTopics() : store.topicsForGame(gameId, type);
-        step.appendChild(el("div", { class: "live-label", text: gAdapter.getTopics ? "2 · Level" : "2 · Topic" }));
+        var pickLabel = gAdapter.pickLabel || (gAdapter.getTopics ? "Level" : "Topic");
+        step.appendChild(el("div", { class: "live-label", text: "2 · " + pickLabel }));
         if (!topics.length) {
           step.appendChild(el("p", { class: "live-muted", text: "This game has no topics enabled. Enable some in ⚙️ Manage content → Games." }));
         } else {

@@ -331,6 +331,25 @@ kbd {
 .adm-game-name { font-weight: 800; margin-top: 6px; }
 .adm-game-meta { color: var(--accent); font-weight: 700; font-size: 0.85rem; margin-top: 4px; }
 
+/* exercise list (per Live game) */
+.adm-ex-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.adm-ex-card { display: flex; gap: 8px; align-items: stretch; }
+.adm-ex-main {
+  flex: 1; text-align: left; background: var(--card); border: 1px solid var(--line);
+  border-radius: 14px; padding: 14px 18px; box-shadow: var(--shadow);
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+}
+.adm-ex-main:hover { border-color: var(--accent); }
+.adm-ex-name { font-weight: 800; }
+.adm-ex-count { color: var(--ink-soft); font-size: 0.85rem; }
+.adm-ex-actions { display: flex; gap: 6px; }
+.adm-ex-btn {
+  width: 46px; background: #fff; border: 1px solid var(--line);
+  border-radius: 12px; font-size: 1rem; cursor: pointer;
+}
+.adm-ex-btn:hover { border-color: var(--accent); }
+.adm-ex-btn.danger:hover { border-color: #e5484d; color: #e5484d; }
+
 .adm-subhead { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .adm-game-title { margin: 0; font-size: 1.2rem; }
 

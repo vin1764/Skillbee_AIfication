@@ -339,6 +339,25 @@ kbd {
 .adm-game-name { font-weight: 800; margin-top: 6px; }
 .adm-game-meta { color: var(--accent); font-weight: 700; font-size: 0.85rem; margin-top: 4px; }
 
+/* exercise list (per Live game) */
+.adm-ex-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.adm-ex-card { display: flex; gap: 8px; align-items: stretch; }
+.adm-ex-main {
+  flex: 1; text-align: left; background: var(--card); border: 1px solid var(--line);
+  border-radius: 14px; padding: 14px 18px; box-shadow: var(--shadow);
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+}
+.adm-ex-main:hover { border-color: var(--accent); }
+.adm-ex-name { font-weight: 800; }
+.adm-ex-count { color: var(--ink-soft); font-size: 0.85rem; }
+.adm-ex-actions { display: flex; gap: 6px; }
+.adm-ex-btn {
+  width: 46px; background: #fff; border: 1px solid var(--line);
+  border-radius: 12px; font-size: 1rem; cursor: pointer;
+}
+.adm-ex-btn:hover { border-color: var(--accent); }
+.adm-ex-btn.danger:hover { border-color: #e5484d; color: #e5484d; }
+
 .adm-subhead { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .adm-game-title { margin: 0; font-size: 1.2rem; }
 
@@ -1187,34 +1206,85 @@ window.SkillbeeBrand = {
     return clone(window.ListeningData || []);
   }
 
+  /* ---------------------------------------------------------------------
+     Exercises — the 5 Live-Class content games (Fall-Detektiv, Wortmonster,
+     Plural-Palast, Konjugations-Karussell, Hör gut zu!) each hold a LIST of
+     named "exercises" rather than one flat bank. A teacher can build a fresh
+     exercise for every lesson while keeping the previous ones. "cases" keeps
+     three case sub-lists per exercise; the others keep a flat "items" list.
+     --------------------------------------------------------------------- */
+  function exId() {
+    return "ex-" + Date.now().toString(36) + "-" + Math.floor(Math.random() * 1e4).toString(36);
+  }
+  // A fresh exercise for the case game (three sub-lists). `seed` may be a legacy
+  // { accusative, dative, genitive } object whose content is migrated in.
+  function caseExercise(name, seed) {
+    seed = seed || {};
+    return {
+      id: exId(), name: name || "Exercise 1",
+      accusative: Array.isArray(seed.accusative) ? clone(seed.accusative) : [],
+      dative: Array.isArray(seed.dative) ? clone(seed.dative) : [],
+      genitive: Array.isArray(seed.genitive) ? clone(seed.genitive) : []
+    };
+  }
+  // A fresh exercise for a flat-list game. `items` may be a legacy array migrated in.
+  function listExercise(name, items) {
+    return { id: exId(), name: name || "Exercise 1", items: Array.isArray(items) ? clone(items) : [] };
+  }
+  function normalizeCaseEx(e) {
+    if (!e.id) e.id = exId();
+    if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
+    ["accusative", "dative", "genitive"].forEach(function (k) { if (!Array.isArray(e[k])) e[k] = []; });
+  }
+  function normalizeListEx(e) {
+    if (!e.id) e.id = exId();
+    if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
+    if (!Array.isArray(e.items)) e.items = [];
+  }
+
+  function defaultExercises() {
+    return {
+      cases: [caseExercise("Exercise 1", defaultCases())],
+      compounds: [listExercise("Exercise 1", defaultCompounds())],
+      plurals: [listExercise("Exercise 1", defaultPlurals())],
+      verbs: [listExercise("Exercise 1", defaultVerbs())],
+      listening: [listExercise("Exercise 1", defaultListening())]
+    };
+  }
+
   function defaults() {
     return {
       vocab: clone(window.GameData.VOCAB_TOPICS),
       sentences: clone(window.GameData.SENTENCE_TOPICS),
-      // Live-game banks — seeded from the built-in data but editable and
-      // saved/synced like everything else.
-      cases: defaultCases(),
-      compounds: defaultCompounds(),
-      plurals: defaultPlurals(),
-      verbs: defaultVerbs(),
-      listening: defaultListening(),
+      // Live-game content, seeded from the built-in data but editable and
+      // saved/synced like everything else. Each game holds named exercises.
+      exercises: defaultExercises(),
       // Per-game topic selection. Missing entry / no "topics" list = the game
       // uses ALL topics of its type from the bank (the default).
       games: {}
     };
   }
 
-  // Make sure an older saved store (from before these games existed) gains the
-  // new sections instead of showing empty editors.
+  // Make sure an older saved store gains the new sections instead of showing
+  // empty editors. Legacy flat banks (d.cases / d.compounds / …) are migrated
+  // into a first exercise, then dropped so exercises are the single source.
   function ensureSections(d) {
-    if (!d.cases || typeof d.cases !== "object") d.cases = defaultCases();
-    ["accusative", "dative", "genitive"].forEach(function (k) {
-      if (!Array.isArray(d.cases[k])) d.cases[k] = [];
+    if (!d.exercises || typeof d.exercises !== "object") d.exercises = {};
+    var ex = d.exercises;
+
+    if (!Array.isArray(ex.cases)) ex.cases = [caseExercise("Exercise 1", d.cases)];
+    else if (!ex.cases.length) ex.cases = [caseExercise("Exercise 1", null)];
+    ex.cases.forEach(normalizeCaseEx);
+
+    ["compounds", "plurals", "verbs", "listening"].forEach(function (k) {
+      if (!Array.isArray(ex[k])) ex[k] = [listExercise("Exercise 1", d[k])];
+      else if (!ex[k].length) ex[k] = [listExercise("Exercise 1", null)];
+      ex[k].forEach(normalizeListEx);
     });
-    if (!Array.isArray(d.compounds)) d.compounds = defaultCompounds();
-    if (!Array.isArray(d.plurals)) d.plurals = defaultPlurals();
-    if (!Array.isArray(d.verbs)) d.verbs = defaultVerbs();
-    if (!Array.isArray(d.listening)) d.listening = defaultListening();
+
+    // Legacy flat fields are now represented as exercises — drop them.
+    delete d.cases; delete d.compounds; delete d.plurals; delete d.verbs; delete d.listening;
+
     if (!d.games || typeof d.games !== "object") d.games = {};
     return d;
   }
@@ -1342,26 +1412,59 @@ window.SkillbeeBrand = {
       return type === "sentences" ? this.data.sentences : this.data.vocab;
     },
 
-    /* Fall-Detektiv case sentences, grouped by case (accusative/dative/genitive). */
+    /* -------- Exercises (Live-Class content games) -------- */
+    // The list of exercises for one game ("cases" | "compounds" | ...).
+    exercisesFor: function (gameKey) {
+      var arr = this.data.exercises && this.data.exercises[gameKey];
+      return Array.isArray(arr) ? arr : [];
+    },
+    // One exercise by id (falls back to the first exercise of that game).
+    exercise: function (gameKey, id) {
+      var arr = this.exercisesFor(gameKey);
+      if (id) { for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i]; }
+      return arr[0] || null;
+    },
+    _blankExercise: function (gameKey, name) {
+      return gameKey === "cases" ? caseExercise(name, null) : listExercise(name, null);
+    },
+    addExercise: function (gameKey, name) {
+      var arr = this.exercisesFor(gameKey);
+      var e = this._blankExercise(gameKey, name || "Exercise " + (arr.length + 1));
+      arr.push(e);
+      this.save();
+      return e;
+    },
+    duplicateExercise: function (gameKey, id) {
+      var src = this.exercise(gameKey, id);
+      if (!src) return null;
+      var copy = clone(src);
+      copy.id = exId();
+      copy.name = (src.name || "Exercise") + " (copy)";
+      this.exercisesFor(gameKey).push(copy);
+      this.save();
+      return copy;
+    },
+    renameExercise: function (gameKey, id, name) {
+      var e = this.exercise(gameKey, id);
+      if (e) { e.name = String(name || "").trim() || e.name; this.save(); }
+    },
+    deleteExercise: function (gameKey, id) {
+      var arr = this.exercisesFor(gameKey);
+      for (var i = 0; i < arr.length; i++) if (arr[i].id === id) { arr.splice(i, 1); break; }
+      if (!arr.length) arr.push(this._blankExercise(gameKey, "Exercise 1")); // keep at least one
+      this.save();
+    },
+
+    /* Back-compat accessors — the FIRST exercise's content (used as a fallback
+       when no specific exercise is chosen, e.g. by the audio helper). */
     casesData: function () {
-      return this.data.cases;
+      var e = this.exercise("cases");
+      return e ? { accusative: e.accusative, dative: e.dative, genitive: e.genitive } : { accusative: [], dative: [], genitive: [] };
     },
-    /* Wortmonster compound-word list. */
-    compoundsData: function () {
-      return this.data.compounds;
-    },
-    /* Plural-Palast noun list. */
-    pluralsData: function () {
-      return this.data.plurals;
-    },
-    /* Konjugations-Karussell verb list. */
-    verbsData: function () {
-      return this.data.verbs;
-    },
-    /* Hör gut zu! listening word list. */
-    listeningData: function () {
-      return this.data.listening;
-    },
+    compoundsData: function () { var e = this.exercise("compounds"); return e ? e.items : []; },
+    pluralsData: function () { var e = this.exercise("plurals"); return e ? e.items : []; },
+    verbsData: function () { var e = this.exercise("verbs"); return e ? e.items : []; },
+    listeningData: function () { var e = this.exercise("listening"); return e ? e.items : []; },
 
     /* Topics a given game should offer (its selected subset, or all by default). */
     topicsForGame: function (gameId, type) {
@@ -2839,6 +2942,7 @@ document.addEventListener("DOMContentLoaded", App.init);
       var mode = "games"; // "bank" | "games" — Games is the default view
       var bankTab = "vocab"; // "vocab" | "sentences" (within the bank)
       var currentGame = null; // gameId when configuring one game
+      var currentExercise = null; // exercise id when editing one exercise (Live games)
       var syncChipEl = null;
 
       /* ---- cloud sync hooks ---- */
@@ -2937,17 +3041,20 @@ document.addEventListener("DOMContentLoaded", App.init);
       function render() {
         container.innerHTML = "";
 
-        // One back button (pinned top-left): steps up a level when inside a
-        // single game's editor, otherwise leaves the content editor.
+        // One back button (pinned top-left): steps up through exercise → game →
+        // menu depending on how deep we are.
+        var inExercise = mode === "games" && currentGame && liveGameById(currentGame) && currentExercise;
         var inGame = mode === "games" && currentGame;
+        var backHtml = inExercise ? "← Exercises" : inGame ? "← Games" : "← Menu";
+        var backFn = inExercise
+          ? function () { currentExercise = null; render(); }
+          : inGame
+            ? function () { currentGame = null; currentExercise = null; render(); }
+            : exitAdmin;
         syncChipEl = el("span", { class: "adm-sync", attrs: { title: "Content is saved to your Firebase and shared with every device" }, text: "☁️ Synced" });
         container.appendChild(
           el("div", { class: "adm-head" }, [
-            el("button", {
-              class: "back-link",
-              html: inGame ? "← Games" : "← Menu",
-              on: { click: inGame ? function () { currentGame = null; render(); } : exitAdmin }
-            }),
+            el("button", { class: "back-link", html: backHtml, on: { click: backFn } }),
             el("h2", { class: "adm-title", html: "🛠️ Manage content" }),
             el("div", { class: "adm-tools" }, [
               syncChipEl,
@@ -2983,6 +3090,7 @@ document.addEventListener("DOMContentLoaded", App.init);
             click: function () {
               mode = id;
               currentGame = null;
+              currentExercise = null;
               render();
             }
           }
@@ -3013,17 +3121,17 @@ document.addEventListener("DOMContentLoaded", App.init);
         });
       }
 
-      /* ---- Fall-Detektiv: case sentences, grouped by case (= difficulty level) ---- */
-      function renderCases(body) {
+      /* ---- Fall-Detektiv: case sentences, grouped by case within one exercise ---- */
+      function renderCases(body, ex) {
         body.appendChild(
           el("p", {
             class: "adm-hint",
             html:
               "These sentences power <b>🕵️ Fall-Detektiv</b> in Live Class Mode. Put <code>___</code> where the article belongs, then give the correct article. " +
-              "Levels stack: <b>Level 1</b> uses Accusative, <b>Level 2</b> adds Dative, <b>Level 3</b> adds Genitive. Changes save automatically."
+              "Group them by case below; when the class plays this exercise, <b>all</b> its sentences are used. Changes save automatically."
           })
         );
-        var C = store.casesData();
+        var C = ex;
         [
           ["accusative", "Accusative — Level 1", "🥇"],
           ["dative", "Dative — Level 2", "🥈"],
@@ -3060,7 +3168,7 @@ document.addEventListener("DOMContentLoaded", App.init);
       }
 
       /* ---- Wortmonster: compound words (Part 1 + Part 2) ---- */
-      function renderCompounds(body) {
+      function renderCompounds(body, ex) {
         body.appendChild(
           el("p", {
             class: "adm-hint",
@@ -3069,7 +3177,7 @@ document.addEventListener("DOMContentLoaded", App.init);
               "and the gender (der/die/das) comes from Part 2. Changes save automatically."
           })
         );
-        var list = store.compoundsData();
+        var list = ex.items;
         body.appendChild(el("div", { class: "adm-row adm-row-head adm-compound-row" }, [
           el("span", { text: "Icon" }),
           el("span", { text: "Part 1" }),
@@ -3089,7 +3197,7 @@ document.addEventListener("DOMContentLoaded", App.init);
       }
 
       /* ---- Plural-Palast: noun → correct plural (+ optional wrong forms) ---- */
-      function renderPlurals(body) {
+      function renderPlurals(body, ex) {
         body.appendChild(
           el("p", {
             class: "adm-hint",
@@ -3098,7 +3206,7 @@ document.addEventListener("DOMContentLoaded", App.init);
               "<b>Wrong options</b> are optional — leave blank and the game auto-picks plausible wrong plurals; type your own (comma-separated) to control them. Changes save automatically."
           })
         );
-        var list = store.pluralsData();
+        var list = ex.items;
         body.appendChild(el("div", { class: "adm-row adm-row-head adm-plural-row" }, [
           el("span", { text: "Icon" }),
           el("span", { text: "Singular (with article)" }),
@@ -3129,7 +3237,7 @@ document.addEventListener("DOMContentLoaded", App.init);
       }
 
       /* ---- Hör gut zu!: spoken word + look-alike options ---- */
-      function renderListening(body) {
+      function renderListening(body, ex) {
         body.appendChild(
           el("p", {
             class: "adm-hint",
@@ -3138,7 +3246,7 @@ document.addEventListener("DOMContentLoaded", App.init);
               "The <b>look-alike options</b> should be words that sound confusingly similar (near-homophones, minimal pairs, umlaut variants). Changes save automatically."
           })
         );
-        var list = store.listeningData();
+        var list = ex.items;
         body.appendChild(el("div", { class: "adm-row adm-row-head adm-listen-row" }, [
           el("span", { text: "Word (spoken)" }),
           el("span", { text: "Meaning" }),
@@ -3165,7 +3273,7 @@ document.addEventListener("DOMContentLoaded", App.init);
       }
 
       /* ---- Konjugations-Karussell: a verb's six present-tense forms ---- */
-      function renderVerbs(body) {
+      function renderVerbs(body, ex) {
         body.appendChild(
           el("p", {
             class: "adm-hint",
@@ -3175,7 +3283,7 @@ document.addEventListener("DOMContentLoaded", App.init);
               "other forms automatically. Changes save automatically."
           })
         );
-        var list = store.verbsData();
+        var list = ex.items;
         if (!list.length) body.appendChild(emptyState("No verbs yet."));
         list.forEach(function (v, i) { body.appendChild(verbCard(v, list, i)); });
         body.appendChild(addRowBtn("+ Verb", function () {
@@ -3274,27 +3382,73 @@ document.addEventListener("DOMContentLoaded", App.init);
         { id: "verbs", name: "Konjugations-Karussell", emoji: "🎠", color: "#e11d74" },
         { id: "listening", name: "Hör gut zu!", emoji: "👂", color: "#0ea5b7" }
       ];
-      function caseTotal() {
-        var C = store.casesData();
-        return (C.accusative || []).length + (C.dative || []).length + (C.genitive || []).length;
-      }
       function liveGameById(id) {
         for (var i = 0; i < LIVE_GAMES.length; i++) if (LIVE_GAMES[i].id === id) return LIVE_GAMES[i];
         return null;
       }
-      function liveGameCount(id) {
-        if (id === "cases") return caseTotal();
-        if (id === "compounds") return store.compoundsData().length;
-        if (id === "plurals") return store.pluralsData().length;
-        if (id === "verbs") return store.verbsData().length;
-        if (id === "listening") return store.listeningData().length;
-        return 0;
+      // Count the content rows inside a single exercise.
+      function exerciseItemCount(id, ex) {
+        if (!ex) return 0;
+        if (id === "cases") return (ex.accusative || []).length + (ex.dative || []).length + (ex.genitive || []).length;
+        return (ex.items || []).length;
       }
       function liveGameUnit(id) {
         if (id === "plurals") return " nouns";
         if (id === "cases") return " sentences";
         if (id === "verbs") return " verbs";
         return " words";
+      }
+
+      /* ---- The list of exercises for one Live game (create / rename / copy / delete) ---- */
+      function renderExerciseList(body, lg) {
+        body.appendChild(
+          el("p", {
+            class: "adm-hint",
+            html:
+              "Each <b>exercise</b> is its own set of content. Build a new exercise for each lesson — your earlier ones stay saved, so you never have to delete previous work. " +
+              "In Live Class Mode you choose which exercise the class plays."
+          })
+        );
+        var list = store.exercisesFor(lg.id);
+        var wrap = el("div", { class: "adm-ex-list" });
+        list.forEach(function (e) {
+          var count = exerciseItemCount(lg.id, e);
+          var card = el("div", { class: "adm-ex-card" });
+          card.appendChild(el("button", {
+            class: "adm-ex-main",
+            attrs: { title: "Edit this exercise" },
+            on: { click: function () { currentExercise = e.id; render(); } }
+          }, [
+            el("div", { class: "adm-ex-name", text: e.name }),
+            el("div", { class: "adm-ex-count", text: count + liveGameUnit(lg.id) })
+          ]));
+          card.appendChild(el("div", { class: "adm-ex-actions" }, [
+            el("button", {
+              class: "adm-ex-btn", html: "✎", attrs: { title: "Rename exercise" },
+              on: { click: function () {
+                var name = window.prompt("Rename exercise:", e.name);
+                if (name != null) { store.renameExercise(lg.id, e.id, name); render(); }
+              } }
+            }),
+            el("button", {
+              class: "adm-ex-btn", html: "⧉", attrs: { title: "Duplicate — copy this exercise's content into a new one" },
+              on: { click: function () { if (store.duplicateExercise(lg.id, e.id)) { render(); toast("Exercise duplicated ✓"); } } }
+            }),
+            el("button", {
+              class: "adm-ex-btn danger", html: "🗑", attrs: { title: "Delete exercise" },
+              on: { click: function () {
+                if (confirmDelete("Delete the exercise “" + e.name + "” and all its content?")) { store.deleteExercise(lg.id, e.id); render(); }
+              } }
+            })
+          ]));
+          wrap.appendChild(card);
+        });
+        body.appendChild(wrap);
+        body.appendChild(el("button", {
+          class: "btn primary adm-add",
+          html: "+ New exercise",
+          on: { click: function () { var e = store.addExercise(lg.id); currentExercise = e.id; render(); } }
+        }));
       }
 
       function renderGames(body) {
@@ -3333,7 +3487,7 @@ document.addEventListener("DOMContentLoaded", App.init);
                 el("div", { class: "adm-game-badge", text: "Live Class Mode" }),
                 el("div", { class: "adm-game-emoji", text: g.emoji }),
                 el("div", { class: "adm-game-name", text: g.name }),
-                el("div", { class: "adm-game-meta", text: liveGameCount(g.id) + liveGameUnit(g.id) })
+                el("div", { class: "adm-game-meta", text: (function () { var n = store.exercisesFor(g.id).length; return n + (n === 1 ? " exercise" : " exercises"); })() })
               ])
             );
           });
@@ -3341,19 +3495,22 @@ document.addEventListener("DOMContentLoaded", App.init);
           return;
         }
 
-        // Live-game editors (own content, no shared-bank topic picking).
+        // Live-game editors: first pick/create an exercise, then edit its content.
         var lg = liveGameById(currentGame);
         if (lg) {
+          if (!currentExercise) { renderExerciseList(body, lg); return; }
+          var ex = store.exercise(currentGame, currentExercise);
+          if (!ex) { currentExercise = null; return renderGames(body); }
           body.appendChild(
             el("div", { class: "adm-subhead" }, [
-              el("h3", { class: "adm-game-title", text: lg.emoji + " " + lg.name })
+              el("h3", { class: "adm-game-title", text: lg.emoji + " " + lg.name + "  ·  " + ex.name })
             ])
           );
-          if (currentGame === "cases") renderCases(body);
-          else if (currentGame === "compounds") renderCompounds(body);
-          else if (currentGame === "plurals") renderPlurals(body);
-          else if (currentGame === "verbs") renderVerbs(body);
-          else if (currentGame === "listening") renderListening(body);
+          if (currentGame === "cases") renderCases(body, ex);
+          else if (currentGame === "compounds") renderCompounds(body, ex);
+          else if (currentGame === "plurals") renderPlurals(body, ex);
+          else if (currentGame === "verbs") renderVerbs(body, ex);
+          else if (currentGame === "listening") renderListening(body, ex);
           return;
         }
 
@@ -3551,6 +3708,7 @@ document.addEventListener("DOMContentLoaded", App.init);
             try {
               store.importJSON(String(reader.result));
               currentGame = null;
+              currentExercise = null;
               render();
               toast("Content imported ✓");
             } catch (e) {
@@ -3566,6 +3724,7 @@ document.addEventListener("DOMContentLoaded", App.init);
         if (confirmDelete("Reset all content back to the defaults? Your changes will be lost.")) {
           store.reset();
           currentGame = null;
+          currentExercise = null;
           render();
           toast("Reset to defaults");
         }
@@ -3899,20 +4058,22 @@ document.addEventListener("DOMContentLoaded", App.init);
     meta: { name: "Fall-Detektiv", emoji: "🕵️", contentType: "cases" },
     timeLimit: 20000,
     supportsTyping: true, // teacher can choose tap-options or type-the-answer
-    // The "topics" for this game are the three difficulty levels.
+    pickLabel: "Exercise",
+    // The "topics" for this game are the teacher's exercises.
     getTopics: function () {
-      return [
-        { id: "l1", name: "Level 1", english: "Accusative", emoji: "1️⃣", level: 1 },
-        { id: "l2", name: "Level 2", english: "+ Dative", emoji: "2️⃣", level: 2 },
-        { id: "l3", name: "Level 3", english: "+ Genitive", emoji: "3️⃣", level: 3 }
-      ];
+      var store = window.ContentStore;
+      var list = (store && store.exercisesFor) ? store.exercisesFor("cases") : [];
+      return list.map(function (e) {
+        var n = (e.accusative || []).length + (e.dative || []).length + (e.genitive || []).length;
+        return { id: e.id, name: e.name, emoji: "🕵️", english: n + (n === 1 ? " sentence" : " sentences") };
+      });
     },
     buildRounds: function (topic) {
       var store = window.ContentStore;
-      var C = (store && store.casesData && store.casesData()) || window.CaseData || { accusative: [], dative: [], genitive: [] };
-      var pool = (C.accusative || []).slice();
-      if (topic.level >= 2) pool = pool.concat(C.dative || []);
-      if (topic.level >= 3) pool = pool.concat(C.genitive || []);
+      var e = (store && store.exercise) ? store.exercise("cases", topic && topic.id) : null;
+      var C = e || window.CaseData || { accusative: [], dative: [], genitive: [] };
+      // An exercise mixes all three cases it contains (its own difficulty scope).
+      var pool = (C.accusative || []).concat(C.dative || []).concat(C.genitive || []);
       // Skip half-finished rows a teacher may have added in the editor.
       pool = pool.filter(function (s) {
         return s && s.sentence && String(s.sentence).indexOf("___") >= 0 && s.correct;
@@ -3974,12 +4135,19 @@ document.addEventListener("DOMContentLoaded", App.init);
   var compoundAdapter = {
     meta: { name: "Wortmonster", emoji: "🧟", contentType: "compounds" },
     timeLimit: 20000,
+    pickLabel: "Exercise",
     getTopics: function () {
-      return [{ id: "all", name: "Wortmonster", english: "All compounds", emoji: "🧟" }];
-    },
-    buildRounds: function () {
       var store = window.ContentStore;
-      var raw = (store && store.compoundsData && store.compoundsData()) || window.CompoundData || [];
+      var list = (store && store.exercisesFor) ? store.exercisesFor("compounds") : [];
+      return list.map(function (e) {
+        var n = (e.items || []).length;
+        return { id: e.id, name: e.name, emoji: "🧟", english: n + (n === 1 ? " word" : " words") };
+      });
+    },
+    buildRounds: function (topic) {
+      var store = window.ContentStore;
+      var e = (store && store.exercise) ? store.exercise("compounds", topic && topic.id) : null;
+      var raw = (e && e.items) || window.CompoundData || [];
       // Keep only usable rows and make sure each has a compound (parts join directly).
       var all = raw.filter(function (c) { return c && c.partA && c.partB; }).map(function (c) {
         return {
@@ -4043,12 +4211,19 @@ document.addEventListener("DOMContentLoaded", App.init);
   var pluralAdapter = {
     meta: { name: "Plural-Palast", emoji: "🏰", contentType: "plurals" },
     timeLimit: 20000,
+    pickLabel: "Exercise",
     getTopics: function () {
-      return [{ id: "all", name: "Plural-Palast", english: "All nouns", emoji: "🏰" }];
-    },
-    buildRounds: function () {
       var store = window.ContentStore;
-      var all = ((store && store.pluralsData && store.pluralsData()) || window.PluralData || [])
+      var list = (store && store.exercisesFor) ? store.exercisesFor("plurals") : [];
+      return list.map(function (e) {
+        var n = (e.items || []).length;
+        return { id: e.id, name: e.name, emoji: "🏰", english: n + (n === 1 ? " noun" : " nouns") };
+      });
+    },
+    buildRounds: function (topic) {
+      var store = window.ContentStore;
+      var e = (store && store.exercise) ? store.exercise("plurals", topic && topic.id) : null;
+      var all = ((e && e.items) || window.PluralData || [])
         .filter(function (p) { return p && p.singular && p.plural; });
       var autoPool = all.map(function (p) { return p.plural; });
       return kit().sample(all, Math.min(10, all.length)).map(function (p) {
@@ -4099,12 +4274,19 @@ document.addEventListener("DOMContentLoaded", App.init);
   var verbAdapter = {
     meta: { name: "Konjugations-Karussell", emoji: "🎠", contentType: "verbs" },
     timeLimit: 15000, // fast-paced warm-up
+    pickLabel: "Exercise",
     getTopics: function () {
-      return [{ id: "all", name: "Konjugations-Karussell", english: "All verbs", emoji: "🎠" }];
-    },
-    buildRounds: function () {
       var store = window.ContentStore;
-      var all = ((store && store.verbsData && store.verbsData()) || window.VerbData || [])
+      var list = (store && store.exercisesFor) ? store.exercisesFor("verbs") : [];
+      return list.map(function (e) {
+        var n = (e.items || []).length;
+        return { id: e.id, name: e.name, emoji: "🎠", english: n + (n === 1 ? " verb" : " verbs") };
+      });
+    },
+    buildRounds: function (topic) {
+      var store = window.ContentStore;
+      var e = (store && store.exercise) ? store.exercise("verbs", topic && topic.id) : null;
+      var all = ((e && e.items) || window.VerbData || [])
         .filter(function (v) { return v && v.inf && v.forms && v.forms.du; });
       return kit().sample(all, Math.min(10, all.length)).map(function (v) {
         var pron = kit().shuffle(PRON_WEIGHTED.slice())[0];
@@ -4271,12 +4453,19 @@ document.addEventListener("DOMContentLoaded", App.init);
   var listenAdapter = {
     meta: { name: "Hör gut zu!", emoji: "👂", contentType: "listening" },
     timeLimit: 20000,
+    pickLabel: "Exercise",
     getTopics: function () {
-      return [{ id: "all", name: "Hör gut zu!", english: "All words", emoji: "👂" }];
-    },
-    buildRounds: function () {
       var store = window.ContentStore;
-      var all = ((store && store.listeningData && store.listeningData()) || window.ListeningData || [])
+      var list = (store && store.exercisesFor) ? store.exercisesFor("listening") : [];
+      return list.map(function (e) {
+        var n = (e.items || []).length;
+        return { id: e.id, name: e.name, emoji: "👂", english: n + (n === 1 ? " word" : " words") };
+      });
+    },
+    buildRounds: function (topic) {
+      var store = window.ContentStore;
+      var e = (store && store.exercise) ? store.exercise("listening", topic && topic.id) : null;
+      var all = ((e && e.items) || window.ListeningData || [])
         .filter(function (w) { return w && w.word; });
       var autoPool = all.map(function (w) { return w.word; });
       return kit().sample(all, Math.min(10, all.length)).map(function (w) {
@@ -4559,7 +4748,8 @@ window.LiveMode = (function () {
         var gAdapter = window.LiveGames[gameId];
         var type = gAdapter.meta.contentType;
         var topics = gAdapter.getTopics ? gAdapter.getTopics() : store.topicsForGame(gameId, type);
-        step.appendChild(el("div", { class: "live-label", text: gAdapter.getTopics ? "2 · Level" : "2 · Topic" }));
+        var pickLabel = gAdapter.pickLabel || (gAdapter.getTopics ? "Level" : "Topic");
+        step.appendChild(el("div", { class: "live-label", text: "2 · " + pickLabel }));
         if (!topics.length) {
           step.appendChild(el("p", { class: "live-muted", text: "This game has no topics enabled. Enable some in ⚙️ Manage content → Games." }));
         } else {
