@@ -116,7 +116,7 @@ const App = (function () {
         canvas.height = window.innerHeight;
       };
       resize();
-      const colors = ["#ffd60a", "#ff595e", "#1982c4", "#8ac926", "#6a4c93", "#ff924c"];
+      const colors = ["#0A84FF", "#FF3B67", "#12C08A", "#FFA51F", "#0B3FDD", "#FFB703"];
       const pieces = Array.from({ length: 140 }, () => ({
         x: Math.random() * canvas.width,
         y: -20 - Math.random() * canvas.height,

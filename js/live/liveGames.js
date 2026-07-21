@@ -16,9 +16,10 @@
     return window.App.kit;
   }
 
-  /* Kahoot-style shape/colour set for up to 4 answer buttons. */
-  var SHAPES = ["🔺", "🔷", "⬤", "⬛"];
-  var COLORS = ["#ff595e", "#1982c4", "#8ac926", "#ff924c"];
+  /* Jewel-toned shape/colour set for up to 4 answer buttons (Skillbee gem theme).
+     Diamond leads (the Skillbee mark); shapes stay distinct for colourblind clarity. */
+  var SHAPES = ["◆", "●", "▲", "■"];
+  var COLORS = ["#0A84FF", "#FF3B67", "#12C08A", "#FFA51F"];
 
   // Build up to `n` wrong options. Uses the teacher's custom ones first (from the
   // admin editor), then tops up with auto-generated ones from `autoPool`. Never
