@@ -415,8 +415,41 @@ const App = (function () {
     games.push(game);
   }
 
+  /* A fixed, decorative backdrop of floating doodles (gems, sparkles, German
+     letters, a speech bubble) behind everything. Pure SVG so it stays crisp on
+     a projector and works offline; content sits on opaque cards above it. */
+  function renderBackdrop() {
+    var bg = document.createElement("div");
+    bg.className = "app-bg";
+    bg.setAttribute("aria-hidden", "true");
+    var gem = function (fill, op, facet) {
+      return '<path d="M50 20 78 44 50 86 22 44Z" fill="' + fill + '" opacity="' + op + '"/>' +
+        (facet ? '<path d="M22 44 50 56 78 44" stroke="' + fill + '" stroke-opacity="0.28" stroke-width="3" fill="none"/>' : '');
+    };
+    var star = function (fill, op) {
+      return '<path d="M20 2 24 16 38 20 24 24 20 38 16 24 2 20 16 16Z" fill="' + fill + '" opacity="' + op + '"/>';
+    };
+    bg.innerHTML =
+      '<svg class="ab ab-float" style="top:11%;left:4%" width="72" height="72" viewBox="0 0 100 100">' + gem("#0A84FF", 0.16, true) + '</svg>' +
+      '<svg class="ab ab-float s2" style="bottom:12%;left:6%" width="54" height="54" viewBox="0 0 100 100">' + gem("#7A2BFF", 0.15, false) + '</svg>' +
+      '<svg class="ab ab-float s3" style="top:16%;right:5%" width="60" height="60" viewBox="0 0 100 100">' + gem("#0B3FDD", 0.15, false) + '</svg>' +
+      '<svg class="ab ab-float s2" style="bottom:16%;right:4%" width="46" height="46" viewBox="0 0 100 100">' + gem("#0A84FF", 0.14, false) + '</svg>' +
+      '<svg class="ab ab-float" style="top:45%;left:2.5%" width="30" height="30" viewBox="0 0 40 40">' + star("#FFB703", 0.45) + '</svg>' +
+      '<svg class="ab ab-float s3 ab-sm" style="bottom:30%;right:8%" width="26" height="26" viewBox="0 0 40 40">' + star("#0A84FF", 0.4) + '</svg>' +
+      '<div class="ab ab-float s2 ab-letter ab-sm" style="top:12%;right:24%;font-size:3.4rem;color:#0A84FF;opacity:.11">ä</div>' +
+      '<div class="ab ab-float ab-letter ab-sm" style="bottom:13%;right:21%;font-size:3rem;color:#7A2BFF;opacity:.11">ü</div>' +
+      '<div class="ab ab-float s3 ab-letter ab-sm" style="bottom:34%;left:20%;font-size:2.6rem;color:#0B3FDD;opacity:.11">ß</div>' +
+      '<svg class="ab ab-float ab-sm" style="top:36%;right:10%" width="90" height="74" viewBox="0 0 120 100">' +
+        '<rect x="6" y="6" width="108" height="66" rx="20" fill="#0A84FF" opacity="0.12"/>' +
+        '<path d="M30 70 26 92 50 70Z" fill="#0A84FF" opacity="0.12"/>' +
+        '<text x="60" y="47" text-anchor="middle" font-family="' + "inherit" + '" font-weight="900" font-size="26" fill="#0B3FDD" fill-opacity="0.45">Hallo!</text>' +
+      '</svg>';
+    document.body.insertBefore(bg, document.body.firstChild);
+  }
+
   function init() {
     root = document.getElementById("app");
+    renderBackdrop();
     // Set the browser-tab icon to the official Skillbee badge.
     if (window.SkillbeeBrand && window.SkillbeeBrand.favicon) {
       let link = document.querySelector('link[rel="icon"]');

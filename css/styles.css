@@ -35,12 +35,25 @@ body {
   font-family: var(--font);
   color: var(--ink);
   background:
-    radial-gradient(1200px 600px at 10% -10%, var(--bg-grad-1), transparent 60%),
-    radial-gradient(1000px 600px at 110% 0%, var(--bg-grad-2), transparent 55%),
+    radial-gradient(820px 560px at 6% 2%, rgba(10, 132, 255, 0.14), transparent 60%),
+    radial-gradient(760px 560px at 96% 98%, rgba(122, 43, 255, 0.11), transparent 60%),
     var(--bg);
+  background-attachment: fixed;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
 }
+
+/* ---------- playful backdrop: floating cartoon doodles (behind all content) ---------- */
+#app { position: relative; z-index: 1; }
+.app-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.app-bg .ab { position: absolute; }
+.app-bg .ab-letter { font-family: var(--font); font-weight: 900; line-height: 1; }
+.app-bg .ab-float { animation: abFloat 8s ease-in-out infinite; will-change: transform; }
+.app-bg .ab-float.s2 { animation-duration: 10.5s; }
+.app-bg .ab-float.s3 { animation-duration: 13s; }
+@keyframes abFloat { 0%, 100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-12px) rotate(4deg); } }
+@media (prefers-reduced-motion: reduce) { .app-bg .ab-float { animation: none; } }
+@media (max-width: 760px) { .app-bg .ab-sm { display: none; } }
 
 button { font-family: inherit; cursor: pointer; }
 kbd {
