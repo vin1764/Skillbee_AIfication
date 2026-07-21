@@ -357,6 +357,9 @@ kbd {
 }
 .adm-ex-btn:hover { border-color: var(--accent); }
 .adm-ex-btn.danger:hover { border-color: #e5484d; color: #e5484d; }
+/* emoji + description row atop a words/sentences exercise editor */
+.adm-ex-head { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.adm-ex-head .adm-input { flex: 1; max-width: 360px; }
 
 .adm-subhead { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .adm-game-title { margin: 0; font-size: 1.2rem; }
@@ -1207,14 +1210,33 @@ window.SkillbeeBrand = {
   }
 
   /* ---------------------------------------------------------------------
-     Exercises — the 5 Live-Class content games (Fall-Detektiv, Wortmonster,
-     Plural-Palast, Konjugations-Karussell, Hör gut zu!) each hold a LIST of
-     named "exercises" rather than one flat bank. A teacher can build a fresh
-     exercise for every lesson while keeping the previous ones. "cases" keeps
-     three case sub-lists per exercise; the others keep a flat "items" list.
+     Exercises — EVERY content game holds its own LIST of named "exercises".
+     A teacher builds a fresh exercise for each lesson and keeps the previous
+     ones instead of overwriting; in each game they pick which to play.
+     Each game owns its content (nothing is shared between games). Shapes:
+       words games  (quiz, memory, hangman)  -> { id, name, emoji, english, words: [...] }
+       sentence game (scramble)              -> { id, name, emoji, english, sentences: [...] }
+       cases (Fall-Detektiv)                 -> { id, name, accusative, dative, genitive }
+       item games (compounds/plurals/verbs/listening) -> { id, name, items: [...] }
      --------------------------------------------------------------------- */
+  var WORD_GAMES = ["quiz", "memory", "hangman"];
+  var ITEM_GAMES = ["compounds", "plurals", "verbs", "listening"];
+
+  function gameKind(gameKey) {
+    if (gameKey === "scramble") return "sentences";
+    if (gameKey === "cases") return "cases";
+    if (WORD_GAMES.indexOf(gameKey) >= 0) return "words";
+    return "items"; // compounds / plurals / verbs / listening
+  }
+
   function exId() {
     return "ex-" + Date.now().toString(36) + "-" + Math.floor(Math.random() * 1e4).toString(36);
+  }
+  function wordsExercise(name, words) {
+    return { id: exId(), name: name || "Exercise 1", emoji: "📚", english: "", words: Array.isArray(words) ? clone(words) : [] };
+  }
+  function sentencesExercise(name, sentences) {
+    return { id: exId(), name: name || "Exercise 1", emoji: "🗣️", english: "", sentences: Array.isArray(sentences) ? clone(sentences) : [] };
   }
   // A fresh exercise for the case game (three sub-lists). `seed` may be a legacy
   // { accusative, dative, genitive } object whose content is migrated in.
@@ -1231,6 +1253,31 @@ window.SkillbeeBrand = {
   function listExercise(name, items) {
     return { id: exId(), name: name || "Exercise 1", items: Array.isArray(items) ? clone(items) : [] };
   }
+  // Turn a legacy shared-bank topic into a per-game exercise (keeps its name/emoji).
+  function topicToExercise(topic, kind) {
+    var e = clone(topic || {});
+    if (!e.id) e.id = exId();
+    if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
+    if (typeof e.emoji !== "string") e.emoji = kind === "sentences" ? "🗣️" : "📚";
+    if (typeof e.english !== "string") e.english = "";
+    if (kind === "sentences") { if (!Array.isArray(e.sentences)) e.sentences = []; delete e.words; }
+    else { if (!Array.isArray(e.words)) e.words = []; delete e.sentences; }
+    return e;
+  }
+  function normalizeWordsEx(e) {
+    if (!e.id) e.id = exId();
+    if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
+    if (typeof e.emoji !== "string") e.emoji = "📚";
+    if (typeof e.english !== "string") e.english = "";
+    if (!Array.isArray(e.words)) e.words = [];
+  }
+  function normalizeSentencesEx(e) {
+    if (!e.id) e.id = exId();
+    if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
+    if (typeof e.emoji !== "string") e.emoji = "🗣️";
+    if (typeof e.english !== "string") e.english = "";
+    if (!Array.isArray(e.sentences)) e.sentences = [];
+  }
   function normalizeCaseEx(e) {
     if (!e.id) e.id = exId();
     if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
@@ -1242,8 +1289,23 @@ window.SkillbeeBrand = {
     if (!Array.isArray(e.items)) e.items = [];
   }
 
+  // The topics a legacy store's game offered (its selection subset, or all).
+  function legacyTopicsFor(d, gameId, type) {
+    var pool = (type === "sentences" ? d.sentences : d.vocab) || [];
+    var cfg = d.games && d.games[gameId];
+    if (!cfg || !Array.isArray(cfg.topics)) return pool;
+    var set = {};
+    cfg.topics.forEach(function (id) { set[id] = true; });
+    return pool.filter(function (t) { return set[t.id]; });
+  }
+
   function defaultExercises() {
+    var vt = (window.GameData && window.GameData.VOCAB_TOPICS) || [];
+    var st = (window.GameData && window.GameData.SENTENCE_TOPICS) || [];
+    var words = function () { return vt.map(function (t) { return topicToExercise(t, "words"); }); };
     return {
+      quiz: words(), memory: words(), hangman: words(),
+      scramble: st.map(function (t) { return topicToExercise(t, "sentences"); }),
       cases: [caseExercise("Exercise 1", defaultCases())],
       compounds: [listExercise("Exercise 1", defaultCompounds())],
       plurals: [listExercise("Exercise 1", defaultPlurals())],
@@ -1253,39 +1315,41 @@ window.SkillbeeBrand = {
   }
 
   function defaults() {
-    return {
-      vocab: clone(window.GameData.VOCAB_TOPICS),
-      sentences: clone(window.GameData.SENTENCE_TOPICS),
-      // Live-game content, seeded from the built-in data but editable and
-      // saved/synced like everything else. Each game holds named exercises.
-      exercises: defaultExercises(),
-      // Per-game topic selection. Missing entry / no "topics" list = the game
-      // uses ALL topics of its type from the bank (the default).
-      games: {}
-    };
+    // Every game holds its own named exercises, seeded from the built-in data.
+    return { exercises: defaultExercises() };
   }
 
-  // Make sure an older saved store gains the new sections instead of showing
-  // empty editors. Legacy flat banks (d.cases / d.compounds / …) are migrated
-  // into a first exercise, then dropped so exercises are the single source.
+  // Make sure any saved/imported store is in the current shape. Legacy shared
+  // banks (d.vocab / d.sentences with d.games selection, and d.cases / d.compounds
+  // / …) are migrated into per-game exercises, then dropped.
   function ensureSections(d) {
     if (!d.exercises || typeof d.exercises !== "object") d.exercises = {};
     var ex = d.exercises;
 
+    // word games — migrate the legacy shared vocab bank (honouring old per-game selection)
+    WORD_GAMES.forEach(function (g) {
+      if (!Array.isArray(ex[g])) ex[g] = legacyTopicsFor(d, g, "vocab").map(function (t) { return topicToExercise(t, "words"); });
+      if (!ex[g].length) ex[g] = [wordsExercise("Exercise 1", null)];
+      ex[g].forEach(normalizeWordsEx);
+    });
+    // sentence game (scramble)
+    if (!Array.isArray(ex.scramble)) ex.scramble = legacyTopicsFor(d, "scramble", "sentences").map(function (t) { return topicToExercise(t, "sentences"); });
+    if (!ex.scramble.length) ex.scramble = [sentencesExercise("Exercise 1", null)];
+    ex.scramble.forEach(normalizeSentencesEx);
+    // cases (Fall-Detektiv)
     if (!Array.isArray(ex.cases)) ex.cases = [caseExercise("Exercise 1", d.cases)];
-    else if (!ex.cases.length) ex.cases = [caseExercise("Exercise 1", null)];
+    if (!ex.cases.length) ex.cases = [caseExercise("Exercise 1", null)];
     ex.cases.forEach(normalizeCaseEx);
-
-    ["compounds", "plurals", "verbs", "listening"].forEach(function (k) {
+    // flat-list games
+    ITEM_GAMES.forEach(function (k) {
       if (!Array.isArray(ex[k])) ex[k] = [listExercise("Exercise 1", d[k])];
-      else if (!ex[k].length) ex[k] = [listExercise("Exercise 1", null)];
+      if (!ex[k].length) ex[k] = [listExercise("Exercise 1", null)];
       ex[k].forEach(normalizeListEx);
     });
 
-    // Legacy flat fields are now represented as exercises — drop them.
+    // Legacy fields are now represented as exercises — drop them.
+    delete d.vocab; delete d.sentences; delete d.games;
     delete d.cases; delete d.compounds; delete d.plurals; delete d.verbs; delete d.listening;
-
-    if (!d.games || typeof d.games !== "object") d.games = {};
     return d;
   }
 
@@ -1306,7 +1370,7 @@ window.SkillbeeBrand = {
         var raw = localStorage.getItem(KEY);
         if (raw) {
           var parsed = JSON.parse(raw);
-          if (parsed && Array.isArray(parsed.vocab) && Array.isArray(parsed.sentences)) {
+          if (parsed && (parsed.exercises || Array.isArray(parsed.vocab) || Array.isArray(parsed.sentences))) {
             this.data = ensureSections(parsed);
             this._ts = Number(localStorage.getItem(TS_KEY)) || 0;
             return;
@@ -1401,19 +1465,9 @@ window.SkillbeeBrand = {
       }
     },
 
-    vocabTopics: function () {
-      return this.data.vocab;
-    },
-    sentenceTopics: function () {
-      return this.data.sentences;
-    },
-
-    poolFor: function (type) {
-      return type === "sentences" ? this.data.sentences : this.data.vocab;
-    },
-
-    /* -------- Exercises (Live-Class content games) -------- */
-    // The list of exercises for one game ("cases" | "compounds" | ...).
+    /* -------- Exercises — every content game -------- */
+    gameKind: function (gameKey) { return gameKind(gameKey); },
+    // The list of exercises for one game ("quiz" | "cases" | "compounds" | ...).
     exercisesFor: function (gameKey) {
       var arr = this.data.exercises && this.data.exercises[gameKey];
       return Array.isArray(arr) ? arr : [];
@@ -1425,7 +1479,11 @@ window.SkillbeeBrand = {
       return arr[0] || null;
     },
     _blankExercise: function (gameKey, name) {
-      return gameKey === "cases" ? caseExercise(name, null) : listExercise(name, null);
+      var kind = gameKind(gameKey);
+      if (kind === "cases") return caseExercise(name, null);
+      if (kind === "words") return wordsExercise(name, null);
+      if (kind === "sentences") return sentencesExercise(name, null);
+      return listExercise(name, null);
     },
     addExercise: function (gameKey, name) {
       var arr = this.exercisesFor(gameKey);
@@ -1466,61 +1524,6 @@ window.SkillbeeBrand = {
     verbsData: function () { var e = this.exercise("verbs"); return e ? e.items : []; },
     listeningData: function () { var e = this.exercise("listening"); return e ? e.items : []; },
 
-    /* Topics a given game should offer (its selected subset, or all by default). */
-    topicsForGame: function (gameId, type) {
-      var pool = this.poolFor(type);
-      var cfg = this.data.games && this.data.games[gameId];
-      if (!cfg || !cfg.topics) return pool;
-      var set = {};
-      cfg.topics.forEach(function (id) { set[id] = true; });
-      return pool.filter(function (t) { return set[t.id]; });
-    },
-
-    isTopicInGame: function (gameId, topicId) {
-      var cfg = this.data.games && this.data.games[gameId];
-      if (!cfg || !cfg.topics) return true; // "all" by default
-      return cfg.topics.indexOf(topicId) !== -1;
-    },
-
-    setTopicInGame: function (gameId, topicId, type, on) {
-      if (!this.data.games) this.data.games = {};
-      var cfg = this.data.games[gameId];
-      if (!cfg || !cfg.topics) {
-        // Was "all" — materialize the full list so unchecking one keeps the rest.
-        cfg = { topics: this.poolFor(type).map(function (t) { return t.id; }) };
-        this.data.games[gameId] = cfg;
-      }
-      var i = cfg.topics.indexOf(topicId);
-      if (on && i === -1) cfg.topics.push(topicId);
-      if (!on && i !== -1) cfg.topics.splice(i, 1);
-      this.save();
-    },
-
-    /* When a new topic is added from a game view, include it there if that
-       game already has an explicit selection (otherwise "all" already covers it). */
-    includeTopicIfConfigured: function (gameId, topicId) {
-      var cfg = this.data.games && this.data.games[gameId];
-      if (cfg && cfg.topics && cfg.topics.indexOf(topicId) === -1) cfg.topics.push(topicId);
-    },
-
-    /* Drop a deleted topic id from every game's selection. */
-    pruneTopic: function (topicId) {
-      var games = this.data.games || {};
-      Object.keys(games).forEach(function (gid) {
-        var cfg = games[gid];
-        if (cfg && cfg.topics) {
-          var i = cfg.topics.indexOf(topicId);
-          if (i !== -1) cfg.topics.splice(i, 1);
-        }
-      });
-    },
-
-    enabledCount: function (gameId, type) {
-      var pool = this.poolFor(type);
-      var self = this;
-      return pool.filter(function (t) { return self.isTopicInGame(gameId, t.id); }).length;
-    },
-
     newId: function (prefix) {
       return (
         (prefix || "id") +
@@ -1537,7 +1540,8 @@ window.SkillbeeBrand = {
 
     importJSON: function (text) {
       var parsed = JSON.parse(text);
-      if (!parsed || !Array.isArray(parsed.vocab) || !Array.isArray(parsed.sentences)) {
+      if (!parsed || typeof parsed !== "object" ||
+          (!parsed.exercises && !Array.isArray(parsed.vocab) && !Array.isArray(parsed.sentences))) {
         throw new Error("The file is not in the right format.");
       }
       this.data = ensureSections(parsed);
@@ -2004,10 +2008,10 @@ const App = (function () {
     );
   }
 
-  /* ---- topic picker (shown before a game starts) ------------------- */
+  /* ---- exercise picker (shown before a game starts) ---------------- */
   function openTopicPicker(game) {
     const usesSentences = game.contentType === "sentences";
-    const topics = window.ContentStore.topicsForGame(game.id, usesSentences ? "sentences" : "vocab");
+    const exercises = window.ContentStore.exercisesFor(game.id);
     const main = document.getElementById("screen");
     main.innerHTML = "";
 
@@ -2015,31 +2019,31 @@ const App = (function () {
       el("div", { class: "picker" }, [
         el("button", { class: "back-link", html: "← Back", on: { click: () => showHome() } }),
         el("h2", { class: "picker-title", html: `${game.emoji} ${game.name}` }),
-        el("p", { class: "picker-sub", text: usesSentences ? "Choose a topic for the sentences:" : "Choose a vocabulary topic:" })
+        el("p", { class: "picker-sub", text: "Choose an exercise:" })
       ])
     );
 
-    if (!topics.length) {
+    if (!exercises.length) {
       main.appendChild(
         el("p", {
           class: "picker-empty",
-          html: "No topics are enabled for this game yet. Add or enable topics in <b>⚙️ Manage content → Games</b>."
+          html: "No exercises for this game yet. Add one in <b>⚙️ Manage content</b>."
         })
       );
       return;
     }
 
     const grid = el("div", { class: "topic-grid" });
-    topics.forEach((topic) => {
-      const count = usesSentences ? topic.sentences.length : topic.words.length;
+    exercises.forEach((ex) => {
+      const count = usesSentences ? (ex.sentences || []).length : (ex.words || []).length;
       grid.appendChild(
         el(
           "button",
-          { class: "topic-card", on: { click: () => launch(game, topic) } },
+          { class: "topic-card", on: { click: () => launch(game, ex) } },
           [
-            el("div", { class: "topic-emoji", text: topic.emoji }),
-            el("div", { class: "topic-name", text: topic.name }),
-            el("div", { class: "topic-en", text: topic.english }),
+            el("div", { class: "topic-emoji", text: ex.emoji || (usesSentences ? "🗣️" : "📚") }),
+            el("div", { class: "topic-name", text: ex.name }),
+            el("div", { class: "topic-en", text: ex.english || "" }),
             el("div", { class: "topic-count", text: `${count} ${usesSentences ? "sentences" : "words"}` })
           ]
         )
@@ -2939,10 +2943,8 @@ document.addEventListener("DOMContentLoaded", App.init);
       var store = api.store;
       var games = api.games || [];
 
-      var mode = "games"; // "bank" | "games" — Games is the default view
-      var bankTab = "vocab"; // "vocab" | "sentences" (within the bank)
-      var currentGame = null; // gameId when configuring one game
-      var currentExercise = null; // exercise id when editing one exercise (Live games)
+      var currentGame = null; // gameId when configuring one content game
+      var currentExercise = null; // exercise id when editing one exercise
       var syncChipEl = null;
 
       /* ---- cloud sync hooks ---- */
@@ -2985,10 +2987,6 @@ document.addEventListener("DOMContentLoaded", App.init);
         store.onRemotePending = null;
         if (store.applyPendingRemote) store.applyPendingRemote();
         api.onExit();
-      }
-
-      function typeOfGame(g) {
-        return g.contentType === "sentences" ? "sentences" : "vocab";
       }
 
       /* A text input bound two-way to obj[field]; saves on every keystroke. */
@@ -3043,8 +3041,8 @@ document.addEventListener("DOMContentLoaded", App.init);
 
         // One back button (pinned top-left): steps up through exercise → game →
         // menu depending on how deep we are.
-        var inExercise = mode === "games" && currentGame && liveGameById(currentGame) && currentExercise;
-        var inGame = mode === "games" && currentGame;
+        var inExercise = currentGame && currentExercise;
+        var inGame = !!currentGame;
         var backHtml = inExercise ? "← Exercises" : inGame ? "← Games" : "← Menu";
         var backFn = inExercise
           ? function () { currentExercise = null; render(); }
@@ -3069,56 +3067,9 @@ document.addEventListener("DOMContentLoaded", App.init);
         );
         updateSyncChip(store.syncState);
 
-        container.appendChild(
-          el("div", { class: "adm-tabs adm-modes" }, [
-            modeBtn("bank", "📚 Content bank"),
-            modeBtn("games", "🎮 Games")
-          ])
-        );
-
         var body = el("div", { class: "adm-body" });
         container.appendChild(body);
-        if (mode === "bank") renderBank(body);
-        else renderGames(body);
-      }
-
-      function modeBtn(id, label) {
-        return el("button", {
-          class: "adm-tab" + (mode === id ? " active" : ""),
-          html: label,
-          on: {
-            click: function () {
-              mode = id;
-              currentGame = null;
-              currentExercise = null;
-              render();
-            }
-          }
-        });
-      }
-
-      /* ---------------- Content bank ---------------- */
-      function renderBank(body) {
-        body.appendChild(
-          el("div", { class: "adm-tabs" }, [
-            subBtn("vocab", "🔤 Words"),
-            subBtn("sentences", "🗣️ Sentences")
-          ])
-        );
-        body.appendChild(
-          el("p", {
-            class: "adm-hint",
-            html: bankTab === "vocab"
-              ? "Words are used by <b>Vocabulary Quiz</b> and <b>Memory</b> (in class and solo) and <b>Hangman</b>. Changes save automatically in this browser."
-              : "Sentences are used by <b>Sentence Scramble</b>. Changes save automatically in this browser."
-          })
-        );
-        addTopicButton(body, bankTab, null);
-        var list = store.poolFor(bankTab);
-        if (!list.length) body.appendChild(emptyState(bankTab === "vocab" ? "No word topics yet." : "No sentence topics yet."));
-        list.forEach(function (topic, i) {
-          body.appendChild(topicCard(topic, i, bankTab, { expanded: false }));
-        });
+        renderGames(body);
       }
 
       /* ---- Fall-Detektiv: case sentences, grouped by case within one exercise ---- */
@@ -3359,22 +3310,9 @@ document.addEventListener("DOMContentLoaded", App.init);
         return sel;
       }
 
-      function subBtn(id, label) {
-        return el("button", {
-          class: "adm-tab" + (bankTab === id ? " active" : ""),
-          html: label,
-          on: {
-            click: function () {
-              bankTab = id;
-              render();
-            }
-          }
-        });
-      }
-
       /* ---------------- Games ---------------- */
-      // The two Live-only games keep their own content (not the shared word /
-      // sentence bank), so their cards open a dedicated editor.
+      // Live-Class-only games get a badge; the rest come from the registered
+      // Solo games passed in `games`. Every game owns its own exercises.
       var LIVE_GAMES = [
         { id: "cases", name: "Fall-Detektiv", emoji: "🕵️", color: "#8b5cf6" },
         { id: "compounds", name: "Wortmonster", emoji: "🧟", color: "#22c55e" },
@@ -3382,62 +3320,79 @@ document.addEventListener("DOMContentLoaded", App.init);
         { id: "verbs", name: "Konjugations-Karussell", emoji: "🎠", color: "#e11d74" },
         { id: "listening", name: "Hör gut zu!", emoji: "👂", color: "#0ea5b7" }
       ];
-      function liveGameById(id) {
-        for (var i = 0; i < LIVE_GAMES.length; i++) if (LIVE_GAMES[i].id === id) return LIVE_GAMES[i];
+      // The full set of content games (Solo word/sentence games + Live games),
+      // each tagged with the "kind" that selects its editor.
+      function allGames() {
+        var out = games.map(function (g) {
+          return { id: g.id, name: g.name, emoji: g.emoji, color: g.color,
+                   kind: g.contentType === "sentences" ? "sentences" : "words", live: false };
+        });
+        LIVE_GAMES.forEach(function (g) {
+          out.push({ id: g.id, name: g.name, emoji: g.emoji, color: g.color,
+                     kind: g.id === "cases" ? "cases" : "items", live: true });
+        });
+        return out;
+      }
+      function gameById(id) {
+        var all = allGames();
+        for (var i = 0; i < all.length; i++) if (all[i].id === id) return all[i];
         return null;
       }
-      // Count the content rows inside a single exercise.
-      function exerciseItemCount(id, ex) {
+      // Count the content rows inside a single exercise, given the game's kind.
+      function exerciseItemCount(kind, ex) {
         if (!ex) return 0;
-        if (id === "cases") return (ex.accusative || []).length + (ex.dative || []).length + (ex.genitive || []).length;
+        if (kind === "cases") return (ex.accusative || []).length + (ex.dative || []).length + (ex.genitive || []).length;
+        if (kind === "words") return (ex.words || []).length;
+        if (kind === "sentences") return (ex.sentences || []).length;
         return (ex.items || []).length;
       }
-      function liveGameUnit(id) {
+      function unitFor(id, kind) {
+        if (kind === "words") return " words";
+        if (kind === "sentences") return " sentences";
         if (id === "plurals") return " nouns";
-        if (id === "cases") return " sentences";
         if (id === "verbs") return " verbs";
         return " words";
       }
 
-      /* ---- The list of exercises for one Live game (create / rename / copy / delete) ---- */
-      function renderExerciseList(body, lg) {
+      /* ---- The list of exercises for one game (create / rename / copy / delete) ---- */
+      function renderExerciseList(body, game) {
         body.appendChild(
           el("p", {
             class: "adm-hint",
             html:
               "Each <b>exercise</b> is its own set of content. Build a new exercise for each lesson — your earlier ones stay saved, so you never have to delete previous work. " +
-              "In Live Class Mode you choose which exercise the class plays."
+              "You choose which exercise to play when you start the game."
           })
         );
-        var list = store.exercisesFor(lg.id);
+        var list = store.exercisesFor(game.id);
         var wrap = el("div", { class: "adm-ex-list" });
         list.forEach(function (e) {
-          var count = exerciseItemCount(lg.id, e);
+          var count = exerciseItemCount(game.kind, e);
           var card = el("div", { class: "adm-ex-card" });
           card.appendChild(el("button", {
             class: "adm-ex-main",
             attrs: { title: "Edit this exercise" },
             on: { click: function () { currentExercise = e.id; render(); } }
           }, [
-            el("div", { class: "adm-ex-name", text: e.name }),
-            el("div", { class: "adm-ex-count", text: count + liveGameUnit(lg.id) })
+            el("div", { class: "adm-ex-name", text: (e.emoji ? e.emoji + " " : "") + e.name }),
+            el("div", { class: "adm-ex-count", text: count + unitFor(game.id, game.kind) })
           ]));
           card.appendChild(el("div", { class: "adm-ex-actions" }, [
             el("button", {
               class: "adm-ex-btn", html: "✎", attrs: { title: "Rename exercise" },
               on: { click: function () {
                 var name = window.prompt("Rename exercise:", e.name);
-                if (name != null) { store.renameExercise(lg.id, e.id, name); render(); }
+                if (name != null) { store.renameExercise(game.id, e.id, name); render(); }
               } }
             }),
             el("button", {
               class: "adm-ex-btn", html: "⧉", attrs: { title: "Duplicate — copy this exercise's content into a new one" },
-              on: { click: function () { if (store.duplicateExercise(lg.id, e.id)) { render(); toast("Exercise duplicated ✓"); } } }
+              on: { click: function () { if (store.duplicateExercise(game.id, e.id)) { render(); toast("Exercise duplicated ✓"); } } }
             }),
             el("button", {
               class: "adm-ex-btn danger", html: "🗑", attrs: { title: "Delete exercise" },
               on: { click: function () {
-                if (confirmDelete("Delete the exercise “" + e.name + "” and all its content?")) { store.deleteExercise(lg.id, e.id); render(); }
+                if (confirmDelete("Delete the exercise “" + e.name + "” and all its content?")) { store.deleteExercise(game.id, e.id); render(); }
               } }
             })
           ]));
@@ -3447,47 +3402,29 @@ document.addEventListener("DOMContentLoaded", App.init);
         body.appendChild(el("button", {
           class: "btn primary adm-add",
           html: "+ New exercise",
-          on: { click: function () { var e = store.addExercise(lg.id); currentExercise = e.id; render(); } }
+          on: { click: function () { var e = store.addExercise(game.id); currentExercise = e.id; render(); } }
         }));
       }
 
       function renderGames(body) {
+        // 1) game grid
         if (!currentGame) {
           body.appendChild(
-            el("p", {
-              class: "adm-hint",
-              html: "Pick a game to edit its content. For word/sentence games you also choose which topics they offer — those changes update the shared bank."
-            })
+            el("p", { class: "adm-hint", html: "Pick a game, then build its <b>exercises</b> — each is a separate set of content you can name, reuse and keep." })
           );
           var grid = el("div", { class: "adm-game-grid" });
-          games.forEach(function (g) {
-            var type = typeOfGame(g);
-            var total = store.poolFor(type).length;
-            var on = store.enabledCount(g.id, type);
+          allGames().forEach(function (g) {
+            var n = store.exercisesFor(g.id).length;
             grid.appendChild(
               el("button", {
                 class: "adm-game-card",
                 attrs: { style: "--accent:" + (g.color || "#3b4de8") },
-                on: { click: function () { currentGame = g.id; render(); } }
+                on: { click: function () { currentGame = g.id; currentExercise = null; render(); } }
               }, [
+                g.live ? el("div", { class: "adm-game-badge", text: "Live Class Mode" }) : null,
                 el("div", { class: "adm-game-emoji", text: g.emoji }),
                 el("div", { class: "adm-game-name", text: g.name }),
-                el("div", { class: "adm-game-meta", text: on + " of " + total + (type === "sentences" ? " sentence sets" : " topics") })
-              ])
-            );
-          });
-          // Live Class Mode games (Fall-Detektiv, Wortmonster, Plural-Palast) with their own banks.
-          LIVE_GAMES.forEach(function (g) {
-            grid.appendChild(
-              el("button", {
-                class: "adm-game-card",
-                attrs: { style: "--accent:" + g.color },
-                on: { click: function () { currentGame = g.id; render(); } }
-              }, [
-                el("div", { class: "adm-game-badge", text: "Live Class Mode" }),
-                el("div", { class: "adm-game-emoji", text: g.emoji }),
-                el("div", { class: "adm-game-name", text: g.name }),
-                el("div", { class: "adm-game-meta", text: (function () { var n = store.exercisesFor(g.id).length; return n + (n === 1 ? " exercise" : " exercises"); })() })
+                el("div", { class: "adm-game-meta", text: n + (n === 1 ? " exercise" : " exercises") })
               ])
             );
           });
@@ -3495,154 +3432,95 @@ document.addEventListener("DOMContentLoaded", App.init);
           return;
         }
 
-        // Live-game editors: first pick/create an exercise, then edit its content.
-        var lg = liveGameById(currentGame);
-        if (lg) {
-          if (!currentExercise) { renderExerciseList(body, lg); return; }
-          var ex = store.exercise(currentGame, currentExercise);
-          if (!ex) { currentExercise = null; return renderGames(body); }
-          body.appendChild(
-            el("div", { class: "adm-subhead" }, [
-              el("h3", { class: "adm-game-title", text: lg.emoji + " " + lg.name + "  ·  " + ex.name })
-            ])
-          );
-          if (currentGame === "cases") renderCases(body, ex);
-          else if (currentGame === "compounds") renderCompounds(body, ex);
-          else if (currentGame === "plurals") renderPlurals(body, ex);
-          else if (currentGame === "verbs") renderVerbs(body, ex);
-          else if (currentGame === "listening") renderListening(body, ex);
+        var game = gameById(currentGame);
+        if (!game) { currentGame = null; return renderGames(body); }
+
+        // 2) exercise list for the chosen game
+        if (!currentExercise) {
+          body.appendChild(el("div", { class: "adm-subhead" }, [
+            el("h3", { class: "adm-game-title", text: game.emoji + " " + game.name })
+          ]));
+          renderExerciseList(body, game);
           return;
         }
 
-        var game = null;
-        for (var k = 0; k < games.length; k++) if (games[k].id === currentGame) game = games[k];
-        if (!game) { currentGame = null; return renderGames(body); }
-        var gtype = typeOfGame(game);
-
-        body.appendChild(
-          el("div", { class: "adm-subhead" }, [
-            el("h3", { class: "adm-game-title", text: game.emoji + " " + game.name })
-          ])
-        );
-        body.appendChild(
-          el("p", {
-            class: "adm-hint",
-            html: "Tick the topics this game should offer. Editing or adding content here also updates the shared bank."
-          })
-        );
-        addTopicButton(body, gtype, game.id);
-        var pool = store.poolFor(gtype);
-        if (!pool.length) body.appendChild(emptyState(gtype === "vocab" ? "No word topics in the bank yet." : "No sentence topics in the bank yet."));
-        pool.forEach(function (topic, i) {
-          body.appendChild(topicCard(topic, i, gtype, { expanded: false, gameId: game.id }));
-        });
+        // 3) editor for one exercise (by game kind)
+        var ex = store.exercise(currentGame, currentExercise);
+        if (!ex) { currentExercise = null; return renderGames(body); }
+        body.appendChild(el("div", { class: "adm-subhead" }, [
+          el("h3", { class: "adm-game-title", text: game.emoji + " " + game.name + "  ·  " + ex.name })
+        ]));
+        if (game.kind === "words") renderWordsExercise(body, ex);
+        else if (game.kind === "sentences") renderSentencesExercise(body, ex);
+        else if (currentGame === "cases") renderCases(body, ex);
+        else if (currentGame === "compounds") renderCompounds(body, ex);
+        else if (currentGame === "plurals") renderPlurals(body, ex);
+        else if (currentGame === "verbs") renderVerbs(body, ex);
+        else if (currentGame === "listening") renderListening(body, ex);
       }
 
-      /* ---------------- reusable topic card ---------------- */
-      function topicCard(topic, index, type, opts) {
-        opts = opts || {};
-        var card = el("div", { class: "adm-topic" });
-        var head = el("div", { class: "adm-topic-head" });
-
-        if (opts.gameId) {
-          var cb = el("input", { class: "adm-check", attrs: { type: "checkbox", title: "Include in this game" } });
-          cb.checked = store.isTopicInGame(opts.gameId, topic.id);
-          cb.addEventListener("change", function () {
-            store.setTopicInGame(opts.gameId, topic.id, type, cb.checked);
-            card.classList.toggle("adm-off", !cb.checked);
-          });
-          head.appendChild(el("label", { class: "adm-include" }, [cb]));
-          if (!cb.checked) card.classList.add("adm-off");
-        }
-
-        head.appendChild(input(topic, "emoji", "🙂", "adm-emoji", 6));
-        head.appendChild(input(topic, "name", "Topic name (German)", "adm-input grow"));
-        head.appendChild(input(topic, "english", "English name", "adm-input"));
-        var countText = type === "vocab" ? topic.words.length + " words" : topic.sentences.length + " sentences";
-        head.appendChild(el("span", { class: "adm-count", text: countText }));
-
-        var rows = el("div", { class: "adm-rows" });
-        if (opts.expanded === false) rows.style.display = "none";
-        var toggle = el("button", {
-          class: "adm-toggle",
-          html: opts.expanded === false ? "Edit ▾" : "▴",
-          attrs: { title: "Show / hide content" },
-          on: {
-            click: function () {
-              var hidden = rows.style.display === "none";
-              rows.style.display = hidden ? "" : "none";
-              toggle.innerHTML = hidden ? "▴" : "Edit ▾";
-            }
-          }
-        });
-        head.appendChild(toggle);
-
-        head.appendChild(
-          el("button", {
-            class: "adm-del",
-            html: "🗑",
-            attrs: { title: "Delete topic (from bank and all games)" },
-            on: {
-              click: function () {
-                if (confirmDelete("Delete this topic? It will be removed from the bank and every game.")) {
-                  store.poolFor(type).splice(index, 1);
-                  store.pruneTopic(topic.id);
-                  store.save();
-                  render();
-                }
-              }
-            }
-          })
+      /* ---- Words exercise editor (Vocabulary Quiz / Memory / Hangman) ---- */
+      function renderWordsExercise(body, ex) {
+        body.appendChild(
+          el("p", { class: "adm-hint", html: "The words in this exercise. <b>Wrong options</b> are optional — leave blank and the game auto-picks wrong answers from the other words here; type your own (comma-separated) to control them. Changes save automatically." })
         );
-        card.appendChild(head);
-
-        if (type === "vocab") {
-          rows.appendChild(
-            el("p", { class: "adm-hint tiny", html: "<b>Wrong options</b> are optional. Leave blank and the game auto-picks wrong answers from the other words in this topic. Type your own (comma-separated) to control exactly what students see." })
-          );
-          rows.appendChild(
-            el("div", { class: "adm-row adm-row-vocab adm-row-head" }, [
-              el("span", { class: "adm-emoji-h", text: "Icon" }),
-              el("span", { text: "German" }),
-              el("span", { text: "English (correct)" }),
-              el("span", { text: "Wrong options (optional)" }),
-              el("span", {})
+        body.appendChild(el("div", { class: "adm-ex-head" }, [
+          input(ex, "emoji", "📚", "adm-emoji", 6),
+          input(ex, "english", "Short description (optional, e.g. Animals)", "adm-input")
+        ]));
+        body.appendChild(
+          el("div", { class: "adm-row adm-row-vocab adm-row-head" }, [
+            el("span", { class: "adm-emoji-h", text: "Icon" }),
+            el("span", { text: "German" }),
+            el("span", { text: "English (correct)" }),
+            el("span", { text: "Wrong options (optional)" }),
+            el("span", {})
+          ])
+        );
+        var list = ex.words;
+        if (!list.length) body.appendChild(emptyState("No words yet — add the first one below."));
+        list.forEach(function (w, wi) {
+          body.appendChild(
+            el("div", { class: "adm-row adm-row-vocab" }, [
+              input(w, "emoji", "🙂", "adm-emoji", 6),
+              input(w, "de", "e.g. der Hund", "adm-input"),
+              input(w, "en", "e.g. the dog", "adm-input"),
+              optionsInput(w, "distractors", "auto — or e.g. the cat, the fish"),
+              delRowBtn("Remove word", function () { list.splice(wi, 1); store.save(); render(); })
             ])
           );
-          topic.words.forEach(function (w, wi) {
-            rows.appendChild(
-              el("div", { class: "adm-row adm-row-vocab" }, [
-                input(w, "emoji", "🙂", "adm-emoji", 6),
-                input(w, "de", "e.g. der Hund", "adm-input"),
-                input(w, "en", "e.g. the dog", "adm-input"),
-                optionsInput(w, "distractors", "auto — or e.g. the cat, the fish"),
-                delRowBtn("Remove word", function () { topic.words.splice(wi, 1); store.save(); render(); })
-              ])
-            );
-          });
-          rows.appendChild(addRowBtn("+ Word", function () { topic.words.push({ de: "", en: "", emoji: "" }); store.save(); render(); }));
-        } else {
-          rows.appendChild(
-            el("div", { class: "adm-row adm-row-sent adm-row-head" }, [
-              el("span", { text: "German sentence" }),
-              el("span", { text: "English translation" }),
-              el("span", {})
+        });
+        body.appendChild(addRowBtn("+ Word", function () { list.push({ de: "", en: "", emoji: "" }); store.save(); render(); }));
+      }
+
+      /* ---- Sentences exercise editor (Satzbau / Sentence Scramble) ---- */
+      function renderSentencesExercise(body, ex) {
+        body.appendChild(
+          el("p", { class: "adm-hint", html: "The sentences students rebuild in <b>Satzbau</b>. Keep them short (A1/A2). Changes save automatically." })
+        );
+        body.appendChild(el("div", { class: "adm-ex-head" }, [
+          input(ex, "emoji", "🗣️", "adm-emoji", 6),
+          input(ex, "english", "Short description (optional, e.g. Everyday)", "adm-input")
+        ]));
+        body.appendChild(
+          el("div", { class: "adm-row adm-row-sent adm-row-head" }, [
+            el("span", { text: "German sentence" }),
+            el("span", { text: "English translation" }),
+            el("span", {})
+          ])
+        );
+        var list = ex.sentences;
+        if (!list.length) body.appendChild(emptyState("No sentences yet — add the first one below."));
+        list.forEach(function (s, si) {
+          body.appendChild(
+            el("div", { class: "adm-row adm-row-sent" }, [
+              input(s, "de", "e.g. Ich lerne Deutsch", "adm-input"),
+              input(s, "en", "e.g. I learn German", "adm-input"),
+              delRowBtn("Remove sentence", function () { list.splice(si, 1); store.save(); render(); })
             ])
           );
-          topic.sentences.forEach(function (s, si) {
-            rows.appendChild(
-              el("div", { class: "adm-row adm-row-sent" }, [
-                input(s, "de", "e.g. Ich lerne Deutsch", "adm-input"),
-                input(s, "en", "e.g. I learn German", "adm-input"),
-                delRowBtn("Remove sentence", function () { topic.sentences.splice(si, 1); store.save(); render(); })
-              ])
-            );
-          });
-          rows.appendChild(addRowBtn("+ Sentence", function () { topic.sentences.push({ de: "", en: "" }); store.save(); render(); }));
-        }
-
-        card.appendChild(rows);
-        return card;
+        });
+        body.appendChild(addRowBtn("+ Sentence", function () { list.push({ de: "", en: "" }); store.save(); render(); }));
       }
 
       function delRowBtn(title, onClick) {
@@ -3651,27 +3529,6 @@ document.addEventListener("DOMContentLoaded", App.init);
 
       function addRowBtn(label, onClick) {
         return el("button", { class: "btn small adm-add-row", html: label, on: { click: onClick } });
-      }
-
-      function addTopicButton(body, type, gameId) {
-        var label = type === "vocab" ? "+ New topic" : "+ New sentence topic";
-        body.appendChild(
-          el("button", {
-            class: "btn primary adm-add",
-            html: label,
-            on: {
-              click: function () {
-                var t = type === "vocab"
-                  ? { id: store.newId("topic"), name: "New topic", english: "", emoji: "📚", words: [{ de: "", en: "", emoji: "" }] }
-                  : { id: store.newId("stopic"), name: "New topic", english: "", emoji: "🗣️", sentences: [{ de: "", en: "" }] };
-                store.poolFor(type).push(t);
-                if (gameId) store.includeTopicIfConfigured(gameId, t.id);
-                store.save();
-                render();
-              }
-            }
-          })
-        );
       }
 
       function emptyState(msg) {
@@ -3977,6 +3834,7 @@ document.addEventListener("DOMContentLoaded", App.init);
     return {
       meta: meta,
       timeLimit: 20000,
+      pickLabel: "Exercise",
       buildRounds: function (topic) {
         var words = (topic.words || []).filter(function (w) { return w.de && w.en; });
         var picked = kit().sample(words, Math.min(10, words.length));
@@ -4746,12 +4604,11 @@ window.LiveMode = (function () {
       // 2) topic
       if (gameId) {
         var gAdapter = window.LiveGames[gameId];
-        var type = gAdapter.meta.contentType;
-        var topics = gAdapter.getTopics ? gAdapter.getTopics() : store.topicsForGame(gameId, type);
-        var pickLabel = gAdapter.pickLabel || (gAdapter.getTopics ? "Level" : "Topic");
+        var topics = gAdapter.getTopics ? gAdapter.getTopics() : store.exercisesFor(gameId);
+        var pickLabel = gAdapter.pickLabel || "Exercise";
         step.appendChild(el("div", { class: "live-label", text: "2 · " + pickLabel }));
         if (!topics.length) {
-          step.appendChild(el("p", { class: "live-muted", text: "This game has no topics enabled. Enable some in ⚙️ Manage content → Games." }));
+          step.appendChild(el("p", { class: "live-muted", text: "This game has no exercises yet. Add one in ⚙️ Manage content." }));
         } else {
           var tg = el("div", { class: "setup-grid" });
           topics.forEach(function (t) {

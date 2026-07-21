@@ -212,12 +212,11 @@ window.LiveMode = (function () {
       // 2) topic
       if (gameId) {
         var gAdapter = window.LiveGames[gameId];
-        var type = gAdapter.meta.contentType;
-        var topics = gAdapter.getTopics ? gAdapter.getTopics() : store.topicsForGame(gameId, type);
-        var pickLabel = gAdapter.pickLabel || (gAdapter.getTopics ? "Level" : "Topic");
+        var topics = gAdapter.getTopics ? gAdapter.getTopics() : store.exercisesFor(gameId);
+        var pickLabel = gAdapter.pickLabel || "Exercise";
         step.appendChild(el("div", { class: "live-label", text: "2 · " + pickLabel }));
         if (!topics.length) {
-          step.appendChild(el("p", { class: "live-muted", text: "This game has no topics enabled. Enable some in ⚙️ Manage content → Games." }));
+          step.appendChild(el("p", { class: "live-muted", text: "This game has no exercises yet. Add one in ⚙️ Manage content." }));
         } else {
           var tg = el("div", { class: "setup-grid" });
           topics.forEach(function (t) {

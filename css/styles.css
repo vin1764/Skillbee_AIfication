@@ -349,6 +349,9 @@ kbd {
 }
 .adm-ex-btn:hover { border-color: var(--accent); }
 .adm-ex-btn.danger:hover { border-color: #e5484d; color: #e5484d; }
+/* emoji + description row atop a words/sentences exercise editor */
+.adm-ex-head { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.adm-ex-head .adm-input { flex: 1; max-width: 360px; }
 
 .adm-subhead { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .adm-game-title { margin: 0; font-size: 1.2rem; }

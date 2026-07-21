@@ -38,25 +38,24 @@ loud** 🔊 so students hear correct pronunciation. Win a round to get **confett
 ## ✏️ Adding or changing the content — no coding needed
 
 Click the **⚙️ Manage content** button (top-right, or on the home screen) to open the built-in
-**content editor**. It has two modes:
+**content editor**.
 
-**📚 Content bank** — the shared master content that feeds every game:
-- **Add / edit / delete word topics** and each word (icon emoji, German, English). Words are used
-  by *Vocabulary Quiz*, *Memory* and *Hangman*.
-- **Add / edit / delete sentence topics** for *Sentence Scramble*.
+Every game keeps its own **exercises** — an exercise is one self-contained set of content
+(a batch of words, sentences, case sentences, verbs, …). This lets you build a **fresh exercise
+for each lesson and keep the previous ones**, instead of overwriting a single list.
 
-**🎮 Games** — configure each game individually:
-- Pick a game, then **tick exactly which topics that game offers** (e.g. give Hangman only a few
-  easy topics). Edits pull from the shared bank.
-- You can also **edit or add content right here** — those changes update the shared bank too.
+- **Pick a game** to see its list of exercises.
+- **➕ New exercise** starts a fresh set · **✎** renames · **⧉** duplicates (copy an old
+  exercise to build on it) · **🗑** deletes.
+- **Open an exercise** to edit its content — add/edit/remove the words, sentences or other rows.
+- When you start a game (Solo or in Live Class Mode), you **choose which exercise to play**.
 
-Common toolbar: **Export** (save everything to a file), **Import** (load a file), **Reset**
-(back to defaults). Changes are **saved automatically in that browser** and show up immediately.
+Common toolbar: **Backup** (save everything to a file), **Restore** (load a file), **Reset**
+(back to defaults). Changes are **saved automatically** and synced across your devices.
 
-> **Sharing content between teachers/devices:** because the app has no server, edits live in the
-> browser they were made in. To share a set, use **Export** on one computer and **Import** on the
-> others. (Want edits to sync automatically for everyone? That needs a small backend — ask and we
-> can add one.)
+> **Sharing content between teachers/devices:** edits sync automatically through the app's cloud,
+> so an exercise built on one device shows up on the others. **Backup** / **Restore** stays
+> available as an optional file-based safety net.
 
 ### Advanced: editing the default content in code
 

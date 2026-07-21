@@ -42,6 +42,7 @@
     return {
       meta: meta,
       timeLimit: 20000,
+      pickLabel: "Exercise",
       buildRounds: function (topic) {
         var words = (topic.words || []).filter(function (w) { return w.de && w.en; });
         var picked = kit().sample(words, Math.min(10, words.length));

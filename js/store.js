@@ -37,14 +37,33 @@
   }
 
   /* ---------------------------------------------------------------------
-     Exercises — the 5 Live-Class content games (Fall-Detektiv, Wortmonster,
-     Plural-Palast, Konjugations-Karussell, Hör gut zu!) each hold a LIST of
-     named "exercises" rather than one flat bank. A teacher can build a fresh
-     exercise for every lesson while keeping the previous ones. "cases" keeps
-     three case sub-lists per exercise; the others keep a flat "items" list.
+     Exercises — EVERY content game holds its own LIST of named "exercises".
+     A teacher builds a fresh exercise for each lesson and keeps the previous
+     ones instead of overwriting; in each game they pick which to play.
+     Each game owns its content (nothing is shared between games). Shapes:
+       words games  (quiz, memory, hangman)  -> { id, name, emoji, english, words: [...] }
+       sentence game (scramble)              -> { id, name, emoji, english, sentences: [...] }
+       cases (Fall-Detektiv)                 -> { id, name, accusative, dative, genitive }
+       item games (compounds/plurals/verbs/listening) -> { id, name, items: [...] }
      --------------------------------------------------------------------- */
+  var WORD_GAMES = ["quiz", "memory", "hangman"];
+  var ITEM_GAMES = ["compounds", "plurals", "verbs", "listening"];
+
+  function gameKind(gameKey) {
+    if (gameKey === "scramble") return "sentences";
+    if (gameKey === "cases") return "cases";
+    if (WORD_GAMES.indexOf(gameKey) >= 0) return "words";
+    return "items"; // compounds / plurals / verbs / listening
+  }
+
   function exId() {
     return "ex-" + Date.now().toString(36) + "-" + Math.floor(Math.random() * 1e4).toString(36);
+  }
+  function wordsExercise(name, words) {
+    return { id: exId(), name: name || "Exercise 1", emoji: "📚", english: "", words: Array.isArray(words) ? clone(words) : [] };
+  }
+  function sentencesExercise(name, sentences) {
+    return { id: exId(), name: name || "Exercise 1", emoji: "🗣️", english: "", sentences: Array.isArray(sentences) ? clone(sentences) : [] };
   }
   // A fresh exercise for the case game (three sub-lists). `seed` may be a legacy
   // { accusative, dative, genitive } object whose content is migrated in.
@@ -61,6 +80,31 @@
   function listExercise(name, items) {
     return { id: exId(), name: name || "Exercise 1", items: Array.isArray(items) ? clone(items) : [] };
   }
+  // Turn a legacy shared-bank topic into a per-game exercise (keeps its name/emoji).
+  function topicToExercise(topic, kind) {
+    var e = clone(topic || {});
+    if (!e.id) e.id = exId();
+    if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
+    if (typeof e.emoji !== "string") e.emoji = kind === "sentences" ? "🗣️" : "📚";
+    if (typeof e.english !== "string") e.english = "";
+    if (kind === "sentences") { if (!Array.isArray(e.sentences)) e.sentences = []; delete e.words; }
+    else { if (!Array.isArray(e.words)) e.words = []; delete e.sentences; }
+    return e;
+  }
+  function normalizeWordsEx(e) {
+    if (!e.id) e.id = exId();
+    if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
+    if (typeof e.emoji !== "string") e.emoji = "📚";
+    if (typeof e.english !== "string") e.english = "";
+    if (!Array.isArray(e.words)) e.words = [];
+  }
+  function normalizeSentencesEx(e) {
+    if (!e.id) e.id = exId();
+    if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
+    if (typeof e.emoji !== "string") e.emoji = "🗣️";
+    if (typeof e.english !== "string") e.english = "";
+    if (!Array.isArray(e.sentences)) e.sentences = [];
+  }
   function normalizeCaseEx(e) {
     if (!e.id) e.id = exId();
     if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
@@ -72,8 +116,23 @@
     if (!Array.isArray(e.items)) e.items = [];
   }
 
+  // The topics a legacy store's game offered (its selection subset, or all).
+  function legacyTopicsFor(d, gameId, type) {
+    var pool = (type === "sentences" ? d.sentences : d.vocab) || [];
+    var cfg = d.games && d.games[gameId];
+    if (!cfg || !Array.isArray(cfg.topics)) return pool;
+    var set = {};
+    cfg.topics.forEach(function (id) { set[id] = true; });
+    return pool.filter(function (t) { return set[t.id]; });
+  }
+
   function defaultExercises() {
+    var vt = (window.GameData && window.GameData.VOCAB_TOPICS) || [];
+    var st = (window.GameData && window.GameData.SENTENCE_TOPICS) || [];
+    var words = function () { return vt.map(function (t) { return topicToExercise(t, "words"); }); };
     return {
+      quiz: words(), memory: words(), hangman: words(),
+      scramble: st.map(function (t) { return topicToExercise(t, "sentences"); }),
       cases: [caseExercise("Exercise 1", defaultCases())],
       compounds: [listExercise("Exercise 1", defaultCompounds())],
       plurals: [listExercise("Exercise 1", defaultPlurals())],
@@ -83,39 +142,41 @@
   }
 
   function defaults() {
-    return {
-      vocab: clone(window.GameData.VOCAB_TOPICS),
-      sentences: clone(window.GameData.SENTENCE_TOPICS),
-      // Live-game content, seeded from the built-in data but editable and
-      // saved/synced like everything else. Each game holds named exercises.
-      exercises: defaultExercises(),
-      // Per-game topic selection. Missing entry / no "topics" list = the game
-      // uses ALL topics of its type from the bank (the default).
-      games: {}
-    };
+    // Every game holds its own named exercises, seeded from the built-in data.
+    return { exercises: defaultExercises() };
   }
 
-  // Make sure an older saved store gains the new sections instead of showing
-  // empty editors. Legacy flat banks (d.cases / d.compounds / …) are migrated
-  // into a first exercise, then dropped so exercises are the single source.
+  // Make sure any saved/imported store is in the current shape. Legacy shared
+  // banks (d.vocab / d.sentences with d.games selection, and d.cases / d.compounds
+  // / …) are migrated into per-game exercises, then dropped.
   function ensureSections(d) {
     if (!d.exercises || typeof d.exercises !== "object") d.exercises = {};
     var ex = d.exercises;
 
+    // word games — migrate the legacy shared vocab bank (honouring old per-game selection)
+    WORD_GAMES.forEach(function (g) {
+      if (!Array.isArray(ex[g])) ex[g] = legacyTopicsFor(d, g, "vocab").map(function (t) { return topicToExercise(t, "words"); });
+      if (!ex[g].length) ex[g] = [wordsExercise("Exercise 1", null)];
+      ex[g].forEach(normalizeWordsEx);
+    });
+    // sentence game (scramble)
+    if (!Array.isArray(ex.scramble)) ex.scramble = legacyTopicsFor(d, "scramble", "sentences").map(function (t) { return topicToExercise(t, "sentences"); });
+    if (!ex.scramble.length) ex.scramble = [sentencesExercise("Exercise 1", null)];
+    ex.scramble.forEach(normalizeSentencesEx);
+    // cases (Fall-Detektiv)
     if (!Array.isArray(ex.cases)) ex.cases = [caseExercise("Exercise 1", d.cases)];
-    else if (!ex.cases.length) ex.cases = [caseExercise("Exercise 1", null)];
+    if (!ex.cases.length) ex.cases = [caseExercise("Exercise 1", null)];
     ex.cases.forEach(normalizeCaseEx);
-
-    ["compounds", "plurals", "verbs", "listening"].forEach(function (k) {
+    // flat-list games
+    ITEM_GAMES.forEach(function (k) {
       if (!Array.isArray(ex[k])) ex[k] = [listExercise("Exercise 1", d[k])];
-      else if (!ex[k].length) ex[k] = [listExercise("Exercise 1", null)];
+      if (!ex[k].length) ex[k] = [listExercise("Exercise 1", null)];
       ex[k].forEach(normalizeListEx);
     });
 
-    // Legacy flat fields are now represented as exercises — drop them.
+    // Legacy fields are now represented as exercises — drop them.
+    delete d.vocab; delete d.sentences; delete d.games;
     delete d.cases; delete d.compounds; delete d.plurals; delete d.verbs; delete d.listening;
-
-    if (!d.games || typeof d.games !== "object") d.games = {};
     return d;
   }
 
@@ -136,7 +197,7 @@
         var raw = localStorage.getItem(KEY);
         if (raw) {
           var parsed = JSON.parse(raw);
-          if (parsed && Array.isArray(parsed.vocab) && Array.isArray(parsed.sentences)) {
+          if (parsed && (parsed.exercises || Array.isArray(parsed.vocab) || Array.isArray(parsed.sentences))) {
             this.data = ensureSections(parsed);
             this._ts = Number(localStorage.getItem(TS_KEY)) || 0;
             return;
@@ -231,19 +292,9 @@
       }
     },
 
-    vocabTopics: function () {
-      return this.data.vocab;
-    },
-    sentenceTopics: function () {
-      return this.data.sentences;
-    },
-
-    poolFor: function (type) {
-      return type === "sentences" ? this.data.sentences : this.data.vocab;
-    },
-
-    /* -------- Exercises (Live-Class content games) -------- */
-    // The list of exercises for one game ("cases" | "compounds" | ...).
+    /* -------- Exercises — every content game -------- */
+    gameKind: function (gameKey) { return gameKind(gameKey); },
+    // The list of exercises for one game ("quiz" | "cases" | "compounds" | ...).
     exercisesFor: function (gameKey) {
       var arr = this.data.exercises && this.data.exercises[gameKey];
       return Array.isArray(arr) ? arr : [];
@@ -255,7 +306,11 @@
       return arr[0] || null;
     },
     _blankExercise: function (gameKey, name) {
-      return gameKey === "cases" ? caseExercise(name, null) : listExercise(name, null);
+      var kind = gameKind(gameKey);
+      if (kind === "cases") return caseExercise(name, null);
+      if (kind === "words") return wordsExercise(name, null);
+      if (kind === "sentences") return sentencesExercise(name, null);
+      return listExercise(name, null);
     },
     addExercise: function (gameKey, name) {
       var arr = this.exercisesFor(gameKey);
@@ -296,61 +351,6 @@
     verbsData: function () { var e = this.exercise("verbs"); return e ? e.items : []; },
     listeningData: function () { var e = this.exercise("listening"); return e ? e.items : []; },
 
-    /* Topics a given game should offer (its selected subset, or all by default). */
-    topicsForGame: function (gameId, type) {
-      var pool = this.poolFor(type);
-      var cfg = this.data.games && this.data.games[gameId];
-      if (!cfg || !cfg.topics) return pool;
-      var set = {};
-      cfg.topics.forEach(function (id) { set[id] = true; });
-      return pool.filter(function (t) { return set[t.id]; });
-    },
-
-    isTopicInGame: function (gameId, topicId) {
-      var cfg = this.data.games && this.data.games[gameId];
-      if (!cfg || !cfg.topics) return true; // "all" by default
-      return cfg.topics.indexOf(topicId) !== -1;
-    },
-
-    setTopicInGame: function (gameId, topicId, type, on) {
-      if (!this.data.games) this.data.games = {};
-      var cfg = this.data.games[gameId];
-      if (!cfg || !cfg.topics) {
-        // Was "all" — materialize the full list so unchecking one keeps the rest.
-        cfg = { topics: this.poolFor(type).map(function (t) { return t.id; }) };
-        this.data.games[gameId] = cfg;
-      }
-      var i = cfg.topics.indexOf(topicId);
-      if (on && i === -1) cfg.topics.push(topicId);
-      if (!on && i !== -1) cfg.topics.splice(i, 1);
-      this.save();
-    },
-
-    /* When a new topic is added from a game view, include it there if that
-       game already has an explicit selection (otherwise "all" already covers it). */
-    includeTopicIfConfigured: function (gameId, topicId) {
-      var cfg = this.data.games && this.data.games[gameId];
-      if (cfg && cfg.topics && cfg.topics.indexOf(topicId) === -1) cfg.topics.push(topicId);
-    },
-
-    /* Drop a deleted topic id from every game's selection. */
-    pruneTopic: function (topicId) {
-      var games = this.data.games || {};
-      Object.keys(games).forEach(function (gid) {
-        var cfg = games[gid];
-        if (cfg && cfg.topics) {
-          var i = cfg.topics.indexOf(topicId);
-          if (i !== -1) cfg.topics.splice(i, 1);
-        }
-      });
-    },
-
-    enabledCount: function (gameId, type) {
-      var pool = this.poolFor(type);
-      var self = this;
-      return pool.filter(function (t) { return self.isTopicInGame(gameId, t.id); }).length;
-    },
-
     newId: function (prefix) {
       return (
         (prefix || "id") +
@@ -367,7 +367,8 @@
 
     importJSON: function (text) {
       var parsed = JSON.parse(text);
-      if (!parsed || !Array.isArray(parsed.vocab) || !Array.isArray(parsed.sentences)) {
+      if (!parsed || typeof parsed !== "object" ||
+          (!parsed.exercises && !Array.isArray(parsed.vocab) && !Array.isArray(parsed.sentences))) {
         throw new Error("The file is not in the right format.");
       }
       this.data = ensureSections(parsed);

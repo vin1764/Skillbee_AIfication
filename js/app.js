@@ -320,10 +320,10 @@ const App = (function () {
     );
   }
 
-  /* ---- topic picker (shown before a game starts) ------------------- */
+  /* ---- exercise picker (shown before a game starts) ---------------- */
   function openTopicPicker(game) {
     const usesSentences = game.contentType === "sentences";
-    const topics = window.ContentStore.topicsForGame(game.id, usesSentences ? "sentences" : "vocab");
+    const exercises = window.ContentStore.exercisesFor(game.id);
     const main = document.getElementById("screen");
     main.innerHTML = "";
 
@@ -331,31 +331,31 @@ const App = (function () {
       el("div", { class: "picker" }, [
         el("button", { class: "back-link", html: "← Back", on: { click: () => showHome() } }),
         el("h2", { class: "picker-title", html: `${game.emoji} ${game.name}` }),
-        el("p", { class: "picker-sub", text: usesSentences ? "Choose a topic for the sentences:" : "Choose a vocabulary topic:" })
+        el("p", { class: "picker-sub", text: "Choose an exercise:" })
       ])
     );
 
-    if (!topics.length) {
+    if (!exercises.length) {
       main.appendChild(
         el("p", {
           class: "picker-empty",
-          html: "No topics are enabled for this game yet. Add or enable topics in <b>⚙️ Manage content → Games</b>."
+          html: "No exercises for this game yet. Add one in <b>⚙️ Manage content</b>."
         })
       );
       return;
     }
 
     const grid = el("div", { class: "topic-grid" });
-    topics.forEach((topic) => {
-      const count = usesSentences ? topic.sentences.length : topic.words.length;
+    exercises.forEach((ex) => {
+      const count = usesSentences ? (ex.sentences || []).length : (ex.words || []).length;
       grid.appendChild(
         el(
           "button",
-          { class: "topic-card", on: { click: () => launch(game, topic) } },
+          { class: "topic-card", on: { click: () => launch(game, ex) } },
           [
-            el("div", { class: "topic-emoji", text: topic.emoji }),
-            el("div", { class: "topic-name", text: topic.name }),
-            el("div", { class: "topic-en", text: topic.english }),
+            el("div", { class: "topic-emoji", text: ex.emoji || (usesSentences ? "🗣️" : "📚") }),
+            el("div", { class: "topic-name", text: ex.name }),
+            el("div", { class: "topic-en", text: ex.english || "" }),
             el("div", { class: "topic-count", text: `${count} ${usesSentences ? "sentences" : "words"}` })
           ]
         )
