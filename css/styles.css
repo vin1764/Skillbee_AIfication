@@ -522,6 +522,13 @@ kbd {
 .adm-verb-forms { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; margin-top: 8px; }
 .adm-verb-field { display: flex; flex-direction: column; gap: 3px; }
 .adm-verb-lbl { font-size: 0.72rem; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; }
+/* Hör-Paare editor — each "question" is one matching round of ≥3 word rows */
+.adm-pairs-q { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 12px; background: #fff; }
+.adm-pairs-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.adm-pairs-title { margin: 0; font-size: 1rem; font-weight: 800; color: var(--ink); }
+.adm-pairs-count { font-size: 0.82rem; font-weight: 700; color: var(--good); }
+.adm-pairs-count.warn { color: var(--bad); }
+.adm-pairs-head .adm-del { margin-left: auto; }
 @media (max-width: 560px) {
   .adm-compound-row { display: flex; flex-wrap: wrap; }
   .adm-compound-row > .adm-input, .adm-compound-row > .adm-gender { flex: 1 1 40%; }
@@ -790,9 +797,51 @@ kbd {
 .res-good .live-card { border-color: var(--good); }
 .res-bad .live-card { border-color: var(--bad); }
 
+/* =====================================================================
+   Hör-Paare (Listen & Match Pairs) — individual match game
+   ===================================================================== */
+/* Host — a live progress bar per student instead of a shared prompt. */
+.match-host-tag { text-align: center; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 1px; font-weight: 800; font-size: 0.9rem; margin-bottom: 16px; }
+.match-progress { max-width: 620px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+.match-prow { display: flex; align-items: center; gap: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; box-shadow: var(--shadow); }
+.match-prow.done { border-color: var(--good); background: #eafaf7; }
+.match-pname { flex: 0 0 32%; font-weight: 700; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.match-pbar { flex: 1; height: 14px; background: #e8ecf7; border-radius: 999px; overflow: hidden; }
+.match-pfill { height: 100%; width: 0; background: var(--grad); border-radius: 999px; transition: width 0.4s ease; }
+.match-prow.done .match-pfill { background: var(--good); }
+.match-pcount { flex: 0 0 auto; font-weight: 900; font-variant-numeric: tabular-nums; color: var(--skb-dark); min-width: 3.2em; text-align: right; }
+
+/* Player — two independently-shuffled columns of tap tiles. */
+.match-count { font-weight: 800; color: var(--ink-soft); }
+.match-count-n { font-weight: 900; color: var(--skb); font-variant-numeric: tabular-nums; }
+.match-board { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.match-col { display: flex; flex-direction: column; gap: 10px; }
+.match-tile {
+  --lip: rgba(11, 63, 221, 0.18);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  min-height: 74px; border-radius: 16px; padding: 12px 10px; font-weight: 800;
+  background: var(--card); border: 2px solid var(--line); box-shadow: 0 5px 0 var(--lip);
+  transition: transform 0.06s, box-shadow 0.06s, background 0.15s, border-color 0.15s;
+  text-align: center; overflow-wrap: anywhere; line-height: 1.25;
+}
+.match-tile:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--lip); }
+.match-tile[disabled] { cursor: default; }
+.match-tile .match-ico { font-size: 1.9rem; line-height: 1; }
+.match-tile .match-slabel { font-size: 0.72rem; color: var(--ink-soft); font-weight: 700; }
+.match-tile .match-memoji { font-size: 1.7rem; line-height: 1; }
+.match-tile .match-mtext { font-size: 1.02rem; }
+.match-tile.speaker { color: var(--skb-dark); }
+.match-tile.sel { border-color: var(--skb); background: var(--skb-tint); box-shadow: 0 5px 0 rgba(11, 63, 221, 0.30); }
+.match-tile.done { border-color: var(--good); background: #eafaf7; color: var(--good); box-shadow: none; opacity: 0.92; }
+.match-tile.done .match-slabel { color: var(--good); font-weight: 800; }
+.match-tile.done:active { transform: none; }
+.match-tile.wrong { border-color: var(--bad); background: #fdecec; color: var(--bad); animation: matchShake 0.4s ease; }
+@keyframes matchShake { 0%,100%{transform:translateX(0);} 20%{transform:translateX(-6px);} 40%{transform:translateX(6px);} 60%{transform:translateX(-4px);} 80%{transform:translateX(4px);} }
+
 @media (max-width: 560px) {
   .live-choice { grid-template-columns: 1fr; }
   .live-q-options.board { grid-template-columns: 1fr; }
+  .match-pname { flex-basis: 28%; }
 }
 
 /* =====================================================================

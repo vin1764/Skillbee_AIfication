@@ -422,8 +422,14 @@
         { id: "compounds", name: "Wortmonster", emoji: "🧟", color: "#22c55e" },
         { id: "plurals", name: "Plural-Palast", emoji: "🏰", color: "#e0731c" },
         { id: "verbs", name: "Konjugations-Karussell", emoji: "🎠", color: "#e11d74" },
-        { id: "listening", name: "Hör gut zu!", emoji: "👂", color: "#0ea5b7" }
+        { id: "listening", name: "Hör gut zu!", emoji: "👂", color: "#0ea5b7" },
+        { id: "hoerpaare", name: "Hör-Paare", emoji: "🎧", color: "#06b6d4" }
       ];
+      function liveKind(id) {
+        if (id === "cases") return "cases";
+        if (id === "hoerpaare") return "pairs";
+        return "items";
+      }
       // The full set of content games (Solo word/sentence games + Live games),
       // each tagged with the "kind" that selects its editor.
       function allGames() {
@@ -432,8 +438,7 @@
                    kind: g.contentType === "sentences" ? "sentences" : "words", live: false };
         });
         LIVE_GAMES.forEach(function (g) {
-          out.push({ id: g.id, name: g.name, emoji: g.emoji, color: g.color,
-                     kind: g.id === "cases" ? "cases" : "items", live: true });
+          out.push({ id: g.id, name: g.name, emoji: g.emoji, color: g.color, kind: liveKind(g.id), live: true });
         });
         return out;
       }
@@ -487,11 +492,13 @@
         if (kind === "cases") return (ex.accusative || []).length + (ex.dative || []).length + (ex.genitive || []).length;
         if (kind === "words") return (ex.words || []).length;
         if (kind === "sentences") return (ex.sentences || []).length;
+        if (kind === "pairs") return (ex.questions || []).length;
         return (ex.items || []).length;
       }
       function unitFor(id, kind) {
         if (kind === "words") return " words";
         if (kind === "sentences") return " sentences";
+        if (kind === "pairs") return " questions";
         if (id === "plurals") return " nouns";
         if (id === "verbs") return " verbs";
         if (id === "listening") return " prompts";
@@ -606,6 +613,7 @@
         ]));
         if (game.kind === "words") renderWordsExercise(body, ex);
         else if (game.kind === "sentences") renderSentencesExercise(body, ex);
+        else if (game.kind === "pairs") renderPairsExercise(body, ex);
         else if (currentGame === "cases") renderCases(body, ex);
         else if (currentGame === "compounds") renderCompounds(body, ex);
         else if (currentGame === "plurals") renderPlurals(body, ex);
@@ -675,6 +683,52 @@
           );
         });
         body.appendChild(addRowBtn("+ Sentence", function () { list.push({ de: "", en: "" }); store.save(); render(); }));
+      }
+
+      /* ---- Hör-Paare editor (Listen & Match): each exercise = N questions, each ≥3 words ---- */
+      function renderPairsExercise(body, ex) {
+        body.appendChild(
+          el("p", {
+            class: "adm-hint",
+            html:
+              "These power <b>🎧 Hör-Paare</b> in Live Class Mode. Each <b>question</b> is one matching round: students hear the German words and tap the English meaning that matches. " +
+              "Give every question <b>at least 3 words</b>. The German is spoken with the app's voice (generated audio where available, otherwise the device voice). Changes save automatically."
+          })
+        );
+        body.appendChild(el("div", { class: "adm-ex-head" }, [ input(ex, "emoji", "🎧", "adm-emoji", 6) ]));
+        if (!Array.isArray(ex.questions)) ex.questions = [];
+        var list = ex.questions;
+        if (!list.length) body.appendChild(emptyState("No questions yet — add the first one below."));
+        list.forEach(function (q, qi) {
+          if (!Array.isArray(q.words)) q.words = [];
+          var complete = q.words.filter(function (w) { return w.de && w.en; }).length;
+          var card = el("div", { class: "adm-pairs-q" });
+          card.appendChild(el("div", { class: "adm-pairs-head" }, [
+            el("h4", { class: "adm-pairs-title", text: "Question " + (qi + 1) }),
+            el("span", { class: "adm-pairs-count" + (complete < 3 ? " warn" : ""), text: complete + (complete === 1 ? " word" : " words") + (complete < 3 ? " · needs at least 3" : "") }),
+            el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove this question" }, on: { click: function () { list.splice(qi, 1); store.save(); render(); } } })
+          ]));
+          card.appendChild(el("div", { class: "adm-row adm-row-head adm-pairs-row" }, [
+            el("span", { class: "adm-emoji-h", text: "Icon" }),
+            el("span", { text: "German (spoken)" }),
+            el("span", { text: "English (meaning)" }),
+            el("span", {})
+          ]));
+          q.words.forEach(function (w, wi) {
+            card.appendChild(el("div", { class: "adm-row adm-pairs-row" }, [
+              input(w, "emoji", "🙂", "adm-emoji", 6),
+              input(w, "de", "e.g. der Hund", "adm-input"),
+              input(w, "en", "e.g. the dog", "adm-input"),
+              delRowBtn("Remove word", function () { q.words.splice(wi, 1); store.save(); render(); })
+            ]));
+          });
+          card.appendChild(addRowBtn("+ Word", function () { q.words.push({ de: "", en: "", emoji: "" }); store.save(); render(); }));
+          body.appendChild(card);
+        });
+        body.appendChild(addRowBtn("+ Question", function () {
+          list.push({ words: [{ de: "", en: "", emoji: "" }, { de: "", en: "", emoji: "" }, { de: "", en: "", emoji: "" }] });
+          store.save(); render();
+        }));
       }
 
       function delRowBtn(title, onClick) {

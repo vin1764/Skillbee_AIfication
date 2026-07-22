@@ -586,6 +586,60 @@
     speakOnReveal: function (round) { return round.correct; }
   };
 
+  /* ---- Hör-Paare (Listen & Match Pairs): tap a speaker, then its meaning ----
+     UNLIKE every other Live game, this one is INDIVIDUAL: each phone works
+     through the same set of words at its own pace, with its own shuffled tiles.
+     The host shows a live progress bar per student instead of a shared prompt.
+     Scoring rewards completeness and speed, and deducts for wrong taps. The
+     Live controller (live.js) branches on `match: true` to drive this flow. */
+
+  // A round's usable pairs — each needs both German (to speak) and English.
+  function validPairs(q) {
+    return (((q && q.words) || [])).filter(function (w) {
+      return w && w.de && w.en;
+    }).map(function (w) {
+      return { de: w.de, en: w.en, emoji: w.emoji || "" };
+    });
+  }
+
+  var hoerpaareAdapter = {
+    meta: { name: "Hör-Paare", emoji: "🎧", contentType: "pairs" },
+    timeLimit: 60000, // students self-pace through several pairs at once
+    pickLabel: "Exercise",
+    match: true,      // individual match flow (see live.js)
+    audioSpeed: true, // host can pick the playback speed at setup
+    getTopics: function () {
+      var store = window.ContentStore;
+      var list = (store && store.exercisesFor) ? store.exercisesFor("hoerpaare") : [];
+      return list.map(function (e) {
+        var n = (e.questions || []).filter(function (q) { return validPairs(q).length >= 3; }).length;
+        return { id: e.id, name: e.name, emoji: e.emoji || "🎧", english: n + (n === 1 ? " round" : " rounds") };
+      });
+    },
+    buildRounds: function (topic) {
+      var store = window.ContentStore;
+      var e = (store && store.exercise) ? store.exercise("hoerpaare", topic && topic.id) : null;
+      var rounds = [];
+      ((e && e.questions) || []).forEach(function (q) {
+        var pairs = validPairs(q).slice(0, 6); // up to 6 pairs on screen at once
+        if (pairs.length >= 3) rounds.push({ type: "pairs", words: pairs });
+      });
+      return rounds.slice(0, 20);
+    },
+    // The generic controller never calls these for a match game, but provide
+    // gentle fallbacks so nothing breaks if it ever does.
+    hostContent: function (el, round) {
+      return el("div", { class: "live-q" }, [
+        el("div", { class: "live-q-tag", text: "🎧 Match every word to its meaning" })
+      ]);
+    },
+    playerContent: function (el, round) {
+      return el("div", { class: "live-muted", text: "Loading…" });
+    },
+    correctLabel: function (round) { return "All " + ((round.words || []).length) + " pairs"; },
+    speakOnReveal: function () { return null; }
+  };
+
   window.LiveGames = {
     quiz: choiceAdapter({ name: "Vocabulary Quiz", emoji: "🎯", contentType: "vocab" }),
     memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" }),
@@ -594,6 +648,7 @@
     plural: pluralAdapter,
     verben: verbAdapter,
     uhrzeit: timeAdapter,
-    listen: listenAdapter
+    listen: listenAdapter,
+    hoerpaare: hoerpaareAdapter
   };
 })();

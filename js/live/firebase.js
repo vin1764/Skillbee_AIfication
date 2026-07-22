@@ -123,6 +123,16 @@
       var ref = db.collection("sessions").doc(code).collection("answers").doc(id);
       return ref.set(Object.assign({ questionIndex: qIndex, studentId: studentId, ts: serverTs() }, payload));
     },
+    // Per-match progress for the individual match game (Hör-Paare). Each matched
+    // pair — and the final "done" state — is its own write-once document, so the
+    // host can show a live progress bar per student. `key` (the running matched
+    // count) makes each id unique per milestone. Reuses the same write-once
+    // answers rule, so no security-rules change is needed.
+    submitProgress: function (code, qIndex, studentId, key, payload) {
+      var id = qIndex + "_" + studentId + "_" + key;
+      var ref = db.collection("sessions").doc(code).collection("answers").doc(id);
+      return ref.set(Object.assign({ questionIndex: qIndex, studentId: studentId, ts: serverTs() }, payload));
+    },
     listenAnswers: function (code, qIndex, cb) {
       return db
         .collection("sessions").doc(code).collection("answers")

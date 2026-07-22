@@ -52,6 +52,7 @@
   function gameKind(gameKey) {
     if (gameKey === "scramble") return "sentences";
     if (gameKey === "cases") return "cases";
+    if (gameKey === "hoerpaare") return "pairs";
     if (WORD_GAMES.indexOf(gameKey) >= 0) return "words";
     return "items"; // compounds / plurals / verbs / listening
   }
@@ -115,6 +116,27 @@
     if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
     if (!Array.isArray(e.items)) e.items = [];
   }
+  // Hör-Paare (Listen & Match): an exercise is a list of "questions", and each
+  // question is a set of words (min 3) students match audio-to-meaning.
+  function pairsExercise(name, questions) {
+    return { id: exId(), name: name || "Exercise 1", emoji: "🎧", questions: Array.isArray(questions) ? clone(questions) : [] };
+  }
+  function normalizePairsEx(e) {
+    if (!e.id) e.id = exId();
+    if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
+    if (typeof e.emoji !== "string") e.emoji = "🎧";
+    if (!Array.isArray(e.questions)) e.questions = [];
+    e.questions = e.questions.filter(function (q) { return q && typeof q === "object"; });
+    e.questions.forEach(function (q) { if (!Array.isArray(q.words)) q.words = []; });
+  }
+  // Seed Hör-Paare with a few ready-made questions (4 words each) from the vocab.
+  function defaultPairsQuestions() {
+    var vt = (window.GameData && window.GameData.VOCAB_TOPICS) || [];
+    var pick = ["zahlen", "farben", "tiere", "essen"];
+    return vt.filter(function (t) { return pick.indexOf(t.id) >= 0; }).map(function (t) {
+      return { words: (t.words || []).slice(0, 4).map(function (w) { return { de: w.de, en: w.en, emoji: w.emoji || "" }; }) };
+    });
+  }
 
   // The topics a legacy store's game offered (its selection subset, or all).
   function legacyTopicsFor(d, gameId, type) {
@@ -145,7 +167,8 @@
       compounds: [listExercise("Exercise 1", defaultCompounds())],
       plurals: [listExercise("Exercise 1", defaultPlurals())],
       verbs: [listExercise("Exercise 1", defaultVerbs())],
-      listening: [listExercise("Exercise 1", defaultListening())]
+      listening: [listExercise("Exercise 1", defaultListening())],
+      hoerpaare: [pairsExercise("Exercise 1", defaultPairsQuestions())]
     };
   }
 
@@ -181,6 +204,10 @@
       if (!ex[k].length) ex[k] = [listExercise("Exercise 1", null)];
       ex[k].forEach(normalizeListEx);
     });
+    // Hör-Paare (pairs)
+    if (!Array.isArray(ex.hoerpaare)) ex.hoerpaare = [pairsExercise("Exercise 1", defaultPairsQuestions())];
+    if (!ex.hoerpaare.length) ex.hoerpaare = [pairsExercise("Exercise 1", null)];
+    ex.hoerpaare.forEach(normalizePairsEx);
 
     // Legacy fields are now represented as exercises — drop them.
     delete d.vocab; delete d.sentences; delete d.games;
@@ -318,6 +345,7 @@
       if (kind === "cases") return caseExercise(name, null);
       if (kind === "words") return wordsExercise(name, null);
       if (kind === "sentences") return sentencesExercise(name, null);
+      if (kind === "pairs") return pairsExercise(name, [{ words: [{ de: "", en: "", emoji: "" }, { de: "", en: "", emoji: "" }, { de: "", en: "", emoji: "" }] }]);
       return listExercise(name, null);
     },
     addExercise: function (gameKey, name) {

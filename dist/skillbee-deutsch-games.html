@@ -530,6 +530,13 @@ kbd {
 .adm-verb-forms { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; margin-top: 8px; }
 .adm-verb-field { display: flex; flex-direction: column; gap: 3px; }
 .adm-verb-lbl { font-size: 0.72rem; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; }
+/* Hör-Paare editor — each "question" is one matching round of ≥3 word rows */
+.adm-pairs-q { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 12px; background: #fff; }
+.adm-pairs-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.adm-pairs-title { margin: 0; font-size: 1rem; font-weight: 800; color: var(--ink); }
+.adm-pairs-count { font-size: 0.82rem; font-weight: 700; color: var(--good); }
+.adm-pairs-count.warn { color: var(--bad); }
+.adm-pairs-head .adm-del { margin-left: auto; }
 @media (max-width: 560px) {
   .adm-compound-row { display: flex; flex-wrap: wrap; }
   .adm-compound-row > .adm-input, .adm-compound-row > .adm-gender { flex: 1 1 40%; }
@@ -798,9 +805,51 @@ kbd {
 .res-good .live-card { border-color: var(--good); }
 .res-bad .live-card { border-color: var(--bad); }
 
+/* =====================================================================
+   Hör-Paare (Listen & Match Pairs) — individual match game
+   ===================================================================== */
+/* Host — a live progress bar per student instead of a shared prompt. */
+.match-host-tag { text-align: center; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 1px; font-weight: 800; font-size: 0.9rem; margin-bottom: 16px; }
+.match-progress { max-width: 620px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+.match-prow { display: flex; align-items: center; gap: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; box-shadow: var(--shadow); }
+.match-prow.done { border-color: var(--good); background: #eafaf7; }
+.match-pname { flex: 0 0 32%; font-weight: 700; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.match-pbar { flex: 1; height: 14px; background: #e8ecf7; border-radius: 999px; overflow: hidden; }
+.match-pfill { height: 100%; width: 0; background: var(--grad); border-radius: 999px; transition: width 0.4s ease; }
+.match-prow.done .match-pfill { background: var(--good); }
+.match-pcount { flex: 0 0 auto; font-weight: 900; font-variant-numeric: tabular-nums; color: var(--skb-dark); min-width: 3.2em; text-align: right; }
+
+/* Player — two independently-shuffled columns of tap tiles. */
+.match-count { font-weight: 800; color: var(--ink-soft); }
+.match-count-n { font-weight: 900; color: var(--skb); font-variant-numeric: tabular-nums; }
+.match-board { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.match-col { display: flex; flex-direction: column; gap: 10px; }
+.match-tile {
+  --lip: rgba(11, 63, 221, 0.18);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  min-height: 74px; border-radius: 16px; padding: 12px 10px; font-weight: 800;
+  background: var(--card); border: 2px solid var(--line); box-shadow: 0 5px 0 var(--lip);
+  transition: transform 0.06s, box-shadow 0.06s, background 0.15s, border-color 0.15s;
+  text-align: center; overflow-wrap: anywhere; line-height: 1.25;
+}
+.match-tile:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--lip); }
+.match-tile[disabled] { cursor: default; }
+.match-tile .match-ico { font-size: 1.9rem; line-height: 1; }
+.match-tile .match-slabel { font-size: 0.72rem; color: var(--ink-soft); font-weight: 700; }
+.match-tile .match-memoji { font-size: 1.7rem; line-height: 1; }
+.match-tile .match-mtext { font-size: 1.02rem; }
+.match-tile.speaker { color: var(--skb-dark); }
+.match-tile.sel { border-color: var(--skb); background: var(--skb-tint); box-shadow: 0 5px 0 rgba(11, 63, 221, 0.30); }
+.match-tile.done { border-color: var(--good); background: #eafaf7; color: var(--good); box-shadow: none; opacity: 0.92; }
+.match-tile.done .match-slabel { color: var(--good); font-weight: 800; }
+.match-tile.done:active { transform: none; }
+.match-tile.wrong { border-color: var(--bad); background: #fdecec; color: var(--bad); animation: matchShake 0.4s ease; }
+@keyframes matchShake { 0%,100%{transform:translateX(0);} 20%{transform:translateX(-6px);} 40%{transform:translateX(6px);} 60%{transform:translateX(-4px);} 80%{transform:translateX(4px);} }
+
 @media (max-width: 560px) {
   .live-choice { grid-template-columns: 1fr; }
   .live-q-options.board { grid-template-columns: 1fr; }
+  .match-pname { flex-basis: 28%; }
 }
 
 /* =====================================================================
@@ -1332,6 +1381,7 @@ window.SkillbeeBrand = {
   function gameKind(gameKey) {
     if (gameKey === "scramble") return "sentences";
     if (gameKey === "cases") return "cases";
+    if (gameKey === "hoerpaare") return "pairs";
     if (WORD_GAMES.indexOf(gameKey) >= 0) return "words";
     return "items"; // compounds / plurals / verbs / listening
   }
@@ -1395,6 +1445,27 @@ window.SkillbeeBrand = {
     if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
     if (!Array.isArray(e.items)) e.items = [];
   }
+  // Hör-Paare (Listen & Match): an exercise is a list of "questions", and each
+  // question is a set of words (min 3) students match audio-to-meaning.
+  function pairsExercise(name, questions) {
+    return { id: exId(), name: name || "Exercise 1", emoji: "🎧", questions: Array.isArray(questions) ? clone(questions) : [] };
+  }
+  function normalizePairsEx(e) {
+    if (!e.id) e.id = exId();
+    if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
+    if (typeof e.emoji !== "string") e.emoji = "🎧";
+    if (!Array.isArray(e.questions)) e.questions = [];
+    e.questions = e.questions.filter(function (q) { return q && typeof q === "object"; });
+    e.questions.forEach(function (q) { if (!Array.isArray(q.words)) q.words = []; });
+  }
+  // Seed Hör-Paare with a few ready-made questions (4 words each) from the vocab.
+  function defaultPairsQuestions() {
+    var vt = (window.GameData && window.GameData.VOCAB_TOPICS) || [];
+    var pick = ["zahlen", "farben", "tiere", "essen"];
+    return vt.filter(function (t) { return pick.indexOf(t.id) >= 0; }).map(function (t) {
+      return { words: (t.words || []).slice(0, 4).map(function (w) { return { de: w.de, en: w.en, emoji: w.emoji || "" }; }) };
+    });
+  }
 
   // The topics a legacy store's game offered (its selection subset, or all).
   function legacyTopicsFor(d, gameId, type) {
@@ -1425,7 +1496,8 @@ window.SkillbeeBrand = {
       compounds: [listExercise("Exercise 1", defaultCompounds())],
       plurals: [listExercise("Exercise 1", defaultPlurals())],
       verbs: [listExercise("Exercise 1", defaultVerbs())],
-      listening: [listExercise("Exercise 1", defaultListening())]
+      listening: [listExercise("Exercise 1", defaultListening())],
+      hoerpaare: [pairsExercise("Exercise 1", defaultPairsQuestions())]
     };
   }
 
@@ -1461,6 +1533,10 @@ window.SkillbeeBrand = {
       if (!ex[k].length) ex[k] = [listExercise("Exercise 1", null)];
       ex[k].forEach(normalizeListEx);
     });
+    // Hör-Paare (pairs)
+    if (!Array.isArray(ex.hoerpaare)) ex.hoerpaare = [pairsExercise("Exercise 1", defaultPairsQuestions())];
+    if (!ex.hoerpaare.length) ex.hoerpaare = [pairsExercise("Exercise 1", null)];
+    ex.hoerpaare.forEach(normalizePairsEx);
 
     // Legacy fields are now represented as exercises — drop them.
     delete d.vocab; delete d.sentences; delete d.games;
@@ -1598,6 +1674,7 @@ window.SkillbeeBrand = {
       if (kind === "cases") return caseExercise(name, null);
       if (kind === "words") return wordsExercise(name, null);
       if (kind === "sentences") return sentencesExercise(name, null);
+      if (kind === "pairs") return pairsExercise(name, [{ words: [{ de: "", en: "", emoji: "" }, { de: "", en: "", emoji: "" }, { de: "", en: "", emoji: "" }] }]);
       return listExercise(name, null);
     },
     addExercise: function (gameKey, name) {
@@ -3516,8 +3593,14 @@ document.addEventListener("DOMContentLoaded", App.init);
         { id: "compounds", name: "Wortmonster", emoji: "🧟", color: "#22c55e" },
         { id: "plurals", name: "Plural-Palast", emoji: "🏰", color: "#e0731c" },
         { id: "verbs", name: "Konjugations-Karussell", emoji: "🎠", color: "#e11d74" },
-        { id: "listening", name: "Hör gut zu!", emoji: "👂", color: "#0ea5b7" }
+        { id: "listening", name: "Hör gut zu!", emoji: "👂", color: "#0ea5b7" },
+        { id: "hoerpaare", name: "Hör-Paare", emoji: "🎧", color: "#06b6d4" }
       ];
+      function liveKind(id) {
+        if (id === "cases") return "cases";
+        if (id === "hoerpaare") return "pairs";
+        return "items";
+      }
       // The full set of content games (Solo word/sentence games + Live games),
       // each tagged with the "kind" that selects its editor.
       function allGames() {
@@ -3526,8 +3609,7 @@ document.addEventListener("DOMContentLoaded", App.init);
                    kind: g.contentType === "sentences" ? "sentences" : "words", live: false };
         });
         LIVE_GAMES.forEach(function (g) {
-          out.push({ id: g.id, name: g.name, emoji: g.emoji, color: g.color,
-                     kind: g.id === "cases" ? "cases" : "items", live: true });
+          out.push({ id: g.id, name: g.name, emoji: g.emoji, color: g.color, kind: liveKind(g.id), live: true });
         });
         return out;
       }
@@ -3581,11 +3663,13 @@ document.addEventListener("DOMContentLoaded", App.init);
         if (kind === "cases") return (ex.accusative || []).length + (ex.dative || []).length + (ex.genitive || []).length;
         if (kind === "words") return (ex.words || []).length;
         if (kind === "sentences") return (ex.sentences || []).length;
+        if (kind === "pairs") return (ex.questions || []).length;
         return (ex.items || []).length;
       }
       function unitFor(id, kind) {
         if (kind === "words") return " words";
         if (kind === "sentences") return " sentences";
+        if (kind === "pairs") return " questions";
         if (id === "plurals") return " nouns";
         if (id === "verbs") return " verbs";
         if (id === "listening") return " prompts";
@@ -3700,6 +3784,7 @@ document.addEventListener("DOMContentLoaded", App.init);
         ]));
         if (game.kind === "words") renderWordsExercise(body, ex);
         else if (game.kind === "sentences") renderSentencesExercise(body, ex);
+        else if (game.kind === "pairs") renderPairsExercise(body, ex);
         else if (currentGame === "cases") renderCases(body, ex);
         else if (currentGame === "compounds") renderCompounds(body, ex);
         else if (currentGame === "plurals") renderPlurals(body, ex);
@@ -3769,6 +3854,52 @@ document.addEventListener("DOMContentLoaded", App.init);
           );
         });
         body.appendChild(addRowBtn("+ Sentence", function () { list.push({ de: "", en: "" }); store.save(); render(); }));
+      }
+
+      /* ---- Hör-Paare editor (Listen & Match): each exercise = N questions, each ≥3 words ---- */
+      function renderPairsExercise(body, ex) {
+        body.appendChild(
+          el("p", {
+            class: "adm-hint",
+            html:
+              "These power <b>🎧 Hör-Paare</b> in Live Class Mode. Each <b>question</b> is one matching round: students hear the German words and tap the English meaning that matches. " +
+              "Give every question <b>at least 3 words</b>. The German is spoken with the app's voice (generated audio where available, otherwise the device voice). Changes save automatically."
+          })
+        );
+        body.appendChild(el("div", { class: "adm-ex-head" }, [ input(ex, "emoji", "🎧", "adm-emoji", 6) ]));
+        if (!Array.isArray(ex.questions)) ex.questions = [];
+        var list = ex.questions;
+        if (!list.length) body.appendChild(emptyState("No questions yet — add the first one below."));
+        list.forEach(function (q, qi) {
+          if (!Array.isArray(q.words)) q.words = [];
+          var complete = q.words.filter(function (w) { return w.de && w.en; }).length;
+          var card = el("div", { class: "adm-pairs-q" });
+          card.appendChild(el("div", { class: "adm-pairs-head" }, [
+            el("h4", { class: "adm-pairs-title", text: "Question " + (qi + 1) }),
+            el("span", { class: "adm-pairs-count" + (complete < 3 ? " warn" : ""), text: complete + (complete === 1 ? " word" : " words") + (complete < 3 ? " · needs at least 3" : "") }),
+            el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove this question" }, on: { click: function () { list.splice(qi, 1); store.save(); render(); } } })
+          ]));
+          card.appendChild(el("div", { class: "adm-row adm-row-head adm-pairs-row" }, [
+            el("span", { class: "adm-emoji-h", text: "Icon" }),
+            el("span", { text: "German (spoken)" }),
+            el("span", { text: "English (meaning)" }),
+            el("span", {})
+          ]));
+          q.words.forEach(function (w, wi) {
+            card.appendChild(el("div", { class: "adm-row adm-pairs-row" }, [
+              input(w, "emoji", "🙂", "adm-emoji", 6),
+              input(w, "de", "e.g. der Hund", "adm-input"),
+              input(w, "en", "e.g. the dog", "adm-input"),
+              delRowBtn("Remove word", function () { q.words.splice(wi, 1); store.save(); render(); })
+            ]));
+          });
+          card.appendChild(addRowBtn("+ Word", function () { q.words.push({ de: "", en: "", emoji: "" }); store.save(); render(); }));
+          body.appendChild(card);
+        });
+        body.appendChild(addRowBtn("+ Question", function () {
+          list.push({ words: [{ de: "", en: "", emoji: "" }, { de: "", en: "", emoji: "" }, { de: "", en: "", emoji: "" }] });
+          store.save(); render();
+        }));
       }
 
       function delRowBtn(title, onClick) {
@@ -3964,6 +4095,16 @@ document.addEventListener("DOMContentLoaded", App.init);
     /* ---------------- answers ---------------- */
     submitAnswer: function (code, qIndex, studentId, payload) {
       var id = qIndex + "_" + studentId; // one answer per student per question
+      var ref = db.collection("sessions").doc(code).collection("answers").doc(id);
+      return ref.set(Object.assign({ questionIndex: qIndex, studentId: studentId, ts: serverTs() }, payload));
+    },
+    // Per-match progress for the individual match game (Hör-Paare). Each matched
+    // pair — and the final "done" state — is its own write-once document, so the
+    // host can show a live progress bar per student. `key` (the running matched
+    // count) makes each id unique per milestone. Reuses the same write-once
+    // answers rule, so no security-rules change is needed.
+    submitProgress: function (code, qIndex, studentId, key, payload) {
+      var id = qIndex + "_" + studentId + "_" + key;
       var ref = db.collection("sessions").doc(code).collection("answers").doc(id);
       return ref.set(Object.assign({ questionIndex: qIndex, studentId: studentId, ts: serverTs() }, payload));
     },
@@ -4626,6 +4767,60 @@ document.addEventListener("DOMContentLoaded", App.init);
     speakOnReveal: function (round) { return round.correct; }
   };
 
+  /* ---- Hör-Paare (Listen & Match Pairs): tap a speaker, then its meaning ----
+     UNLIKE every other Live game, this one is INDIVIDUAL: each phone works
+     through the same set of words at its own pace, with its own shuffled tiles.
+     The host shows a live progress bar per student instead of a shared prompt.
+     Scoring rewards completeness and speed, and deducts for wrong taps. The
+     Live controller (live.js) branches on `match: true` to drive this flow. */
+
+  // A round's usable pairs — each needs both German (to speak) and English.
+  function validPairs(q) {
+    return (((q && q.words) || [])).filter(function (w) {
+      return w && w.de && w.en;
+    }).map(function (w) {
+      return { de: w.de, en: w.en, emoji: w.emoji || "" };
+    });
+  }
+
+  var hoerpaareAdapter = {
+    meta: { name: "Hör-Paare", emoji: "🎧", contentType: "pairs" },
+    timeLimit: 60000, // students self-pace through several pairs at once
+    pickLabel: "Exercise",
+    match: true,      // individual match flow (see live.js)
+    audioSpeed: true, // host can pick the playback speed at setup
+    getTopics: function () {
+      var store = window.ContentStore;
+      var list = (store && store.exercisesFor) ? store.exercisesFor("hoerpaare") : [];
+      return list.map(function (e) {
+        var n = (e.questions || []).filter(function (q) { return validPairs(q).length >= 3; }).length;
+        return { id: e.id, name: e.name, emoji: e.emoji || "🎧", english: n + (n === 1 ? " round" : " rounds") };
+      });
+    },
+    buildRounds: function (topic) {
+      var store = window.ContentStore;
+      var e = (store && store.exercise) ? store.exercise("hoerpaare", topic && topic.id) : null;
+      var rounds = [];
+      ((e && e.questions) || []).forEach(function (q) {
+        var pairs = validPairs(q).slice(0, 6); // up to 6 pairs on screen at once
+        if (pairs.length >= 3) rounds.push({ type: "pairs", words: pairs });
+      });
+      return rounds.slice(0, 20);
+    },
+    // The generic controller never calls these for a match game, but provide
+    // gentle fallbacks so nothing breaks if it ever does.
+    hostContent: function (el, round) {
+      return el("div", { class: "live-q" }, [
+        el("div", { class: "live-q-tag", text: "🎧 Match every word to its meaning" })
+      ]);
+    },
+    playerContent: function (el, round) {
+      return el("div", { class: "live-muted", text: "Loading…" });
+    },
+    correctLabel: function (round) { return "All " + ((round.words || []).length) + " pairs"; },
+    speakOnReveal: function () { return null; }
+  };
+
   window.LiveGames = {
     quiz: choiceAdapter({ name: "Vocabulary Quiz", emoji: "🎯", contentType: "vocab" }),
     memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" }),
@@ -4634,7 +4829,8 @@ document.addEventListener("DOMContentLoaded", App.init);
     plural: pluralAdapter,
     verben: verbAdapter,
     uhrzeit: timeAdapter,
-    listen: listenAdapter
+    listen: listenAdapter,
+    hoerpaare: hoerpaareAdapter
   };
 })();
 
@@ -4939,7 +5135,11 @@ window.LiveMode = (function () {
         var words = [], sentences = [];
         try {
           var ex = store.exercise && store.exercise(gameId === "listen" ? "listening" : gameId, topic && topic.id);
-          var items = (ex && (ex.items || ex.words)) || [];
+          var items = ((ex && (ex.items || ex.words)) || []).slice();
+          // Hör-Paare keeps its words inside each question — flatten them in too.
+          if (ex && Array.isArray(ex.questions)) {
+            ex.questions.forEach(function (q) { (q.words || []).forEach(function (w) { items.push(w); }); });
+          }
           items.forEach(function (it) {
             var t = it && (it.word || it.de);
             if (!t) return;
@@ -5033,6 +5233,7 @@ window.LiveMode = (function () {
           index: i, type: r.type, de: r.de || null, emoji: r.emoji || null, options: r.options || null,
           sentence: r.sentence || null, blank: r.blank || null, clueWord: r.clueWord || null,
           meaning: r.meaning || null, tiles: r.tiles || null,
+          words: r.words || null, speed: r.speed || null,
           answerMode: sess.answerMode || "options",
           startedAt: window.LiveDB.serverTs()
         }
@@ -5058,6 +5259,7 @@ window.LiveMode = (function () {
     }
 
     function renderQuestion(i, r, answered) {
+      if (adapter.match) return renderMatchHost(i, r);
       var joinedN = Object.keys(sess.joined || {}).length || (sess.students || []).length;
       show(screen("host", [
         el("div", { class: "host-topbar" }, [
@@ -5071,7 +5273,55 @@ window.LiveMode = (function () {
       ]));
     }
 
+    // ---- Host: live per-student progress for the individual match game ----
+    function renderMatchHost(i, r) {
+      var total = (r.words || []).length || 1;
+      var joined = sess.joined || {};
+      var joinedIds = Object.keys(joined);
+      // Best progress per student, from the docs the live listener delivered.
+      var prog = {};
+      latestAnswers.forEach(function (a) {
+        if (a.studentId == null) return;
+        var cur = prog[a.studentId] || { matched: 0, done: false };
+        if ((a.matched || 0) > cur.matched) cur.matched = a.matched || 0;
+        if (a.done) cur.done = true;
+        prog[a.studentId] = cur;
+      });
+      // Show the students who joined (fall back to the full roster before anyone joins).
+      var roster = sess.students || [];
+      var shown = joinedIds.length
+        ? roster.filter(function (s) { return joinedIds.indexOf(s.id) >= 0; })
+        : roster;
+      var doneCount = 0;
+      var rows = shown.map(function (stu) {
+        var p = prog[stu.id] || { matched: 0, done: false };
+        if (p.done) doneCount++;
+        var pct = Math.round(Math.min(1, p.matched / total) * 100);
+        return el("div", { class: "match-prow" + (p.done ? " done" : "") }, [
+          el("span", { class: "match-pname", text: stu.name }),
+          el("div", { class: "match-pbar" }, [
+            el("div", { class: "match-pfill", attrs: { style: "width:" + pct + "%" } })
+          ]),
+          el("span", { class: "match-pcount", text: (p.done ? "✓ " : "") + p.matched + "/" + total })
+        ]);
+      });
+      show(screen("host", [
+        el("div", { class: "host-topbar" }, [
+          el("div", { class: "host-q-num", text: "Round " + (i + 1) + " / " + rounds.length }),
+          el("div", { class: "host-answered", text: doneCount + " of " + (shown.length || roster.length) + " finished" })
+        ]),
+        el("div", { class: "match-host-tag", text: "🎧 Each student matches every word to its meaning" }),
+        rows.length
+          ? el("div", { class: "match-progress" }, rows)
+          : el("p", { class: "live-muted", text: "Waiting for students to join…" }),
+        el("div", { class: "host-controls" }, [
+          el("button", { class: "btn primary big", text: "Reveal & score ▶", on: { click: function () { reveal(i, r); } } })
+        ])
+      ]));
+    }
+
     function reveal(i, r) {
+      if (adapter.match) return revealMatch(i, r);
       clearTimeout(timer);
       if (answersUnsub) { answersUnsub(); answersUnsub = null; }
       // Reuse the answers our live listener already delivered instead of
@@ -5104,32 +5354,87 @@ window.LiveMode = (function () {
       }
     }
 
+    // ---- Score the individual match round from each student's progress docs ----
+    function revealMatch(i, r) {
+      clearTimeout(timer);
+      if (answersUnsub) { answersUnsub(); answersUnsub = null; }
+      var arr = latestAnswers;
+      var total = (r.words || []).length || 1;
+      var startedAt = sess.round && sess.round.startedAt && sess.round.startedAt.toMillis ? sess.round.startedAt.toMillis() : null;
+      // Keep the most complete record per student (a "done" doc, else highest matched).
+      var best = {};
+      arr.forEach(function (a) {
+        if (a.studentId == null) return;
+        var cur = best[a.studentId];
+        if (!cur || a.done || (a.matched || 0) > (cur.matched || 0)) best[a.studentId] = a;
+      });
+      var scores = Object.assign({}, sess.scores || {});
+      var results = [];
+      (sess.students || []).forEach(function (stu) {
+        var a = best[stu.id];
+        if (!a) {
+          results.push({ studentId: stu.id, name: stu.name, correct: false, points: 0, answered: false, matched: 0, total: total });
+          return;
+        }
+        var matched = Math.min(a.matched || 0, total);
+        var wrong = a.wrong || 0;
+        var done = !!a.done || matched >= total;
+        var ts = a.ts && a.ts.toMillis ? a.ts.toMillis() : null;
+        var elapsed = (startedAt != null && ts != null) ? Math.max(0, ts - startedAt) : TL;
+        var frac = Math.max(0, 1 - elapsed / TL);
+        // Partial credit for pairs found + a speed bonus only when fully done,
+        // minus a deduction for each wrong tap. Floored at zero.
+        var pts = Math.round((matched / total) * 600) + (done ? Math.round(400 * frac) : 0) - 40 * wrong;
+        if (pts < 0) pts = 0;
+        scores[stu.id] = (scores[stu.id] || 0) + pts;
+        results.push({ studentId: stu.id, name: stu.name, correct: done, points: pts, answered: matched > 0, matched: matched, total: total });
+      });
+      results.sort(function (x, y) { return y.points - x.points; });
+      results.forEach(function (rr, idx) { rr.rank = idx + 1; });
+      window.LiveDB.updateSession(code, {
+        status: "reveal", scores: scores,
+        reveal: { index: i, correct: adapter.correctLabel(r), explanation: null, results: results, match: true }
+      });
+      renderReveal(i, r, results, scores);
+    }
+
     function renderReveal(i, r, results) {
       var last = (i + 1) >= rounds.length;
+      var isMatch = !!adapter.match;
       var correctCount = results.filter(function (x) { return x.correct; }).length;
+      var mtotal = (r.words || []).length;
       // Leaderboard for THIS question only (ranked by points earned this round).
       var ranked = results.filter(function (x) { return x.answered; }).sort(function (a, b) { return b.points - a.points; });
+      var answerBlock = isMatch
+        ? el("div", { class: "reveal-answer" }, [
+            el("div", { class: "reveal-label", text: "Round complete" }),
+            el("div", { class: "reveal-value", text: "🎧 " + mtotal + (mtotal === 1 ? " pair" : " pairs") })
+          ])
+        : el("div", { class: "reveal-answer" }, [
+            el("div", { class: "reveal-label", text: "Correct answer" }),
+            el("div", { class: "reveal-value", text: adapter.correctLabel(r) }),
+            r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null,
+            r.sentence ? el("div", { class: "reveal-sentence" }, filledSentence(r.sentence, r.correct)) : null,
+            r.explanation ? el("div", { class: "reveal-why", text: r.explanation }) : null
+          ]);
+      var statText = isMatch
+        ? correctCount + " of " + results.length + " finished every pair"
+        : correctCount + " of " + results.length + " correct";
       show(screen("host", [
-        el("div", { class: "host-topbar" }, [el("div", { class: "host-q-num", text: "Question " + (i + 1) + " / " + rounds.length })]),
-        el("div", { class: "reveal-answer" }, [
-          el("div", { class: "reveal-label", text: "Correct answer" }),
-          el("div", { class: "reveal-value", text: adapter.correctLabel(r) }),
-          r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null,
-          r.sentence ? el("div", { class: "reveal-sentence" }, filledSentence(r.sentence, r.correct)) : null,
-          r.explanation ? el("div", { class: "reveal-why", text: r.explanation }) : null
-        ]),
-        el("div", { class: "reveal-stat", text: correctCount + " of " + results.length + " correct" }),
-        el("h3", { class: "reveal-board-title", text: "Top scorers — this question" }),
+        el("div", { class: "host-topbar" }, [el("div", { class: "host-q-num", text: (isMatch ? "Round " : "Question ") + (i + 1) + " / " + rounds.length })]),
+        answerBlock,
+        el("div", { class: "reveal-stat", text: statText }),
+        el("h3", { class: "reveal-board-title", text: "Top scorers — this " + (isMatch ? "round" : "question") }),
         ranked.length
           ? el("div", { class: "board-list" }, ranked.slice(0, 8).map(function (x, idx) {
-              return el("div", { class: "board-row" + (idx === 0 && x.correct ? " top" : "") }, [
+              return el("div", { class: "board-row" + (idx === 0 && x.points > 0 ? " top" : "") }, [
                 el("span", { class: "board-rank", text: (idx + 1) }),
-                el("span", { class: "board-name", text: x.name }),
-                el("span", { class: "board-pts", text: x.correct ? "+" + x.points : "✗" })
+                el("span", { class: "board-name", text: x.name + (isMatch ? "  (" + x.matched + "/" + x.total + ")" : "") }),
+                el("span", { class: "board-pts", text: x.points > 0 ? "+" + x.points : (isMatch ? "0" : "✗") })
               ]);
             }))
           : el("p", { class: "live-muted", text: "No answers this round." }),
-        el("button", { class: "btn primary big", text: last ? "Finish ▶" : "Next question ▶", on: { click: nextQuestion } })
+        el("button", { class: "btn primary big", text: last ? "Finish ▶" : (isMatch ? "Next round ▶" : "Next question ▶"), on: { click: nextQuestion } })
       ]));
     }
 
@@ -5266,18 +5571,28 @@ window.LiveMode = (function () {
     stop();
     var answeredIndex = -1;
     var lastStatus = null, lastQ = -1, lastSeq = null;
+    var matchRenderedQ = -1; // match board is stateful — render it once per round
 
     track(window.LiveDB.listenSession(code, function (s) {
       if (!s) { show(screen("player live-center", [el("div", { class: "live-card" }, [el("h2", { text: "Room closed" })])])); return; }
       // A new game in the same room resets question numbering — allow answering again.
       var seq = s.gameSeq || 0;
-      if (seq !== lastSeq) { answeredIndex = -1; lastSeq = seq; }
+      if (seq !== lastSeq) { answeredIndex = -1; matchRenderedQ = -1; lastSeq = seq; }
       var qi = s.round ? s.round.index : -1;
       if (s.status === lastStatus && qi === lastQ && s.status !== "question") return;
       lastStatus = s.status; lastQ = qi;
 
       if (s.status === "lobby") return waitScreen("You're in! 🎉", "Get ready — watch the smartboard.");
       if (s.status === "question") {
+        var qAdapter = window.LiveGames[s.gameId];
+        if (qAdapter && qAdapter.match) {
+          // Individual match game: build the board once and never rebuild it
+          // mid-round (that would reset the student's taps and re-shuffle).
+          if (answeredIndex === qi) return waitScreen("All matched! 🎉", "Waiting for the class…");
+          if (matchRenderedQ === qi) return;
+          matchRenderedQ = qi;
+          return matchPlayerScreen(s);
+        }
         if (answeredIndex === qi) return waitScreen("Answer locked ✔", "Waiting for the class…");
         return answerScreen(s);
       }
@@ -5319,7 +5634,137 @@ window.LiveMode = (function () {
       show(body);
     }
 
+    /* ---- Individual match board (Hör-Paare) ----
+       Each phone gets its OWN shuffled columns of speaker tiles (tap = hear the
+       German word) and meaning tiles (English + emoji). Tap a speaker, then its
+       meaning, to lock a pair. Wrong taps flash and cost points at scoring, but
+       replaying audio is always free. Progress is reported to the host as each
+       pair is matched. */
+    function matchPlayerScreen(s) {
+      var r = s.round;
+      var words = (r.words || []).slice();
+      var total = words.length;
+      var rate = r.speed || 1;
+      var matched = 0, wrong = 0, finished = false;
+      var startTs = Date.now();
+
+      // Independent shuffles → every phone's layout is different.
+      var speakers = kit.shuffle(words.map(function (w, idx) { return { idx: idx, de: w.de }; }));
+      var meanings = kit.shuffle(words.map(function (w, idx) { return { idx: idx, en: w.en, emoji: w.emoji }; }));
+      var sel = { speaker: null, meaning: null }; // { idx, btn }
+      var busy = false; // brief lock during the wrong-answer flash
+
+      var counter = el("span", { class: "match-count-n", text: "0 / " + total });
+      var speakerCol = el("div", { class: "match-col speakers" });
+      var meaningCol = el("div", { class: "match-col meanings" });
+
+      function play(de) { try { kit.speak(de, { rate: rate }); } catch (e) {} }
+
+      function reportMatch() {
+        // One write-once doc per matched pair drives the host's live bar; the
+        // final one (matched === total) carries done:true for scoring. Rejected
+        // silently if the host has already moved on.
+        try {
+          window.LiveDB.submitProgress(code, r.index, stu.id, matched, {
+            matched: matched, total: total, wrong: wrong, done: matched >= total
+          }).catch(function () {});
+        } catch (e) {}
+      }
+
+      function clearSel() {
+        if (sel.speaker) sel.speaker.btn.classList.remove("sel");
+        if (sel.meaning) sel.meaning.btn.classList.remove("sel");
+        sel.speaker = null; sel.meaning = null;
+      }
+
+      function tryMatch() {
+        if (!sel.speaker || !sel.meaning) return;
+        var sp = sel.speaker, me = sel.meaning;
+        if (sp.idx === me.idx) {
+          matched++;
+          counter.textContent = matched + " / " + total;
+          sp.btn.classList.remove("sel"); me.btn.classList.remove("sel");
+          sp.btn.classList.add("done"); me.btn.classList.add("done");
+          sp.btn.disabled = true; me.btn.disabled = true;
+          // Reveal the German word on the now-solved speaker tile (a small reward).
+          var lbl = sp.btn.querySelector(".match-slabel");
+          if (lbl) lbl.textContent = words[sp.idx].de;
+          sel.speaker = null; sel.meaning = null;
+          try { kit.beep("good"); } catch (e) {}
+          reportMatch();
+          if (matched >= total) return finish();
+        } else {
+          wrong++;
+          busy = true;
+          sp.btn.classList.remove("sel"); me.btn.classList.remove("sel");
+          sp.btn.classList.add("wrong"); me.btn.classList.add("wrong");
+          try { kit.beep("bad"); } catch (e) {}
+          var a = sp.btn, b = me.btn;
+          sel.speaker = null; sel.meaning = null;
+          setTimeout(function () { a.classList.remove("wrong"); b.classList.remove("wrong"); busy = false; }, 500);
+        }
+      }
+
+      function onSpeaker(item, btn) {
+        if (busy || btn.disabled) return;
+        play(item.de);                       // always free to replay
+        if (sel.speaker) sel.speaker.btn.classList.remove("sel");
+        sel.speaker = { idx: item.idx, btn: btn };
+        btn.classList.add("sel");
+        tryMatch();
+      }
+      function onMeaning(item, btn) {
+        if (busy || btn.disabled) return;
+        if (sel.meaning) sel.meaning.btn.classList.remove("sel");
+        sel.meaning = { idx: item.idx, btn: btn };
+        btn.classList.add("sel");
+        tryMatch();
+      }
+
+      function finish() {
+        if (finished) return;
+        finished = true;
+        answeredIndex = r.index; // lock this round for this phone
+        var secs = Math.max(1, Math.round((Date.now() - startTs) / 1000));
+        show(screen("player live-center res-good", [el("div", { class: "live-card" }, [
+          el("div", { class: "player-name-tag", text: stu.name }),
+          el("div", { class: "live-big-emoji", text: "🎧" }),
+          el("h2", { text: "All matched! 🎉" }),
+          el("p", { class: "live-sub", text: "You matched all " + total + " pairs in " + secs + "s" }),
+          wrong ? el("p", { class: "player-why", text: wrong + (wrong === 1 ? " wrong tap" : " wrong taps") }) : null,
+          el("p", { class: "live-sub", text: "Waiting for the class…" })
+        ])]));
+      }
+
+      speakers.forEach(function (item) {
+        var btn = el("button", { class: "match-tile speaker" }, [
+          el("span", { class: "match-ico", text: "🔊" }),
+          el("span", { class: "match-slabel", text: "Tap to hear" })
+        ]);
+        btn.addEventListener("click", function () { onSpeaker(item, btn); });
+        speakerCol.appendChild(btn);
+      });
+      meanings.forEach(function (item) {
+        var btn = el("button", { class: "match-tile meaning" }, [
+          item.emoji ? el("span", { class: "match-memoji", text: item.emoji }) : null,
+          el("span", { class: "match-mtext", text: item.en })
+        ]);
+        btn.addEventListener("click", function () { onMeaning(item, btn); });
+        meaningCol.appendChild(btn);
+      });
+
+      show(screen("player", [
+        el("div", { class: "player-topbar" }, [
+          el("div", { class: "player-name-tag", text: stu.name }),
+          el("div", { class: "match-count", text: "Matched " }, [counter])
+        ]),
+        el("div", { class: "player-prompt-hint", text: "Tap 🔊 to hear it, then its meaning 👇" }),
+        el("div", { class: "match-board" }, [speakerCol, meaningCol])
+      ]));
+    }
+
     function resultScreen(s) {
+      if (s.reveal && s.reveal.match) return matchResultScreen(s);
       var me = (s.reveal && s.reveal.results || []).filter(function (x) { return x.studentId === stu.id; })[0];
       var correct = me && me.correct;
       var pts = me ? me.points : 0;
@@ -5330,6 +5775,20 @@ window.LiveMode = (function () {
         el("h2", { text: correct ? "Correct!" : (me && me.answered ? "Not quite" : "Too slow") }),
         el("p", { class: "live-sub", text: "Answer: " + (s.reveal ? s.reveal.correct : "") }),
         s.reveal && s.reveal.explanation ? el("p", { class: "player-why", text: s.reveal.explanation }) : null,
+        el("div", { class: "player-points", text: (pts > 0 ? "+" + pts : "0") + " points" })
+      ])]));
+    }
+
+    function matchResultScreen(s) {
+      var me = (s.reveal && s.reveal.results || []).filter(function (x) { return x.studentId === stu.id; })[0];
+      var matched = me ? me.matched : 0, total = me ? me.total : 0, pts = me ? me.points : 0;
+      var allDone = !!(me && me.correct);
+      kit.beep(allDone ? "good" : "bad");
+      show(screen("player live-center " + (allDone ? "res-good" : "res-bad"), [el("div", { class: "live-card" }, [
+        el("div", { class: "player-name-tag", text: stu.name }),
+        el("div", { class: "live-big-emoji", text: allDone ? "🎧" : (matched > 0 ? "🧩" : "⏰") }),
+        el("h2", { text: allDone ? "All matched!" : (matched > 0 ? "Time's up" : "Too slow") }),
+        el("p", { class: "live-sub", text: "You matched " + matched + " of " + total + (total === 1 ? " pair" : " pairs") }),
         el("div", { class: "player-points", text: (pts > 0 ? "+" + pts : "0") + " points" })
       ])]));
     }
