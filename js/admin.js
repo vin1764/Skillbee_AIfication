@@ -119,6 +119,97 @@
       }
       function autoGrow(ta) { try { ta.style.height = "auto"; ta.style.height = (ta.scrollHeight + 2) + "px"; } catch (e) {} }
 
+      /* ---------------- Auto-translate (German → English) ----------------
+         Scoped to straightforward German→English pairs: base vocab (words),
+         Wortmonster compounds, and Hör gut zu! prompts. Deliberately NOT wired
+         into Fall-Detektiv — its case sentences must stay fully manual, since a
+         generic translation can obscure which noun carries the grammatical case.
+         AI-filled values are DRAFTS: dashed + badged "AI · review" until the
+         teacher edits the field or clicks ✓ to confirm. We never silently
+         overwrite an existing translation — only empty fields (a per-field
+         click on a filled field is treated as an explicit regenerate). */
+      function isDraft(o, f) { return !!(o && o._ai && o._ai[f]); }
+      function markDraft(o, f) { if (!o._ai) o._ai = {}; o._ai[f] = true; }
+      function clearDraft(o, f) {
+        if (!o || !o._ai) return;
+        delete o._ai[f];
+        for (var k in o._ai) { if (o._ai[k]) return; }
+        delete o._ai; // no drafts left — drop the marker so it doesn't linger in saved content
+      }
+
+      // An English-meaning input paired with an "Auto-translate" (✨) button and
+      // an "AI · review" badge. `getGerman()` returns the German source to send.
+      function enField(obj, enKey, getGerman, placeholder, inputCls) {
+        var wrap = el("div", { class: "adm-en-cell" });
+        var inp = el("input", {
+          class: inputCls || "adm-input",
+          attrs: { type: "text", value: obj[enKey] == null ? "" : obj[enKey], placeholder: placeholder || "e.g. the dog" },
+          on: { input: function (e) { obj[enKey] = e.target.value; clearDraft(obj, enKey); paint(); store.save(); } }
+        });
+        var btn = el("button", { class: "adm-tr-btn", attrs: { type: "button", title: "Auto-translate from German" }, html: "✨" });
+        var badge = el("span", { class: "adm-ai-badge" }, [
+          el("span", { class: "adm-ai-txt", text: "AI · review" }),
+          el("button", {
+            class: "adm-ai-ok", attrs: { type: "button", title: "Looks right — confirm" }, html: "✓",
+            on: { click: function () { clearDraft(obj, enKey); paint(); store.save(); } }
+          })
+        ]);
+        btn.addEventListener("click", function () {
+          var german = String((getGerman && getGerman()) || "").trim();
+          if (!german) { toast("Add the German first."); return; }
+          if (!window.Translator || !window.Translator.available()) { toast("Auto-translate isn't switched on yet."); return; }
+          btn.disabled = true; btn.classList.add("loading");
+          window.Translator.translateText(german).then(function (en) {
+            en = (en || "").trim();
+            if (!en) { toast("No translation came back — try again."); return; }
+            obj[enKey] = en; inp.value = en; markDraft(obj, enKey); paint(); store.save();
+          }).catch(function (err) {
+            toast(err && err.code === "no-endpoint" ? "Auto-translate isn't switched on yet." : "Translation failed — try again.");
+          }).then(function () { btn.disabled = false; btn.classList.remove("loading"); });
+        });
+        function paint() {
+          var d = isDraft(obj, enKey);
+          inp.classList.toggle("ai-draft", d);
+          badge.style.display = d ? "" : "none";
+        }
+        paint();
+        wrap.appendChild(inp); wrap.appendChild(btn); wrap.appendChild(badge);
+        return wrap;
+      }
+
+      // Top-of-list "Translate all empty English" bulk button. `rows` is a list
+      // of { obj, enKey, getGerman }. Only fills BLANK English fields whose
+      // German source is present — never overwrites existing translations.
+      function bulkTranslateBar(rows) {
+        var btn = el("button", { class: "btn small adm-bulk-tr", attrs: { type: "button" }, html: "✨ Translate all empty English" });
+        var origHtml = "✨ Translate all empty English";
+        btn.addEventListener("click", function () {
+          if (!window.Translator || !window.Translator.available()) { toast("Auto-translate isn't switched on yet."); return; }
+          var todo = rows.filter(function (r) {
+            return String((r.getGerman && r.getGerman()) || "").trim() && !String(r.obj[r.enKey] || "").trim();
+          });
+          if (!todo.length) { toast("No empty English fields to fill."); return; }
+          btn.disabled = true; btn.innerHTML = "Translating…";
+          window.Translator.translateBatch(todo.map(function (r) { return String(r.getGerman()).trim(); })).then(function (out) {
+            var n = 0;
+            todo.forEach(function (r, i) {
+              var en = (out[i] || "").trim();
+              if (en) { r.obj[r.enKey] = en; markDraft(r.obj, r.enKey); n++; }
+            });
+            store.save();
+            render();
+            toast(n ? ("Filled " + n + " field" + (n === 1 ? "" : "s") + " — please review") : "Nothing came back — try again.");
+          }).catch(function (err) {
+            btn.disabled = false; btn.innerHTML = origHtml;
+            toast(err && err.code === "no-endpoint" ? "Auto-translate isn't switched on yet." : "Translation failed — try again.");
+          });
+        });
+        return el("div", { class: "adm-bulk-bar" }, [
+          btn,
+          el("span", { class: "adm-bulk-note", text: "Fills blank English only · AI drafts you review before they count" })
+        ]);
+      }
+
       function toast(msg) {
         var t = el("div", { class: "adm-toast", text: msg });
         document.body.appendChild(t);
@@ -227,6 +318,9 @@
           })
         );
         var list = ex.items;
+        body.appendChild(bulkTranslateBar(list.map(function (c) {
+          return { obj: c, enKey: "meaning", getGerman: function () { return joinCompound(c.partA, c.partB); } };
+        })));
         body.appendChild(el("div", { class: "adm-row adm-row-head adm-compound-row" }, [
           el("span", { text: "Icon" }),
           el("span", { text: "Part 1" }),
@@ -297,6 +391,9 @@
           })
         );
         var list = ex.items;
+        body.appendChild(bulkTranslateBar(list.map(function (w) {
+          return { obj: w, enKey: "meaning", getGerman: function () { return w.word; } };
+        })));
         if (!list.length) body.appendChild(emptyState("Nothing here yet — add the first prompt below."));
         list.forEach(function (w, i) { body.appendChild(listenCard(w, list, i)); });
         body.appendChild(addRowBtn("+ Prompt", function () {
@@ -318,7 +415,7 @@
         ]));
         card.appendChild(el("div", { class: "adm-listen-line" }, [
           el("span", { class: "adm-listen-lbl", text: "Meaning" }),
-          input(w, "meaning", "what it means (shown at the reveal)", "adm-input grow")
+          enField(w, "meaning", function () { return w.word; }, "what it means (shown at the reveal)", "adm-input grow")
         ]));
         card.appendChild(el("div", { class: "adm-listen-line" }, [
           el("span", { class: "adm-listen-lbl", text: "Look-alikes" }),
@@ -385,7 +482,7 @@
           partInput(c, "partB", "Schuh", refresh),
           word,
           genderSelect(c),
-          input(c, "meaning", "e.g. glove", "adm-input"),
+          enField(c, "meaning", function () { return joinCompound(c.partA, c.partB); }, "e.g. glove"),
           el("button", {
             class: "adm-del", html: "✕", attrs: { title: "Remove" },
             on: { click: function () { list.splice(index, 1); store.save(); render(); } }
@@ -630,6 +727,10 @@
           input(ex, "emoji", "📚", "adm-emoji", 6),
           input(ex, "english", "Short description (optional, e.g. Animals)", "adm-input")
         ]));
+        var list = ex.words;
+        body.appendChild(bulkTranslateBar(list.map(function (w) {
+          return { obj: w, enKey: "en", getGerman: function () { return w.de; } };
+        })));
         body.appendChild(
           el("div", { class: "adm-row adm-row-vocab adm-row-head" }, [
             el("span", { class: "adm-emoji-h", text: "Icon" }),
@@ -639,14 +740,13 @@
             el("span", {})
           ])
         );
-        var list = ex.words;
         if (!list.length) body.appendChild(emptyState("No words yet — add the first one below."));
         list.forEach(function (w, wi) {
           body.appendChild(
             el("div", { class: "adm-row adm-row-vocab" }, [
               input(w, "emoji", "🙂", "adm-emoji", 6),
               input(w, "de", "e.g. der Hund", "adm-input"),
-              input(w, "en", "e.g. the dog", "adm-input"),
+              enField(w, "en", function () { return w.de; }, "e.g. the dog"),
               optionsInput(w, "distractors", "auto — or e.g. the cat, the fish"),
               delRowBtn("Remove word", function () { list.splice(wi, 1); store.save(); render(); })
             ])

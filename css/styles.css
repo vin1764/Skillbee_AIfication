@@ -559,6 +559,29 @@ kbd {
 .adm-pairs-count { font-size: 0.82rem; font-weight: 700; color: var(--good); }
 .adm-pairs-count.warn { color: var(--bad); }
 .adm-pairs-head .adm-del { margin-left: auto; }
+
+/* Auto-translate (German → English) — button, AI-draft marker, bulk bar */
+.adm-en-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.adm-en-cell > input { flex: 1 1 60px; min-width: 0; }
+.adm-tr-btn {
+  flex: 0 0 auto; width: 34px; height: 34px; border: 1px solid var(--line);
+  background: #fff; border-radius: 9px; cursor: pointer; font-size: 0.95rem; line-height: 1;
+}
+.adm-tr-btn:hover:not(:disabled) { border-color: var(--skb); background: var(--skb-tint); }
+.adm-tr-btn:disabled { opacity: 0.5; cursor: default; }
+.adm-tr-btn.loading { animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+/* an unconfirmed AI suggestion: dashed amber, distinct from saved (solid) fields */
+input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf0; }
+.adm-ai-badge { flex: 1 1 100%; display: inline-flex; align-items: center; gap: 6px; font-size: 0.72rem; font-weight: 800; color: #9a7400; }
+.adm-ai-ok {
+  width: 20px; height: 20px; border: 1px solid #e0c477; background: #fff;
+  border-radius: 6px; color: var(--good); font-weight: 900; line-height: 1; cursor: pointer;
+}
+.adm-ai-ok:hover { background: #eafaf7; border-color: var(--good); }
+.adm-bulk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 4px 0 12px; }
+.adm-bulk-tr { white-space: nowrap; }
+.adm-bulk-note { color: var(--ink-soft); font-size: 0.82rem; font-weight: 600; }
 @media (max-width: 560px) {
   .adm-compound-row { display: flex; flex-wrap: wrap; }
   .adm-compound-row > .adm-input, .adm-compound-row > .adm-gender { flex: 1 1 40%; }
