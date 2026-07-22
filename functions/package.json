@@ -1,7 +1,0 @@
-{
-  "name": "skillbee-translate-fn",
-  "version": "1.0.0",
-  "description": "Server-side German→English translation for Skillbee Deutsch Games (keeps the Azure key off the public site).",
-  "main": "translate/index.js",
-  "engines": { "node": ">=18" }
-}

@@ -137,6 +137,20 @@
         delete o._ai; // no drafts left — drop the marker so it doesn't linger in saved content
       }
 
+      var NO_TRANSLATOR_MSG = "Auto-translate needs a browser with a built-in translator — open the app in Chrome or Edge.";
+      // Resolve the browser's built-in translator, toasting once about the
+      // one-time model download if it hasn't been fetched yet. Rejects with
+      // { code: "unsupported" } when this browser has no built-in translator.
+      function ensureTranslator() {
+        var AT = window.AutoTranslate;
+        if (!AT || !AT.supported()) return Promise.reject({ code: "unsupported" });
+        return AT.availability().then(function (av) {
+          if (av === "unavailable") throw { code: "unsupported" };
+          if (av === "downloadable" || av === "downloading") toast("Setting up the translator — one-time download, please wait…");
+          return AT;
+        });
+      }
+
       // An English-meaning input paired with an "Auto-translate" (✨) button and
       // an "AI · review" badge. `getGerman()` returns the German source to send.
       function enField(obj, enKey, getGerman, placeholder, inputCls) {
@@ -157,14 +171,15 @@
         btn.addEventListener("click", function () {
           var german = String((getGerman && getGerman()) || "").trim();
           if (!german) { toast("Add the German first."); return; }
-          if (!window.Translator || !window.Translator.available()) { toast("Auto-translate isn't switched on yet."); return; }
           btn.disabled = true; btn.classList.add("loading");
-          window.Translator.translateText(german).then(function (en) {
+          ensureTranslator().then(function (AT) {
+            return AT.translateText(german);
+          }).then(function (en) {
             en = (en || "").trim();
             if (!en) { toast("No translation came back — try again."); return; }
             obj[enKey] = en; inp.value = en; markDraft(obj, enKey); paint(); store.save();
           }).catch(function (err) {
-            toast(err && err.code === "no-endpoint" ? "Auto-translate isn't switched on yet." : "Translation failed — try again.");
+            toast(err && err.code === "unsupported" ? NO_TRANSLATOR_MSG : "Translation failed — try again.");
           }).then(function () { btn.disabled = false; btn.classList.remove("loading"); });
         });
         function paint() {
@@ -184,13 +199,15 @@
         var btn = el("button", { class: "btn small adm-bulk-tr", attrs: { type: "button" }, html: "✨ Translate all empty English" });
         var origHtml = "✨ Translate all empty English";
         btn.addEventListener("click", function () {
-          if (!window.Translator || !window.Translator.available()) { toast("Auto-translate isn't switched on yet."); return; }
           var todo = rows.filter(function (r) {
             return String((r.getGerman && r.getGerman()) || "").trim() && !String(r.obj[r.enKey] || "").trim();
           });
           if (!todo.length) { toast("No empty English fields to fill."); return; }
+          if (!window.AutoTranslate || !window.AutoTranslate.supported()) { toast(NO_TRANSLATOR_MSG); return; }
           btn.disabled = true; btn.innerHTML = "Translating…";
-          window.Translator.translateBatch(todo.map(function (r) { return String(r.getGerman()).trim(); })).then(function (out) {
+          ensureTranslator().then(function (AT) {
+            return AT.translateBatch(todo.map(function (r) { return String(r.getGerman()).trim(); }));
+          }).then(function (out) {
             var n = 0;
             todo.forEach(function (r, i) {
               var en = (out[i] || "").trim();
@@ -201,7 +218,7 @@
             toast(n ? ("Filled " + n + " field" + (n === 1 ? "" : "s") + " — please review") : "Nothing came back — try again.");
           }).catch(function (err) {
             btn.disabled = false; btn.innerHTML = origHtml;
-            toast(err && err.code === "no-endpoint" ? "Auto-translate isn't switched on yet." : "Translation failed — try again.");
+            toast(err && err.code === "unsupported" ? NO_TRANSLATOR_MSG : "Translation failed — try again.");
           });
         });
         return el("div", { class: "adm-bulk-bar" }, [
