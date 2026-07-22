@@ -245,6 +245,36 @@ kbd {
 .quiz-opt.wrong { border-color: var(--bad); background: #ffeef0; }
 
 /* =====================================================================
+   SOLO wrappers for the Live games (reuse the Live adapter UI)
+   ===================================================================== */
+.solo-live { max-width: 580px; margin: 0 auto; }
+.solo-live-card { text-align: center; margin-top: 6px; }
+/* the reused Live prompt/answer blocks sit comfortably in the narrower Solo column */
+.solo-live-card .live-q-word { margin: 6px 0 14px; }
+.solo-live-card .cases-sentence.phone { margin-top: 6px; }
+.solo-live-card .listen-audio { margin: 8px 0 18px; }
+/* ring the correct tap-option on reveal (options keep their own colour) */
+.solo-live .live-opt.phone.correct { outline: 4px solid var(--good); outline-offset: 2px; }
+.solo-live .match-board { margin-top: 6px; }
+/* feedback strip shown after each answer */
+.solo-reveal {
+  display: flex; align-items: center; gap: 14px; text-align: left;
+  max-width: 460px; margin: 16px auto 0; padding: 14px 18px;
+  border-radius: 16px; border: 2px solid var(--line); background: var(--card);
+  box-shadow: var(--shadow); animation: rise 0.25s backwards;
+}
+.solo-reveal.good { border-color: var(--good); background: #eafaf7; }
+.solo-reveal.bad { border-color: var(--bad); background: #ffeef0; }
+.solo-reveal-icon {
+  flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 1.3rem; font-weight: 900; color: #fff;
+}
+.solo-reveal.good .solo-reveal-icon { background: var(--good); }
+.solo-reveal.bad .solo-reveal-icon { background: var(--bad); }
+.solo-reveal-title { font-weight: 800; }
+.solo-reveal-ans { color: var(--ink-soft); font-weight: 600; font-size: 0.95rem; overflow-wrap: anywhere; }
+
+/* =====================================================================
    MEMORY
    ===================================================================== */
 .memory-board { display: grid; grid-template-columns: repeat(var(--cols), 1fr); gap: 12px; max-width: 720px; margin: 0 auto; }

@@ -323,8 +323,6 @@ const App = (function () {
 
   /* ---- exercise picker (shown before a game starts) ---------------- */
   function openTopicPicker(game) {
-    const usesSentences = game.contentType === "sentences";
-    const exercises = window.ContentStore.exercisesFor(game.id);
     const main = document.getElementById("screen");
     main.innerHTML = "";
 
@@ -336,7 +334,32 @@ const App = (function () {
       ])
     );
 
-    if (!exercises.length) {
+    // Live-derived Solo games supply their own topic list (built from their
+    // adapter); plain word/sentence games list their exercises directly.
+    let topics, makeCard;
+    if (typeof game.getTopics === "function") {
+      topics = game.getTopics() || [];
+      makeCard = (t) =>
+        el("button", { class: "topic-card", on: { click: () => launch(game, t) } }, [
+          el("div", { class: "topic-emoji", text: t.emoji || game.emoji }),
+          el("div", { class: "topic-name", text: t.name }),
+          el("div", { class: "topic-count", text: t.english || "" })
+        ]);
+    } else {
+      const usesSentences = game.contentType === "sentences";
+      topics = window.ContentStore.exercisesFor(game.id);
+      makeCard = (ex) => {
+        const count = usesSentences ? (ex.sentences || []).length : (ex.words || []).length;
+        return el("button", { class: "topic-card", on: { click: () => launch(game, ex) } }, [
+          el("div", { class: "topic-emoji", text: ex.emoji || (usesSentences ? "🗣️" : "📚") }),
+          el("div", { class: "topic-name", text: ex.name }),
+          el("div", { class: "topic-en", text: ex.english || "" }),
+          el("div", { class: "topic-count", text: `${count} ${usesSentences ? "sentences" : "words"}` })
+        ]);
+      };
+    }
+
+    if (!topics.length) {
       main.appendChild(
         el("p", {
           class: "picker-empty",
@@ -347,21 +370,7 @@ const App = (function () {
     }
 
     const grid = el("div", { class: "topic-grid" });
-    exercises.forEach((ex) => {
-      const count = usesSentences ? (ex.sentences || []).length : (ex.words || []).length;
-      grid.appendChild(
-        el(
-          "button",
-          { class: "topic-card", on: { click: () => launch(game, ex) } },
-          [
-            el("div", { class: "topic-emoji", text: ex.emoji || (usesSentences ? "🗣️" : "📚") }),
-            el("div", { class: "topic-name", text: ex.name }),
-            el("div", { class: "topic-en", text: ex.english || "" }),
-            el("div", { class: "topic-count", text: `${count} ${usesSentences ? "sentences" : "words"}` })
-          ]
-        )
-      );
-    });
+    topics.forEach((t) => grid.appendChild(makeCard(t)));
     main.appendChild(grid);
   }
 
@@ -404,7 +413,9 @@ const App = (function () {
         el,
         kit,
         store: window.ContentStore,
-        games: games.map((g) => ({ id: g.id, name: g.name, emoji: g.emoji, color: g.color, contentType: g.contentType })),
+        // Live-wrapped Solo games are excluded here — their content is edited
+        // under the Live games, so listing them again would duplicate editors.
+        games: games.filter((g) => !g.liveWrapped).map((g) => ({ id: g.id, name: g.name, emoji: g.emoji, color: g.color, contentType: g.contentType })),
         onExit: typeof onExit === "function" ? onExit : () => showHome()
       });
     }

@@ -35,7 +35,9 @@ const jsFiles = [
   // so Live Mode there shows a friendly "needs the internet" message.
   "js/live/firebase.js",
   "js/live/liveGames.js",
-  "js/live/live.js"
+  "js/live/live.js",
+  // Solo/Offline wrappers for the Live games — must load after liveGames.js.
+  "js/games/live-solo.js"
 ];
 const js = jsFiles.map((f) => `/* ==== ${f} ==== */\n` + readFileSync(f, "utf8")).join("\n\n");
 
