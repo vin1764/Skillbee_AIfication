@@ -4997,6 +4997,7 @@ window.LiveMode = (function () {
     stop();
     var sess = null;
     var answersUnsub = null;
+    var latestAnswers = []; // answers delivered by the live listener for the current question
     var timer = null;
     var TL = adapter.timeLimit || 20000;
 
@@ -5042,7 +5043,9 @@ window.LiveMode = (function () {
     function watchAnswers(i, r) {
       if (answersUnsub) { answersUnsub(); answersUnsub = null; }
       var answered = 0;
+      latestAnswers = []; // fresh question
       answersUnsub = window.LiveDB.listenAnswers(code, i, function (arr) {
+        latestAnswers = arr; // keep the newest set so reveal needn't re-query
         answered = arr.length;
         renderQuestion(i, r, answered);
         var joinedN = Object.keys(sess.joined || {}).length || sess.students.length;
@@ -5071,7 +5074,10 @@ window.LiveMode = (function () {
     function reveal(i, r) {
       clearTimeout(timer);
       if (answersUnsub) { answersUnsub(); answersUnsub = null; }
-      window.LiveDB.getAnswers(code, i).then(function (arr) {
+      // Reuse the answers our live listener already delivered instead of
+      // re-querying Firestore — saves ~one read per student, every question.
+      var arr = latestAnswers;
+      {
         var startedAt = sess.round && sess.round.startedAt && sess.round.startedAt.toMillis ? sess.round.startedAt.toMillis() : null;
         var byStudent = {};
         arr.forEach(function (a) { byStudent[a.studentId] = a; });
@@ -5095,7 +5101,7 @@ window.LiveMode = (function () {
         var german = adapter.speakOnReveal(r);
         if (german) kit.speak(german);
         renderReveal(i, r, results, scores);
-      });
+      }
     }
 
     function renderReveal(i, r, results) {
