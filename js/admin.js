@@ -815,6 +815,12 @@
         body.appendChild(el("div", { class: "adm-ex-head" }, [ input(ex, "emoji", "🎧", "adm-emoji", 6) ]));
         if (!Array.isArray(ex.questions)) ex.questions = [];
         var list = ex.questions;
+        // Bulk translate spans every word in every question of this exercise.
+        var trRows = [];
+        list.forEach(function (q) {
+          (q.words || []).forEach(function (w) { trRows.push({ obj: w, enKey: "en", getGerman: function () { return w.de; } }); });
+        });
+        body.appendChild(bulkTranslateBar(trRows));
         if (!list.length) body.appendChild(emptyState("No questions yet — add the first one below."));
         list.forEach(function (q, qi) {
           if (!Array.isArray(q.words)) q.words = [];
@@ -835,7 +841,7 @@
             card.appendChild(el("div", { class: "adm-row adm-pairs-row" }, [
               input(w, "emoji", "🙂", "adm-emoji", 6),
               input(w, "de", "e.g. der Hund", "adm-input"),
-              input(w, "en", "e.g. the dog", "adm-input"),
+              enField(w, "en", function () { return w.de; }, "e.g. the dog"),
               delRowBtn("Remove word", function () { q.words.splice(wi, 1); store.save(); render(); })
             ]));
           });
