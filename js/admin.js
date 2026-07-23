@@ -291,7 +291,7 @@
               (window.TeacherGate && window.TeacherGate.gated())
                 ? el("button", { class: "btn small ghost", html: "🔒 PIN", attrs: { title: "Change teacher PIN" }, on: { click: function () { window.TeacherGate.changePin(); } } })
                 : null,
-              el("button", { class: "btn small ghost adm-reset", html: "↺ Reset", attrs: { title: "Erase all content and restore defaults (asks you to type RESET)" }, on: { click: doReset } })
+              el("button", { class: "btn small ghost adm-reset", html: "↺ Reset", attrs: { title: "Erase all content and restore defaults (type RESET + enter your PIN)" }, on: { click: doReset } })
             ])
           ])
         );
@@ -970,12 +970,17 @@
         input.addEventListener("keydown", function (e) { if (e.key === "Enter" && matches()) goBtn.click(); });
         goBtn.addEventListener("click", function () {
           if (!matches()) return;
-          store.reset();
-          currentGame = null;
-          currentExercise = null;
-          close();
-          render();
-          toast("Reset to defaults");
+          close(); // close this modal first, so the PIN keypad shows on its own
+          function run() {
+            store.reset();
+            currentGame = null;
+            currentExercise = null;
+            render();
+            toast("Reset to defaults");
+          }
+          // Require the teacher PIN (fresh, every time) before actually wiping.
+          if (window.TeacherGate && window.TeacherGate.verify) window.TeacherGate.verify(run);
+          else run();
         });
 
         overlay.appendChild(el("div", { class: "adm-modal" }, [

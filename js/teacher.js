@@ -109,6 +109,24 @@ window.TeacherGate = (function () {
     });
   }
 
+  // Like require(), but ALWAYS asks for the PIN — it ignores the session unlock
+  // cache and never unlocks. For guarding a single dangerous action (e.g. Reset)
+  // so the teacher must re-enter their PIN each time. Cancelling just does nothing.
+  function verify(onOk) {
+    if (!gated()) return onOk();               // offline: no PIN system
+    loadStoredHash().then(function (stored) {
+      if (!stored) return onOk();              // no PIN configured — nothing to check
+      modal({
+        title: "Enter teacher PIN",
+        sub: "Confirm it's you before resetting.",
+        onPin: function (pin, a) {
+          if (hashPin(pin) === stored) { a.close(); onOk(); }
+          else a.error("Wrong PIN");
+        }
+      });
+    });
+  }
+
   function changePin() {
     var first = null;
     modal({
@@ -122,5 +140,5 @@ window.TeacherGate = (function () {
     });
   }
 
-  return { require: require, isUnlocked: isUnlocked, lock: lock, changePin: changePin, gated: gated };
+  return { require: require, verify: verify, isUnlocked: isUnlocked, lock: lock, changePin: changePin, gated: gated };
 })();
