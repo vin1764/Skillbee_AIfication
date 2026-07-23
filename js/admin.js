@@ -137,6 +137,30 @@
         delete o._ai; // no drafts left — drop the marker so it doesn't linger in saved content
       }
 
+      /* ---------------- Auto emoji (offline dictionary) ----------------
+         Fills a row's emoji from its text on its own, when a text field is
+         finalised (blur/change) — NO button. Non-destructive: only fills an
+         empty emoji cell, and never overwrites one the teacher typed. Leaves it
+         blank when nothing sensible matches. Returns a fill() to attach to the
+         row's text inputs' "change" events. */
+      var _autoEmojiRows = (typeof WeakSet !== "undefined") ? new WeakSet() : null;
+      function wireAutoEmoji(emojiInput, row, getTexts) {
+        if (!emojiInput || !window.EmojiPick) return null;
+        // Typing your own emoji opts this row out of any further auto-fill.
+        emojiInput.addEventListener("input", function () { if (_autoEmojiRows) _autoEmojiRows.delete(row); });
+        return function () {
+          var cur = String(row.emoji || "").trim();
+          if (cur && !(_autoEmojiRows && _autoEmojiRows.has(row))) return; // leave existing/manual emoji alone
+          var e = window.EmojiPick.forTexts((getTexts() || []).filter(Boolean));
+          if (e && e !== cur) {
+            row.emoji = e;
+            emojiInput.value = e;
+            if (_autoEmojiRows) _autoEmojiRows.add(row);
+            store.save();
+          }
+        };
+      }
+
       var NO_TRANSLATOR_MSG = "Auto-translate needs a browser with a built-in translator — open the app in Chrome or Edge.";
       // Resolve the browser's built-in translator, toasting once about the
       // one-time model download if it hasn't been fetched yet. Rejects with
@@ -380,10 +404,13 @@
         ]));
         if (!list.length) body.appendChild(emptyState("No nouns yet."));
         list.forEach(function (p, i) {
+          var emojiInp = input(p, "emoji", "🙂", "adm-emoji", 6);
+          var singInp = input(p, "singular", "e.g. der Hund", "adm-input");
+          var enCell = enField(p, "en", function () { return p.singular; }, "dog");
+          var fill = wireAutoEmoji(emojiInp, p, function () { return [p.singular, p.en]; });
+          if (fill) { singInp.addEventListener("change", fill); var ei = enCell.querySelector("input"); if (ei) ei.addEventListener("change", fill); }
           body.appendChild(el("div", { class: "adm-row adm-plural-row" }, [
-            input(p, "emoji", "🙂", "adm-emoji", 6),
-            input(p, "singular", "e.g. der Hund", "adm-input"),
-            enField(p, "en", function () { return p.singular; }, "dog"),
+            emojiInp, singInp, enCell,
             input(p, "plural", "e.g. Hunde", "adm-input"),
             optionsInput(p, "wrong", "auto — or e.g. Hunden, Hünde"),
             el("button", {
@@ -496,13 +523,19 @@
       function compoundRow(c, list, index) {
         var word = el("span", { class: "adm-compound-word", text: joinCompound(c.partA, c.partB) });
         function refresh() { word.textContent = joinCompound(c.partA, c.partB); }
+        var emojiInp = input(c, "emoji", "🙂", "adm-emoji", 6);
+        // Emoji comes from the meaning (glove → 🧤) or the joined word (Handschuh → 🧤).
+        var fill = wireAutoEmoji(emojiInp, c, function () { return [c.meaning, joinCompound(c.partA, c.partB)]; });
+        var pa = partInput(c, "partA", "Hand", refresh);
+        var pb = partInput(c, "partB", "Schuh", refresh);
+        var meaningCell = enField(c, "meaning", function () { return joinCompound(c.partA, c.partB); }, "e.g. glove");
+        if (fill) {
+          pa.addEventListener("change", fill);
+          pb.addEventListener("change", fill);
+          var mi = meaningCell.querySelector("input"); if (mi) mi.addEventListener("change", fill);
+        }
         return el("div", { class: "adm-row adm-compound-row" }, [
-          input(c, "emoji", "🙂", "adm-emoji", 6),
-          partInput(c, "partA", "Hand", refresh),
-          partInput(c, "partB", "Schuh", refresh),
-          word,
-          genderSelect(c),
-          enField(c, "meaning", function () { return joinCompound(c.partA, c.partB); }, "e.g. glove"),
+          emojiInp, pa, pb, word, genderSelect(c), meaningCell,
           el("button", {
             class: "adm-del", html: "✕", attrs: { title: "Remove" },
             on: { click: function () { list.splice(index, 1); store.save(); render(); } }
@@ -762,11 +795,14 @@
         );
         if (!list.length) body.appendChild(emptyState("No words yet — add the first one below."));
         list.forEach(function (w, wi) {
+          var emojiInp = input(w, "emoji", "🙂", "adm-emoji", 6);
+          var deInp = input(w, "de", "e.g. der Hund", "adm-input");
+          var enCell = enField(w, "en", function () { return w.de; }, "e.g. the dog");
+          var fill = wireAutoEmoji(emojiInp, w, function () { return [w.de, w.en]; });
+          if (fill) { deInp.addEventListener("change", fill); var ei = enCell.querySelector("input"); if (ei) ei.addEventListener("change", fill); }
           body.appendChild(
             el("div", { class: "adm-row adm-row-vocab" }, [
-              input(w, "emoji", "🙂", "adm-emoji", 6),
-              input(w, "de", "e.g. der Hund", "adm-input"),
-              enField(w, "en", function () { return w.de; }, "e.g. the dog"),
+              emojiInp, deInp, enCell,
               optionsInput(w, "distractors", "auto — or e.g. the cat, the fish"),
               delRowBtn("Remove word", function () { list.splice(wi, 1); store.save(); render(); })
             ])
@@ -844,10 +880,13 @@
             el("span", {})
           ]));
           q.words.forEach(function (w, wi) {
+            var emojiInp = input(w, "emoji", "🙂", "adm-emoji", 6);
+            var deInp = input(w, "de", "e.g. der Hund", "adm-input");
+            var enCell = enField(w, "en", function () { return w.de; }, "e.g. the dog");
+            var fill = wireAutoEmoji(emojiInp, w, function () { return [w.de, w.en]; });
+            if (fill) { deInp.addEventListener("change", fill); var ei = enCell.querySelector("input"); if (ei) ei.addEventListener("change", fill); }
             card.appendChild(el("div", { class: "adm-row adm-pairs-row" }, [
-              input(w, "emoji", "🙂", "adm-emoji", 6),
-              input(w, "de", "e.g. der Hund", "adm-input"),
-              enField(w, "en", function () { return w.de; }, "e.g. the dog"),
+              emojiInp, deInp, enCell,
               delRowBtn("Remove word", function () { q.words.splice(wi, 1); store.save(); render(); })
             ]));
           });
