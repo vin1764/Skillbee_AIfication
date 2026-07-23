@@ -448,6 +448,14 @@ kbd {
   box-shadow: var(--shadow-lg);
 }
 .adm-modal-title { font-weight: 800; font-size: 1.1rem; margin-bottom: 6px; }
+.adm-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+/* Reset is dangerous — keep it visually quiet (muted, no border) until hover. */
+.adm-reset { opacity: 0.55; color: var(--ink-soft); box-shadow: none; }
+.adm-reset:hover { opacity: 1; color: #fff; background: var(--bad); border-color: var(--bad); }
+/* Destructive confirm button — red, and clearly disabled until "RESET" is typed. */
+.btn.danger { background: var(--bad); color: #fff; border-color: var(--bad); }
+.btn.danger:hover:not(:disabled) { filter: brightness(0.95); }
+.btn.danger:disabled { opacity: 0.45; cursor: not-allowed; }
 .adm-copy-list { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
 .adm-copy-group {
   font-weight: 800; color: var(--ink-soft); font-size: 0.78rem;
@@ -4453,7 +4461,7 @@ document.addEventListener("DOMContentLoaded", App.init);
               (window.TeacherGate && window.TeacherGate.gated())
                 ? el("button", { class: "btn small ghost", html: "🔒 PIN", attrs: { title: "Change teacher PIN" }, on: { click: function () { window.TeacherGate.changePin(); } } })
                 : null,
-              el("button", { class: "btn small ghost", html: "↺ Reset", on: { click: doReset } })
+              el("button", { class: "btn small ghost adm-reset", html: "↺ Reset", attrs: { title: "Erase all content and restore defaults (asks you to type RESET)" }, on: { click: doReset } })
             ])
           ])
         );
@@ -5115,14 +5123,46 @@ document.addEventListener("DOMContentLoaded", App.init);
         inp.click();
       }
 
+      // Reset wipes ALL content back to defaults — irreversible. Gate it behind a
+      // deliberate "type the word to confirm" modal so it can't be hit by accident.
       function doReset() {
-        if (confirmDelete("Reset all content back to the defaults? Your changes will be lost.")) {
+        var overlay = el("div", { class: "adm-overlay" });
+        function close() { overlay.remove(); }
+        overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
+
+        var input = el("input", {
+          class: "adm-input",
+          attrs: { type: "text", placeholder: "Type RESET", autocapitalize: "characters", autocomplete: "off", spellcheck: "false" }
+        });
+        var goBtn = el("button", { class: "btn danger", text: "Reset everything", attrs: { disabled: "true" } });
+        function matches() { return input.value.trim().toUpperCase() === "RESET"; }
+        input.addEventListener("input", function () { goBtn.disabled = !matches(); });
+        input.addEventListener("keydown", function (e) { if (e.key === "Enter" && matches()) goBtn.click(); });
+        goBtn.addEventListener("click", function () {
+          if (!matches()) return;
           store.reset();
           currentGame = null;
           currentExercise = null;
+          close();
           render();
           toast("Reset to defaults");
-        }
+        });
+
+        overlay.appendChild(el("div", { class: "adm-modal" }, [
+          el("div", { class: "adm-modal-title", text: "⚠️ Reset ALL content?" }),
+          el("p", {
+            class: "adm-hint",
+            html: "This erases <b>every exercise and word you've added</b> across all games and restores the built-in defaults. <b>It can't be undone.</b> Consider clicking <b>⬇ Backup</b> first."
+          }),
+          el("label", { class: "live-label", text: "Type RESET to confirm" }),
+          input,
+          el("div", { class: "adm-modal-actions" }, [
+            el("button", { class: "btn ghost", text: "Cancel", on: { click: close } }),
+            goBtn
+          ])
+        ]));
+        document.body.appendChild(overlay);
+        setTimeout(function () { try { input.focus(); } catch (e) {} }, 50);
       }
 
       render();

@@ -440,6 +440,14 @@ kbd {
   box-shadow: var(--shadow-lg);
 }
 .adm-modal-title { font-weight: 800; font-size: 1.1rem; margin-bottom: 6px; }
+.adm-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+/* Reset is dangerous — keep it visually quiet (muted, no border) until hover. */
+.adm-reset { opacity: 0.55; color: var(--ink-soft); box-shadow: none; }
+.adm-reset:hover { opacity: 1; color: #fff; background: var(--bad); border-color: var(--bad); }
+/* Destructive confirm button — red, and clearly disabled until "RESET" is typed. */
+.btn.danger { background: var(--bad); color: #fff; border-color: var(--bad); }
+.btn.danger:hover:not(:disabled) { filter: brightness(0.95); }
+.btn.danger:disabled { opacity: 0.45; cursor: not-allowed; }
 .adm-copy-list { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
 .adm-copy-group {
   font-weight: 800; color: var(--ink-soft); font-size: 0.78rem;
