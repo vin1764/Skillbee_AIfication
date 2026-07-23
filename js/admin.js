@@ -367,6 +367,9 @@
           })
         );
         var list = ex.items;
+        body.appendChild(bulkTranslateBar(list.map(function (p) {
+          return { obj: p, enKey: "en", getGerman: function () { return p.singular; } };
+        })));
         body.appendChild(el("div", { class: "adm-row adm-row-head adm-plural-row" }, [
           el("span", { text: "Icon" }),
           el("span", { text: "Singular (with article)" }),
@@ -380,7 +383,7 @@
           body.appendChild(el("div", { class: "adm-row adm-plural-row" }, [
             input(p, "emoji", "🙂", "adm-emoji", 6),
             input(p, "singular", "e.g. der Hund", "adm-input"),
-            input(p, "en", "dog", "adm-input"),
+            enField(p, "en", function () { return p.singular; }, "dog"),
             input(p, "plural", "e.g. Hunde", "adm-input"),
             optionsInput(p, "wrong", "auto — or e.g. Hunden, Hünde"),
             el("button", {
@@ -781,6 +784,10 @@
           input(ex, "emoji", "🗣️", "adm-emoji", 6),
           input(ex, "english", "Short description (optional, e.g. Everyday)", "adm-input")
         ]));
+        var list = ex.sentences;
+        body.appendChild(bulkTranslateBar(list.map(function (s) {
+          return { obj: s, enKey: "en", getGerman: function () { return s.de; } };
+        })));
         body.appendChild(
           el("div", { class: "adm-row adm-row-sent adm-row-head" }, [
             el("span", { text: "German sentence" }),
@@ -788,13 +795,12 @@
             el("span", {})
           ])
         );
-        var list = ex.sentences;
         if (!list.length) body.appendChild(emptyState("No sentences yet — add the first one below."));
         list.forEach(function (s, si) {
           body.appendChild(
             el("div", { class: "adm-row adm-row-sent" }, [
               input(s, "de", "e.g. Ich lerne Deutsch", "adm-input"),
-              input(s, "en", "e.g. I learn German", "adm-input"),
+              enField(s, "en", function () { return s.de; }, "e.g. I learn German"),
               delRowBtn("Remove sentence", function () { list.splice(si, 1); store.save(); render(); })
             ])
           );
