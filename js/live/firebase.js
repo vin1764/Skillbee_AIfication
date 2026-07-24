@@ -25,15 +25,22 @@
       }
       firebase.initializeApp(firebaseConfig);
       db = firebase.firestore();
+      // ignoreUndefinedProperties: without it, ONE `undefined` field anywhere in
+      // a payload makes the SDK throw the entire write away — synchronously,
+      // inside whichever click handler asked for it (this froze the host's
+      // Reveal button in every game whose scorer omitted a field). Dropping the
+      // stray field is always better than losing the write.
+      var settings = { ignoreUndefinedProperties: true };
+      if (!window.__FIRESTORE_EMULATOR__) {
+        // Long-polling is more reliable behind corporate/school proxies than
+        // the default streaming transport.
+        settings.experimentalForceLongPolling = true;
+        settings.useFetchStreams = false;
+      }
+      try { db.settings(settings); } catch (e) {}
       if (window.__FIRESTORE_EMULATOR__) {
         // Test-only: point at a local Firestore emulator. Never set in production.
         try { db.useEmulator(window.__FIRESTORE_EMULATOR__.host, window.__FIRESTORE_EMULATOR__.port); } catch (e) {}
-      } else {
-        // Long-polling is more reliable behind corporate/school proxies than
-        // the default streaming transport.
-        try {
-          db.settings({ experimentalForceLongPolling: true, useFetchStreams: false });
-        } catch (e) {}
       }
     } catch (e) {
       initError = e;
