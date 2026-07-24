@@ -387,6 +387,11 @@ window.LiveMode = (function () {
     var TL = adapter.timeLimit || 20000;
     var hostRenderedQ = -1; // host question screen is built once per round; later
                             // answers only update the counter, never rebuild the DOM
+    var hostPhase = "lobby"; // "lobby" | "question" | "reveal" | "podium". Once the
+                             // teacher reveals, late-arriving answer/progress
+                             // snapshots must NOT rebuild the question screen over
+                             // the reveal — renderQuestion/renderMatchHost bail
+                             // unless we're actually in the question phase.
 
     track(window.LiveDB.listenSession(code, function (s) {
       sess = s;
@@ -395,6 +400,7 @@ window.LiveMode = (function () {
     }));
 
     function hostLobby() {
+      hostPhase = "lobby";
       var joined = sess.joined || {};
       var names = Object.keys(joined).map(function (id) { return joined[id].name; });
       var chips = el("div", { class: "join-chips" }, names.map(function (n) { return el("span", { class: "join-chip", text: n }); }));
@@ -447,6 +453,7 @@ window.LiveMode = (function () {
     }
 
     function watchAnswers(i, r) {
+      hostPhase = "question"; // we're now taking answers for round i
       if (answersUnsub) { answersUnsub(); answersUnsub = null; }
       var answered = 0;
       latestAnswers = []; // fresh question
@@ -464,6 +471,12 @@ window.LiveMode = (function () {
     }
 
     function renderQuestion(i, r, answered) {
+      // A late answer snapshot can still fire after the teacher reveals (the
+      // Firestore listener isn't cancelled instantly). Never rebuild the question
+      // screen unless we're actually in the question phase — otherwise we'd tear
+      // the reveal screen down and drop the teacher back onto the question, which
+      // looked like "the Reveal button stopped working".
+      if (hostPhase !== "question") return;
       if (adapter.match) return renderMatchHost(i, r);
       var joinedN = Object.keys(sess.joined || {}).length || (sess.students || []).length;
       // Build the question screen once per round; on every later answer just
@@ -528,27 +541,32 @@ window.LiveMode = (function () {
 
     function renderMatchHost(i, r) {
       var d = matchProgress(r);
-      // Same fix as tap games: once the progress board exists, refresh only the
-      // bars + counter in place. Rebuilding the whole screen on every matched
-      // pair would keep destroying the "Reveal & score" button under the teacher.
+      // The `.match-progress` container is ALWAYS rendered (a "waiting…" line lives
+      // inside it when empty), so once the round is built we only ever refresh the
+      // bars + counter in place. Rebuilding the whole screen on every matched pair
+      // would keep destroying the "Reveal & score" button under the teacher.
+      function fill(container) {
+        container.innerHTML = "";
+        if (d.rows.length) d.rows.forEach(function (row) { container.appendChild(row); });
+        else container.appendChild(el("p", { class: "live-muted", text: "Waiting for students to join…" }));
+      }
       var counter = document.querySelector(".host-answered");
       var progWrap = document.querySelector(".match-progress");
-      if (hostRenderedQ === i && counter && progWrap && d.rows.length) {
+      if (hostRenderedQ === i && counter && progWrap) {
         counter.textContent = d.doneCount + " of " + d.denom + " finished";
-        progWrap.innerHTML = "";
-        d.rows.forEach(function (row) { progWrap.appendChild(row); });
+        fill(progWrap);
         return;
       }
       hostRenderedQ = i;
+      var progContainer = el("div", { class: "match-progress" });
+      fill(progContainer);
       show(screen("host", [
         el("div", { class: "host-topbar" }, [
           el("div", { class: "host-q-num", text: "Round " + (i + 1) + " / " + rounds.length }),
           el("div", { class: "host-answered", text: d.doneCount + " of " + d.denom + " finished" })
         ]),
         el("div", { class: "match-host-tag", text: "🔗 Each student matches every pair" }),
-        d.rows.length
-          ? el("div", { class: "match-progress" }, d.rows)
-          : el("p", { class: "live-muted", text: "Waiting for students to join…" }),
+        progContainer,
         el("div", { class: "host-controls" }, [
           el("button", { class: "btn primary big", text: "Reveal & score ▶", on: { click: function () { reveal(i, r); } } })
         ])
@@ -556,6 +574,9 @@ window.LiveMode = (function () {
     }
 
     function reveal(i, r) {
+      // Revealing is the teacher's call at ANY moment. Mark the phase first so a
+      // late answer snapshot can't rebuild the question screen over this reveal.
+      hostPhase = "reveal";
       if (adapter.match) return revealMatch(i, r);
       clearTimeout(timer);
       if (answersUnsub) { answersUnsub(); answersUnsub = null; }
@@ -573,13 +594,15 @@ window.LiveMode = (function () {
           if (!a) { results.push({ studentId: stu.id, name: stu.name, correct: false, points: 0, answered: false }); return; }
           var ts = a.ts && a.ts.toMillis ? a.ts.toMillis() : null;
           var elapsed = (startedAt != null && ts != null) ? Math.max(0, ts - startedAt) : TL;
-          var sc = adapter.score(r, a, elapsed, TL);
-          scores[stu.id] = (scores[stu.id] || 0) + sc.points;
-          results.push({ studentId: stu.id, name: stu.name, correct: sc.correct, points: sc.points, answered: true, matched: sc.matched, total: sc.total });
+          // A bad answer payload must never brick the reveal — score defensively.
+          var sc; try { sc = adapter.score(r, a, elapsed, TL) || {}; } catch (e) { sc = { correct: false, points: 0 }; }
+          scores[stu.id] = (scores[stu.id] || 0) + (sc.points || 0);
+          results.push({ studentId: stu.id, name: stu.name, correct: !!sc.correct, points: sc.points || 0, answered: true, matched: sc.matched, total: sc.total });
         });
         results.sort(function (x, y) { return y.points - x.points; });
         results.forEach(function (rr, idx) { rr.rank = idx + 1; });
-        var revealDoc = { index: i, correct: adapter.correctLabel(r), explanation: r.explanation || null, results: results };
+        var correctLabelText; try { correctLabelText = adapter.correctLabel(r); } catch (e) { correctLabelText = ""; }
+        var revealDoc = { index: i, correct: correctLabelText, explanation: r.explanation || null, results: results };
         // Lücken-Text: now that the round is over it's safe to ship the correct
         // answers so each phone can mark its own blanks right/wrong.
         if (adapter.blanks) { revealDoc.blanks = r.blanks; revealDoc.sentence = r.sentence; }
@@ -595,6 +618,7 @@ window.LiveMode = (function () {
 
     // ---- Score the individual match round from each student's progress docs ----
     function revealMatch(i, r) {
+      hostPhase = "reveal"; // late progress docs must not rebuild over the reveal
       clearTimeout(timer);
       if (answersUnsub) { answersUnsub(); answersUnsub = null; }
       var arr = latestAnswers;
@@ -704,6 +728,7 @@ window.LiveMode = (function () {
     }
 
     function podium() {
+      hostPhase = "podium";
       // Transition into the final screen (once), then render it.
       window.LiveDB.updateSession(code, { status: "podium" });
       if (sess.persistMode === "continue") window.LiveDB.saveLeaderboard(sess.rosterId, sess.scores || {});
