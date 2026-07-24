@@ -56,6 +56,37 @@ service cloud.firestore {
 
         allow update, delete: if false;
       }
+
+      // ---- Joined: one document per claimed roster slot, sessions/{room}/joined/{studentId}.
+      // This is the SERVER-SIDE backstop for the name-claim race: even a client
+      // that bypasses the app's transaction cannot steal a name that is already
+      // held with a fresh heartbeat. A slot frees up once its heartbeat is older
+      // than 15s (a disconnected student's phone stops sending heartbeats).
+      match /joined/{studentId} {
+        allow read: if true;
+
+        // Claiming a FREE slot: a create only happens when no document exists, so
+        // it is by definition nobody's name yet. Validate shape.
+        allow create: if
+          shortStr(request.resource.data.name, 80) &&
+          request.resource.data.owner is string &&
+          request.resource.data.heartbeat is timestamp;
+
+        // Update = the OWNER device refreshing its heartbeat / re-claiming, OR
+        // anyone reclaiming a slot whose heartbeat has gone stale (owner gone). A
+        // fresh slot can NEVER be taken over by a DIFFERENT device — that's the
+        // server-side backstop for the name-claim race.
+        allow update: if
+          shortStr(request.resource.data.name, 80) &&
+          request.resource.data.owner is string &&
+          request.resource.data.heartbeat is timestamp && (
+            request.resource.data.owner == resource.data.owner ||
+            resource.data.heartbeat < request.time - duration.value(15, 's')
+          );
+
+        // Leaving (tab close / explicit leave) frees the slot immediately.
+        allow delete: if true;
+      }
     }
 
     // ---- Shared content bank (words, sentences, cases, compounds) ----

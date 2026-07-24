@@ -369,7 +369,7 @@ window.LiveMode = (function () {
             rosterId: roster.id, rosterName: roster.name, students: roster.students,
             gameId: sel.gameId, gameName: sel.adapter.meta.name, topicName: sel.topic.name,
             status: "lobby", questionIndex: -1, totalQuestions: sel.rounds.length,
-            round: null, reveal: null, scores: seed.scores, joined: {}, persistMode: sel.persistMode,
+            round: null, reveal: null, scores: seed.scores, persistMode: sel.persistMode,
             answerMode: sel.answerMode, gameSeq: 0
           }).then(function (code) {
             hostRun(code, sel.adapter, sel.rounds, roster);
@@ -427,6 +427,32 @@ window.LiveMode = (function () {
     var passageInfo = null, passageSpeed = 1;
     (rounds || []).some(function (r) { if (r && r.passage) { passageInfo = r.passage; passageSpeed = r.speed || 1; return true; } return false; });
 
+    // ---- Live presence (who has actually claimed a name) --------------------
+    // Each claimed slot is a sessions/{code}/joined/{id} doc with a heartbeat the
+    // student refreshes. A slot is "present" only while its heartbeat is fresh;
+    // once a phone dies the heartbeat stops and the name frees up. This drives
+    // the lobby's joined / "still missing" split, the answered denominators, and
+    // the disconnected markers.
+    var joinedList = [];
+    var STALE = window.LiveDB.JOIN_STALE_MS || 15000;
+    function present() {
+      var now = Date.now();
+      return joinedList.filter(function (j) { return j.name && (now - j.heartbeat) < STALE; });
+    }
+    function presentMap() { var m = {}; present().forEach(function (j) { m[j.id] = j.name; }); return m; }
+    function presentCount() { return present().length; }
+    function onPresence() {
+      if (!sess) return;
+      if (hostPhase === "lobby") return hostLobby();
+      // Mid-game: refresh the answered denominator / board markers in place.
+      if (hostPhase === "question" && sess.round) renderQuestion(sess.round.index, rounds[sess.round.index], (latestAnswers || []).length);
+    }
+    track(window.LiveDB.listenJoined(code, function (arr) { joinedList = arr; onPresence(); }));
+    // Heartbeats stop silently on disconnect (no write), so poll to notice names
+    // going stale even when no snapshot arrives.
+    var presenceTimer = setInterval(onPresence, 3000);
+    track(function () { clearInterval(presenceTimer); });
+
     track(window.LiveDB.listenSession(code, function (s) {
       sess = s;
       if (!s) return;
@@ -435,17 +461,28 @@ window.LiveMode = (function () {
 
     function hostLobby() {
       hostPhase = "lobby";
-      var joined = sess.joined || {};
-      var names = Object.keys(joined).map(function (id) { return joined[id].name; });
-      var chips = el("div", { class: "join-chips" }, names.map(function (n) { return el("span", { class: "join-chip", text: n }); }));
+      var roster = sess.students || [];
+      var pm = presentMap();
+      var joinedNames = roster.filter(function (s) { return pm[s.id]; });
+      var missing = roster.filter(function (s) { return !pm[s.id]; });
       show(screen("host", [
         el("div", { class: "roomcode-wrap" }, [
           el("div", { class: "roomcode-label", text: "Join at this screen's URL — room code:" }),
           el("div", { class: "roomcode", text: code })
         ]),
-        el("div", { class: "join-count", text: names.length + " joined" }),
-        chips,
-        el("button", { class: "btn primary big", text: "Start game ▶", attrs: names.length ? {} : { disabled: "true" }, on: { click: (adapter.passage ? hostPassage : nextQuestion) } }),
+        el("div", { class: "join-count", text: joinedNames.length + " of " + roster.length + " joined" }),
+        joinedNames.length
+          ? el("div", { class: "join-chips" }, joinedNames.map(function (s) { return el("span", { class: "join-chip", text: s.name }); }))
+          : null,
+        // Live "still missing" list — updates in real time as students join and,
+        // if a phone drops (heartbeat goes stale), the name reappears here.
+        missing.length
+          ? el("div", { class: "join-missing" }, [
+              el("div", { class: "join-missing-label", text: "⏳ Still missing (" + missing.length + ")" }),
+              el("div", { class: "join-chips missing" }, missing.map(function (s) { return el("span", { class: "join-chip out", text: s.name }); }))
+            ])
+          : el("div", { class: "join-allin", text: "🎉 Everyone's in!" }),
+        el("button", { class: "btn primary big", text: "Start game ▶", attrs: joinedNames.length ? {} : { disabled: "true" }, on: { click: (adapter.passage ? hostPassage : nextQuestion) } }),
         el("button", { class: "back-link small", html: "✕ Close room", on: { click: closeRoom } })
       ]));
     }
@@ -555,7 +592,7 @@ window.LiveMode = (function () {
         latestAnswers = arr; // keep the newest set so reveal needn't re-query
         answered = arr.length;
         renderQuestion(i, r, answered);
-        var joinedN = Object.keys(sess.joined || {}).length || sess.students.length;
+        var joinedN = presentCount() || (sess.students || []).length;
         if (answered >= joinedN && joinedN > 0) { /* everyone answered — teacher may reveal */ }
       });
       // cosmetic countdown then auto-enable reveal
@@ -572,7 +609,7 @@ window.LiveMode = (function () {
       // looked like "the Reveal button stopped working".
       if (hostPhase !== "question") return;
       if (adapterForRound(r).match) return renderMatchHost(i, r);
-      var joinedN = Object.keys(sess.joined || {}).length || (sess.students || []).length;
+      var joinedN = presentCount() || (sess.students || []).length;
       // Build the question screen once per round; on every later answer just
       // update the "X of Y answered" counter in place. Calling show() on each
       // submission would tear down and rebuild the Reveal button under the
@@ -604,8 +641,7 @@ window.LiveMode = (function () {
     // progress docs the live listener has delivered so far.
     function matchProgress(r) {
       var total = (r.pairs || []).length || 1;
-      var joined = sess.joined || {};
-      var joinedIds = Object.keys(joined);
+      var joinedIds = Object.keys(presentMap());
       // Best progress per student, from the docs the live listener delivered.
       var prog = {};
       latestAnswers.forEach(function (a) {
@@ -846,13 +882,17 @@ window.LiveMode = (function () {
         el("div", { class: "reveal-stat", text: statText }),
         el("h3", { class: "reveal-board-title", text: "Top scorers — this " + (isMatch ? "round" : "question") }),
         ranked.length
-          ? el("div", { class: "board-list" }, ranked.slice(0, 8).map(function (x, idx) {
-              return el("div", { class: "board-row" + (idx === 0 && x.points > 0 ? " top" : "") }, [
-                el("span", { class: "board-rank", text: (idx + 1) }),
-                el("span", { class: "board-name", text: x.name + (showCount ? "  (" + x.matched + "/" + x.total + ")" : "") }),
-                el("span", { class: "board-pts", text: x.points > 0 ? "+" + x.points : (showCount ? "0" : "✗") })
-              ]);
-            }))
+          ? el("div", { class: "board-list" }, (function () {
+              var pm = presentMap();
+              return ranked.slice(0, 8).map(function (x, idx) {
+                var offline = !pm[x.studentId]; // dropped mid-game — small, quiet cue
+                return el("div", { class: "board-row" + (idx === 0 && x.points > 0 ? " top" : "") + (offline ? " offline" : ""), attrs: offline ? { title: "Disconnected" } : {} }, [
+                  el("span", { class: "board-rank", text: (idx + 1) }),
+                  el("span", { class: "board-name", text: x.name + (showCount ? "  (" + x.matched + "/" + x.total + ")" : "") + (offline ? "  ⚠" : "") }),
+                  el("span", { class: "board-pts", text: x.points > 0 ? "+" + x.points : (showCount ? "0" : "✗") })
+                ]);
+              });
+            })())
           : el("p", { class: "live-muted", text: "No answers this round." }),
         el("div", { class: "reveal-actions" }, [
           r.passage ? el("button", { class: "btn ghost show-passage-btn", html: "📖 Show passage", on: { click: function () { showPassageOverlay(r.passage); } } }) : null,
@@ -872,7 +912,8 @@ window.LiveMode = (function () {
 
     function renderPodium() {
       var scores = sess.scores || {};
-      var rows = (sess.students || []).map(function (s) { return { name: s.name, pts: scores[s.id] || 0 }; })
+      var pm = presentMap();
+      var rows = (sess.students || []).map(function (s) { return { name: s.name, pts: scores[s.id] || 0, offline: !pm[s.id] }; })
         .sort(function (a, b) { return b.pts - a.pts; });
       var top3 = rows.slice(0, 3);
       show(screen("host", [
@@ -889,9 +930,9 @@ window.LiveMode = (function () {
         el("h3", { class: "reveal-board-title", text: "Final leaderboard" }),
         rows.length
           ? el("div", { class: "board-list" }, rows.map(function (row, idx) {
-              return el("div", { class: "board-row" + (idx === 0 ? " top" : "") }, [
+              return el("div", { class: "board-row" + (idx === 0 ? " top" : "") + (row.offline ? " offline" : ""), attrs: row.offline ? { title: "Disconnected" } : {} }, [
                 el("span", { class: "board-rank", text: (idx + 1) }),
-                el("span", { class: "board-name", text: row.name }),
+                el("span", { class: "board-name", text: row.name + (row.offline ? "  ⚠" : "") }),
                 el("span", { class: "board-pts", text: row.pts })
               ]);
             }))
@@ -973,22 +1014,54 @@ window.LiveMode = (function () {
   function playerPickName(code, s) {
     stop();
     window.AppNav.set(function () { playerJoin(); }, null);
-    var joined = s.joined || {};
-    var grid = el("div", { class: "name-grid" }, (s.students || []).map(function (stu) {
-      var taken = !!joined[stu.id];
-      return el("button", {
-        class: "name-btn" + (taken ? " taken" : ""),
-        on: { click: function () { pick(stu); } }
-      }, [el("span", { text: stu.name }), taken ? el("span", { class: "name-taken", text: "✓" }) : null]);
-    }));
-    function pick(stu) {
-      window.LiveDB.joinSession(code, stu.id, stu.name).then(function () {
-        playerRun(code, stu);
-      }).catch(function (e) { alert("Could not join: " + e.message); });
+    var students = s.students || [];
+    var STALE = window.LiveDB.JOIN_STALE_MS || 15000;
+    var joinedList = [];   // live [{id, name, heartbeat}] from the joined subcollection
+    var busy = false;      // a claim is in flight
+    var errBox = el("div", { class: "code-err" });
+    var grid = el("div", { class: "name-grid" });
+
+    function takenSet() {
+      var now = Date.now(), m = {};
+      joinedList.forEach(function (j) { if (j.name && (now - j.heartbeat) < STALE) m[j.id] = true; });
+      return m;
     }
+    function renderNames() {
+      var taken = takenSet();
+      grid.innerHTML = "";
+      students.forEach(function (stu) {
+        var isTaken = !!taken[stu.id];
+        var btn = el("button", {
+          class: "name-btn" + (isTaken ? " taken" : ""),
+          attrs: isTaken ? { disabled: "true" } : {},
+          on: { click: function () { if (!isTaken && !busy) pick(stu, btn); } }
+        }, [el("span", { text: stu.name }), isTaken ? el("span", { class: "name-taken", text: "✓" }) : null]);
+        grid.appendChild(btn);
+      });
+    }
+    // Live roster presence — taken names gray out in real time (and free up again
+    // if a student drops), for everyone still on this screen.
+    track(window.LiveDB.listenJoined(code, function (arr) { joinedList = arr; renderNames(); }));
+    var pollTimer = setInterval(renderNames, 3000); // catch names going stale
+    track(function () { clearInterval(pollTimer); });
+
+    function pick(stu, btn) {
+      busy = true; errBox.textContent = ""; if (btn) btn.classList.add("claiming");
+      var owner = window.LiveDB.deviceToken ? window.LiveDB.deviceToken() : ("d-" + Math.random());
+      window.LiveDB.claimName(code, stu.id, stu.name, owner).then(function () {
+        playerRun(code, stu);
+      }).catch(function (e) {
+        busy = false;
+        if (e && e.code === "name-taken") errBox.textContent = "Someone just picked " + stu.name + " — choose another.";
+        else errBox.textContent = "Couldn't join — try again.";
+        renderNames();
+      });
+    }
+    renderNames();
     show(screen("player live-center", [
       el("h2", { class: "live-title", text: "Who are you?" }),
       el("p", { class: "live-sub", text: "Tap your name" }),
+      errBox,
       grid
     ]));
   }
@@ -997,6 +1070,15 @@ window.LiveMode = (function () {
     stop();
     // Back leaves the room; confirm while the student is on an answering screen.
     window.AppNav.set(function () { landing(); }, function () { return !!document.querySelector(".match-board, .live-q-options.phone, .cases-player, .wm-player, .tf-player"); });
+    // Presence heartbeat: keep this student's claimed name alive. If the phone
+    // dies or the tab closes, the heartbeats stop and the name frees up (after
+    // JOIN_STALE_MS); a clean tab-close frees it instantly via leaveSession.
+    window.LiveDB.heartbeat(code, stu.id);
+    var hbTimer = setInterval(function () { window.LiveDB.heartbeat(code, stu.id); }, 5000);
+    track(function () { clearInterval(hbTimer); });
+    var onLeave = function () { try { window.LiveDB.leaveSession(code, stu.id); } catch (e) {} };
+    try { window.addEventListener("pagehide", onLeave); window.addEventListener("beforeunload", onLeave); } catch (e) {}
+    track(function () { try { window.removeEventListener("pagehide", onLeave); window.removeEventListener("beforeunload", onLeave); } catch (e) {} });
     // The Passage game runs different formats per question — resolve the phone's
     // adapter from the CURRENT round's `fmt`, falling back to the session game.
     function playerAdapter(s) { return (s && s.round && s.round.fmt && window.LiveGames[s.round.fmt]) || window.LiveGames[s.gameId]; }

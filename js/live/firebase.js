@@ -118,10 +118,72 @@
     updateSession: function (code, data) {
       return db.collection("sessions").doc(code).set(data, { merge: true });
     },
-    joinSession: function (code, studentId, studentName) {
-      var patch = { joined: {} };
-      patch.joined[studentId] = { name: studentName, at: Date.now() };
-      return db.collection("sessions").doc(code).set(patch, { merge: true });
+    // A student's claimed roster slot lives in its OWN document at
+    // sessions/{code}/joined/{studentId}, with a heartbeat the client refreshes.
+    // A name is "free" again once its heartbeat is older than JOIN_STALE_MS.
+    JOIN_STALE_MS: 15000, // 15s (~3 missed 5s heartbeats) — see claimName/presence
+
+    // A stable per-BROWSER token so we can tell "the same phone reconnecting"
+    // (allowed to keep its name) from "a different phone grabbing the same name"
+    // (refused). Two students can't be distinguished by (id, name) alone.
+    deviceToken: function () {
+      try {
+        var t = localStorage.getItem("skillbee_device_token");
+        if (!t) { t = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("skillbee_device_token", t); }
+        return t;
+      } catch (e) { return "d-" + Math.random().toString(36).slice(2); }
+    },
+
+    // Claim a name ATOMICALLY. A Firestore transaction makes the read-check-write
+    // one indivisible step: if two DIFFERENT phones tap the same name at once, one
+    // wins and the other's transaction retries, sees the fresh claim by a
+    // different owner, and fails with { code:"name-taken" } — no silent overwrite.
+    // The true owner may always re-claim (reconnect); a slot whose heartbeat has
+    // gone stale (owner gone) is reclaimable by anyone.
+    claimName: function (code, studentId, studentName, owner) {
+      var ref = db.collection("sessions").doc(code).collection("joined").doc(studentId);
+      var STALE = LiveDB.JOIN_STALE_MS;
+      return db.runTransaction(function (tx) {
+        return tx.get(ref).then(function (d) {
+          if (d.exists) {
+            var data = d.data() || {};
+            var hb = data.heartbeat;
+            var ms = (hb && hb.toMillis) ? hb.toMillis() : 0;
+            // Held by a DIFFERENT device with a fresh heartbeat — refuse.
+            if (ms && (Date.now() - ms) < STALE && data.owner !== owner) {
+              return Promise.reject({ code: "name-taken" });
+            }
+          }
+          tx.set(ref, { name: studentName, owner: owner, joinedAt: serverTs(), heartbeat: serverTs() });
+          return null;
+        });
+      }).then(function () { return true; });
+    },
+    // Refresh this student's heartbeat (called every few seconds while joined).
+    heartbeat: function (code, studentId) {
+      return db.collection("sessions").doc(code).collection("joined").doc(studentId)
+        .set({ heartbeat: serverTs() }, { merge: true }).catch(function () {});
+    },
+    // Explicitly give up a slot (tab close / leave) so the name frees instantly.
+    leaveSession: function (code, studentId) {
+      return db.collection("sessions").doc(code).collection("joined").doc(studentId)
+        .delete().catch(function () {});
+    },
+    // Live view of every claimed slot: [{ id, name, heartbeat(ms) }]. A pending
+    // serverTimestamp reads back null momentarily — treat that as "just now".
+    listenJoined: function (code, cb) {
+      return db.collection("sessions").doc(code).collection("joined").onSnapshot(
+        function (snap) {
+          var arr = [];
+          snap.forEach(function (d) {
+            var x = d.data() || {};
+            var hb = (x.heartbeat && x.heartbeat.toMillis) ? x.heartbeat.toMillis() : Date.now();
+            arr.push({ id: d.id, name: x.name, heartbeat: hb });
+          });
+          cb(arr);
+        },
+        function () { cb([]); }
+      );
     },
 
     /* ---------------- answers ---------------- */

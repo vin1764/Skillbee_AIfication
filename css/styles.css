@@ -1189,3 +1189,16 @@ input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf
 .adm-pq-move:hover { background: var(--skb-tint); }
 .adm-pq-body { margin-top: 10px; }
 .adm-pq-add { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+
+/* ===== Live presence (room joining / disconnect) ===== */
+.join-missing { margin: 14px auto 4px; max-width: 640px; }
+.join-missing-label { font-size: 0.85rem; font-weight: 800; color: var(--ink-soft); margin-bottom: 8px; }
+.join-chips.missing { opacity: 0.95; }
+.join-chip.out { background: #fff; color: var(--ink-soft); border: 1px dashed var(--line-deep); }
+.join-allin { margin: 16px auto; font-weight: 800; color: var(--good); }
+/* Grayed-out taken names on the phone join screen. */
+.name-btn.taken { opacity: 0.45; cursor: not-allowed; }
+.name-btn.claiming { opacity: 0.7; }
+/* Small, quiet "disconnected" cue on the host board / leaderboard. */
+.board-row.offline { opacity: 0.55; }
+.board-row.offline .board-name { font-style: italic; }
