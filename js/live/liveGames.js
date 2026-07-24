@@ -578,17 +578,13 @@
     hostContent: function (el, round) {
       if (round._plays == null) round._plays = 0;
       var btn;
-      function label() {
-        if (round._plays === 0) return "🔊 Play the audio";
-        if (round._plays === 1) return "🔁 Play again (1 left)";
-        return "✓ Played twice";
-      }
-      function refresh() { btn.innerHTML = label(); btn.disabled = round._plays >= 2; }
+      // Teacher may replay the clip as many times as she likes — no cap.
+      function label() { return round._plays === 0 ? "🔊 Play the audio" : "🔁 Play again"; }
       btn = el("button", {
         class: "btn primary big listen-play",
-        on: { click: function () { if (round._plays < 2) { round._plays++; try { kit().speak(round.word, { rate: round.speed || 1 }); } catch (e) {} refresh(); } } }
+        on: { click: function () { round._plays++; try { kit().speak(round.word, { rate: round.speed || 1 }); } catch (e) {} btn.innerHTML = label(); } }
       });
-      refresh();
+      btn.innerHTML = label();
       var typing = round.answerMode === "type";
       return el("div", { class: "live-q" }, [
         el("div", { class: "live-q-tag", text: typing ? "👂 Type what you hear" : "👂 Which one did you hear?" }),

@@ -372,6 +372,8 @@ window.LiveMode = (function () {
     var latestAnswers = []; // answers delivered by the live listener for the current question
     var timer = null;
     var TL = adapter.timeLimit || 20000;
+    var hostRenderedQ = -1; // host question screen is built once per round; later
+                            // answers only update the counter, never rebuild the DOM
 
     track(window.LiveDB.listenSession(code, function (s) {
       sess = s;
@@ -439,6 +441,17 @@ window.LiveMode = (function () {
     function renderQuestion(i, r, answered) {
       if (adapter.match) return renderMatchHost(i, r);
       var joinedN = Object.keys(sess.joined || {}).length || (sess.students || []).length;
+      // Build the question screen once per round; on every later answer just
+      // update the "X of Y answered" counter in place. Calling show() on each
+      // submission would tear down and rebuild the Reveal button under the
+      // teacher's finger, so in a fast class she couldn't tap it until the
+      // answers stopped flowing (i.e. until everyone had answered).
+      var counter = document.querySelector(".host-answered");
+      if (hostRenderedQ === i && counter) {
+        counter.textContent = answered + " of " + joinedN + " answered";
+        return;
+      }
+      hostRenderedQ = i;
       show(screen("host", [
         el("div", { class: "host-topbar" }, [
           el("div", { class: "host-q-num", text: "Question " + (i + 1) + " / " + rounds.length }),
@@ -452,7 +465,9 @@ window.LiveMode = (function () {
     }
 
     // ---- Host: live per-student progress for the individual match game ----
-    function renderMatchHost(i, r) {
+    // Build the per-student progress rows + the "N finished" count from the
+    // progress docs the live listener has delivered so far.
+    function matchProgress(r) {
       var total = (r.words || []).length || 1;
       var joined = sess.joined || {};
       var joinedIds = Object.keys(joined);
@@ -483,14 +498,31 @@ window.LiveMode = (function () {
           el("span", { class: "match-pcount", text: (p.done ? "✓ " : "") + p.matched + "/" + total })
         ]);
       });
+      return { rows: rows, doneCount: doneCount, denom: (shown.length || roster.length) };
+    }
+
+    function renderMatchHost(i, r) {
+      var d = matchProgress(r);
+      // Same fix as tap games: once the progress board exists, refresh only the
+      // bars + counter in place. Rebuilding the whole screen on every matched
+      // pair would keep destroying the "Reveal & score" button under the teacher.
+      var counter = document.querySelector(".host-answered");
+      var progWrap = document.querySelector(".match-progress");
+      if (hostRenderedQ === i && counter && progWrap && d.rows.length) {
+        counter.textContent = d.doneCount + " of " + d.denom + " finished";
+        progWrap.innerHTML = "";
+        d.rows.forEach(function (row) { progWrap.appendChild(row); });
+        return;
+      }
+      hostRenderedQ = i;
       show(screen("host", [
         el("div", { class: "host-topbar" }, [
           el("div", { class: "host-q-num", text: "Round " + (i + 1) + " / " + rounds.length }),
-          el("div", { class: "host-answered", text: doneCount + " of " + (shown.length || roster.length) + " finished" })
+          el("div", { class: "host-answered", text: d.doneCount + " of " + d.denom + " finished" })
         ]),
         el("div", { class: "match-host-tag", text: "🎧 Each student matches every word to its meaning" }),
-        rows.length
-          ? el("div", { class: "match-progress" }, rows)
+        d.rows.length
+          ? el("div", { class: "match-progress" }, d.rows)
           : el("p", { class: "live-muted", text: "Waiting for students to join…" }),
         el("div", { class: "host-controls" }, [
           el("button", { class: "btn primary big", text: "Reveal & score ▶", on: { click: function () { reveal(i, r); } } })
