@@ -106,10 +106,39 @@
     if (typeof e.english !== "string") e.english = "";
     if (!Array.isArray(e.sentences)) e.sentences = [];
   }
+  // A Lücken-Text sentence entry: { sentence, blanks:[{id,correct}], wordBank,
+  // explanation }. Older stores hold single-blank case rows ({ sentence, correct,
+  // distractors, clueWord }) — migrate those forward in place. Idempotent.
+  function migrateCaseEntry(e) {
+    if (!e || typeof e !== "object") return { sentence: "", blanks: [], wordBank: [], explanation: "" };
+    if (Array.isArray(e.blanks)) {
+      e.sentence = String(e.sentence || "");
+      e.blanks = e.blanks.map(function (b, i) {
+        return { id: (b && b.id != null) ? b.id : i + 1, correct: String((b && b.correct) || "").trim() };
+      });
+      e.wordBank = Array.isArray(e.wordBank) ? e.wordBank.map(function (w) { return String(w).trim(); }).filter(Boolean) : [];
+      if (typeof e.explanation !== "string") e.explanation = "";
+      delete e.correct; delete e.distractors; delete e.clueWord; delete e.blank; delete e.answer;
+      return e;
+    }
+    var correct = String(e.correct || "").trim();
+    var bank = [];
+    if (correct) bank.push(correct);
+    (Array.isArray(e.distractors) ? e.distractors : []).forEach(function (d) { d = String(d).trim(); if (d && bank.indexOf(d) < 0) bank.push(d); });
+    return {
+      sentence: String(e.sentence || ""),
+      blanks: correct ? [{ id: 1, correct: correct }] : [],
+      wordBank: bank,
+      explanation: e.explanation || ""
+    };
+  }
   function normalizeCaseEx(e) {
     if (!e.id) e.id = exId();
     if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
-    ["accusative", "dative", "genitive"].forEach(function (k) { if (!Array.isArray(e[k])) e[k] = []; });
+    ["accusative", "dative", "genitive"].forEach(function (k) {
+      if (!Array.isArray(e[k])) e[k] = [];
+      e[k] = e[k].map(migrateCaseEntry);
+    });
   }
   function normalizeListEx(e) {
     if (!e.id) e.id = exId();

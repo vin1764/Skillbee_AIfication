@@ -134,20 +134,43 @@
     });
   }
 
+  // How many blanks a sentence marks (numbered ___N___ if present, else plain ___).
+  function countGaps(sentence) {
+    var numbered = (String(sentence).match(/___\d+___/g) || []).length;
+    return numbered || (String(sentence).match(/_{2,}/g) || []).length;
+  }
+
+  // Build the tap-mode word bank: the teacher's list if given, otherwise the
+  // correct answers topped up with plausible article distractors so tap mode
+  // isn't trivial. Always includes every correct answer, de-duplicated.
+  function buildWordBank(corrects, provided) {
+    var out = [];
+    (Array.isArray(provided) ? provided : []).forEach(function (w) { w = String(w).trim(); if (w && out.indexOf(w) < 0) out.push(w); });
+    corrects.forEach(function (c) { if (c && out.indexOf(c) < 0) out.push(c); });
+    if (out.length < corrects.length + 1) {
+      var pool = ARTICLE_POOL.filter(function (a) { return out.indexOf(a) < 0; });
+      kit().sample(pool, (corrects.length + 1) - out.length).forEach(function (a) { out.push(a); });
+    }
+    return out;
+  }
+
   // Accept BOTH the new multi-blank schema and the legacy single-blank case
   // rows (sentence + correct + distractors) a teacher may have in the editor,
   // and normalise to { sentence, blanks:[{id,correct}], wordBank, explanation }.
   function normBlankEntry(s) {
     if (!s) return null;
     if (Array.isArray(s.blanks) && s.blanks.length) {
+      var sentence = String(s.sentence || "");
+      if (sentence.indexOf("___") < 0) return null;               // no blank marker
       var blanks = s.blanks.map(function (b, i) {
         return { id: (b.id != null ? b.id : i + 1), correct: String(b.correct == null ? "" : b.correct).trim() };
       }).filter(function (b) { return b.correct !== ""; });
       if (!blanks.length) return null;
-      var wordBank = (Array.isArray(s.wordBank) && s.wordBank.length)
-        ? s.wordBank.map(function (w) { return String(w).trim(); }).filter(Boolean)
-        : blanks.map(function (b) { return b.correct; });
-      return { sentence: ensureNumbered(String(s.sentence || ""), blanks), blanks: blanks, wordBank: wordBank, explanation: s.explanation || "" };
+      // Skip half-finished rows: an unfilled gap would render a slot that can't
+      // be scored, so only play sentences whose gaps all have answers.
+      if (countGaps(sentence) !== blanks.length) return null;
+      var wordBank = buildWordBank(blanks.map(function (b) { return b.correct; }), s.wordBank);
+      return { sentence: ensureNumbered(sentence, blanks), blanks: blanks, wordBank: wordBank, explanation: s.explanation || "" };
     }
     // Legacy: one blank marked by "___", with a single correct article.
     if (s.sentence && String(s.sentence).indexOf("___") >= 0 && s.correct) {

@@ -1,8 +1,10 @@
 /* =====================================================================
-   Fall-Detektiv (Case Detective) — sentence bank.
-   Each entry: a sentence with a blanked article, the case it needs, the
-   correct article, three distractor articles, the "clue" word (verb or
-   preposition that decides the case), and a one-line explanation.
+   Case-article drills — the first content set for Lücken-Text (fill in
+   the blank). Authored here in a compact single-blank form (sentence with
+   one ___, the correct article, wrong-article choices, a one-line
+   explanation) and transformed at the bottom into the general Lücken-Text
+   schema { sentence, blanks:[{id,correct}], wordBank, explanation } that
+   the engine and the content editor use.
 
    Levels build up (a class only sees cases it has learned):
      Level 1 = accusative
@@ -64,4 +66,24 @@ const CASE_DRILLS = {
   ]
 };
 
-window.CaseData = CASE_DRILLS;
+// Transform the compact single-blank rows into the general Lücken-Text schema.
+// Each becomes a one-blank sentence; the word bank = correct + distractors.
+function toBlanks(list) {
+  return (list || []).map(function (e) {
+    var correct = String(e.correct || "").trim();
+    var bank = [correct];
+    (e.distractors || []).forEach(function (d) { d = String(d).trim(); if (d && bank.indexOf(d) < 0) bank.push(d); });
+    return {
+      sentence: String(e.sentence || ""),        // plain ___ marks the blank
+      blanks: [{ id: 1, correct: correct }],
+      wordBank: bank,
+      explanation: e.explanation || ""
+    };
+  });
+}
+
+window.CaseData = {
+  accusative: toBlanks(CASE_DRILLS.accusative),
+  dative: toBlanks(CASE_DRILLS.dative),
+  genitive: toBlanks(CASE_DRILLS.genitive)
+};

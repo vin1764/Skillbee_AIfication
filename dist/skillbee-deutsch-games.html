@@ -552,6 +552,13 @@ kbd {
 .adm-case-line:last-child { margin-bottom: 0; }
 .adm-case-line > .adm-input { flex: 1 1 140px; }
 .adm-case-line > .adm-article { flex: 0 0 78px; text-align: center; font-weight: 800; }
+.adm-case-line > .adm-ta { flex: 1 1 100%; }
+/* Per-blank answer fields (one row, wraps on small screens) */
+.adm-case-blanks { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 2px 0 10px; }
+.adm-blank-field { display: inline-flex; align-items: center; gap: 6px; background: #f4f7ff; border: 1px solid var(--line); border-radius: 9px; padding: 4px 8px; }
+.adm-blank-num { font-size: 0.72rem; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; }
+.adm-blank-field > .adm-article { flex: 0 0 90px; }
+.adm-blank-hint { color: var(--ink-soft); font-size: 0.85rem; font-style: italic; }
 
 /* Wortmonster (compounds) editor */
 .adm-compound-row {
@@ -1229,10 +1236,12 @@ window.GameData = { VOCAB_TOPICS, SENTENCE_TOPICS };
 
 /* ==== js/data-cases.js ==== */
 /* =====================================================================
-   Fall-Detektiv (Case Detective) — sentence bank.
-   Each entry: a sentence with a blanked article, the case it needs, the
-   correct article, three distractor articles, the "clue" word (verb or
-   preposition that decides the case), and a one-line explanation.
+   Case-article drills — the first content set for Lücken-Text (fill in
+   the blank). Authored here in a compact single-blank form (sentence with
+   one ___, the correct article, wrong-article choices, a one-line
+   explanation) and transformed at the bottom into the general Lücken-Text
+   schema { sentence, blanks:[{id,correct}], wordBank, explanation } that
+   the engine and the content editor use.
 
    Levels build up (a class only sees cases it has learned):
      Level 1 = accusative
@@ -1294,7 +1303,27 @@ const CASE_DRILLS = {
   ]
 };
 
-window.CaseData = CASE_DRILLS;
+// Transform the compact single-blank rows into the general Lücken-Text schema.
+// Each becomes a one-blank sentence; the word bank = correct + distractors.
+function toBlanks(list) {
+  return (list || []).map(function (e) {
+    var correct = String(e.correct || "").trim();
+    var bank = [correct];
+    (e.distractors || []).forEach(function (d) { d = String(d).trim(); if (d && bank.indexOf(d) < 0) bank.push(d); });
+    return {
+      sentence: String(e.sentence || ""),        // plain ___ marks the blank
+      blanks: [{ id: 1, correct: correct }],
+      wordBank: bank,
+      explanation: e.explanation || ""
+    };
+  });
+}
+
+window.CaseData = {
+  accusative: toBlanks(CASE_DRILLS.accusative),
+  dative: toBlanks(CASE_DRILLS.dative),
+  genitive: toBlanks(CASE_DRILLS.genitive)
+};
 
 
 /* ==== js/data-compounds.js ==== */
@@ -1555,10 +1584,39 @@ window.SkillbeeBrand = {
     if (typeof e.english !== "string") e.english = "";
     if (!Array.isArray(e.sentences)) e.sentences = [];
   }
+  // A Lücken-Text sentence entry: { sentence, blanks:[{id,correct}], wordBank,
+  // explanation }. Older stores hold single-blank case rows ({ sentence, correct,
+  // distractors, clueWord }) — migrate those forward in place. Idempotent.
+  function migrateCaseEntry(e) {
+    if (!e || typeof e !== "object") return { sentence: "", blanks: [], wordBank: [], explanation: "" };
+    if (Array.isArray(e.blanks)) {
+      e.sentence = String(e.sentence || "");
+      e.blanks = e.blanks.map(function (b, i) {
+        return { id: (b && b.id != null) ? b.id : i + 1, correct: String((b && b.correct) || "").trim() };
+      });
+      e.wordBank = Array.isArray(e.wordBank) ? e.wordBank.map(function (w) { return String(w).trim(); }).filter(Boolean) : [];
+      if (typeof e.explanation !== "string") e.explanation = "";
+      delete e.correct; delete e.distractors; delete e.clueWord; delete e.blank; delete e.answer;
+      return e;
+    }
+    var correct = String(e.correct || "").trim();
+    var bank = [];
+    if (correct) bank.push(correct);
+    (Array.isArray(e.distractors) ? e.distractors : []).forEach(function (d) { d = String(d).trim(); if (d && bank.indexOf(d) < 0) bank.push(d); });
+    return {
+      sentence: String(e.sentence || ""),
+      blanks: correct ? [{ id: 1, correct: correct }] : [],
+      wordBank: bank,
+      explanation: e.explanation || ""
+    };
+  }
   function normalizeCaseEx(e) {
     if (!e.id) e.id = exId();
     if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
-    ["accusative", "dative", "genitive"].forEach(function (k) { if (!Array.isArray(e[k])) e[k] = []; });
+    ["accusative", "dative", "genitive"].forEach(function (k) {
+      if (!Array.isArray(e[k])) e[k] = [];
+      e[k] = e[k].map(migrateCaseEntry);
+    });
   }
   function normalizeListEx(e) {
     if (!e.id) e.id = exId();
@@ -4674,14 +4732,15 @@ document.addEventListener("DOMContentLoaded", App.init);
         renderGames(body);
       }
 
-      /* ---- Fall-Detektiv: case sentences, grouped by case within one exercise ---- */
+      /* ---- Lücken-Text: fill-in sentences (one or many blanks), by case ---- */
       function renderCases(body, ex) {
         body.appendChild(
           el("p", {
             class: "adm-hint",
             html:
-              "These sentences power <b>✏️ Lücken-Text</b> (fill in the blank) in Live Class Mode. Put <code>___</code> where the missing word belongs, then give the correct word. " +
-              "Group them by case below; when the class plays this exercise, <b>all</b> its sentences are used. Changes save automatically."
+              "These sentences power <b>✏️ Lücken-Text</b> (fill in the blank) in Live Class Mode. Type <code>___</code> wherever a word is missing — " +
+              "<b>one or several blanks per sentence</b> — then give the correct word for each. The <b>word bank</b> (answers + wrong choices) is what students " +
+              "pick from in Tap mode; leave it blank and the game fills in plausible articles. Group by case; the class plays <b>all</b> the exercise's sentences. Changes save automatically."
           })
         );
         var C = ex;
@@ -4695,28 +4754,61 @@ document.addEventListener("DOMContentLoaded", App.init);
           body.appendChild(el("h3", { class: "adm-case-h", text: sec[2] + " " + sec[1] + "  (" + list.length + ")" }));
           list.forEach(function (entry, i) { body.appendChild(caseRow(entry, list, i)); });
           body.appendChild(addRowBtn("+ Sentence", function () {
-            list.push({ sentence: "", correct: "", clueWord: "", explanation: "" });
+            list.push({ sentence: "", blanks: [], wordBank: [], explanation: "" });
             store.save();
             render();
           }));
         });
       }
 
+      // Count the ___ gaps in a sentence and keep entry.blanks the same length,
+      // preserving the answers already typed (so editing text mid-sentence is safe).
+      function syncBlanks(entry) {
+        var n = (String(entry.sentence || "").match(/_{2,}/g) || []).length;
+        if (!Array.isArray(entry.blanks)) entry.blanks = [];
+        while (entry.blanks.length < n) entry.blanks.push({ id: entry.blanks.length + 1, correct: "" });
+        if (entry.blanks.length > n) entry.blanks = entry.blanks.slice(0, n);
+        entry.blanks.forEach(function (b, i) { b.id = i + 1; if (b.correct == null) b.correct = ""; });
+      }
+
       function caseRow(entry, list, index) {
+        if (!Array.isArray(entry.blanks)) entry.blanks = [];
+        syncBlanks(entry);
         var card = el("div", { class: "adm-case" });
+        var blanksWrap = el("div", { class: "adm-case-blanks" });
+
+        function renderBlanks() {
+          blanksWrap.innerHTML = "";
+          if (!entry.blanks.length) {
+            blanksWrap.appendChild(el("span", { class: "adm-blank-hint", text: "Type ___ in the sentence above to add a blank." }));
+            return;
+          }
+          entry.blanks.forEach(function (b, i) {
+            blanksWrap.appendChild(el("label", { class: "adm-blank-field" }, [
+              el("span", { class: "adm-blank-num", text: "Blank " + (i + 1) }),
+              input(b, "correct", "answer", "adm-input adm-article", 14)
+            ]));
+          });
+        }
+
+        var sentInput = textareaInput(entry, "sentence", "e.g. Ich sehe ___ Mann und gebe ___ Frau ein Buch.", "adm-ta grow");
+        // Re-sync the per-blank answer fields live as the teacher edits the text,
+        // without rebuilding the textarea (keeps their cursor/focus in place).
+        sentInput.addEventListener("input", function () { syncBlanks(entry); renderBlanks(); store.save(); });
+
         card.appendChild(el("div", { class: "adm-case-line" }, [
-          input(entry, "sentence", "e.g. Ich sehe ___ Mann.", "adm-input grow"),
-          input(entry, "correct", "den", "adm-input adm-article", 5),
+          sentInput,
           el("button", {
             class: "adm-del", html: "🗑", attrs: { title: "Remove sentence" },
             on: { click: function () { list.splice(index, 1); store.save(); render(); } }
           })
         ]));
+        card.appendChild(blanksWrap);
         card.appendChild(el("div", { class: "adm-case-line" }, [
-          input(entry, "clueWord", "clue word (the verb or preposition)", "adm-input"),
-          optionsInput(entry, "distractors", "wrong articles (optional, auto if blank)"),
+          optionsInput(entry, "wordBank", "word bank — answers + wrong choices (comma-separated; blank = auto)"),
           input(entry, "explanation", "why it's correct (shown at reveal)", "adm-input grow")
         ]));
+        renderBlanks();
         return card;
       }
 
@@ -5721,20 +5813,43 @@ document.addEventListener("DOMContentLoaded", App.init);
     });
   }
 
+  // How many blanks a sentence marks (numbered ___N___ if present, else plain ___).
+  function countGaps(sentence) {
+    var numbered = (String(sentence).match(/___\d+___/g) || []).length;
+    return numbered || (String(sentence).match(/_{2,}/g) || []).length;
+  }
+
+  // Build the tap-mode word bank: the teacher's list if given, otherwise the
+  // correct answers topped up with plausible article distractors so tap mode
+  // isn't trivial. Always includes every correct answer, de-duplicated.
+  function buildWordBank(corrects, provided) {
+    var out = [];
+    (Array.isArray(provided) ? provided : []).forEach(function (w) { w = String(w).trim(); if (w && out.indexOf(w) < 0) out.push(w); });
+    corrects.forEach(function (c) { if (c && out.indexOf(c) < 0) out.push(c); });
+    if (out.length < corrects.length + 1) {
+      var pool = ARTICLE_POOL.filter(function (a) { return out.indexOf(a) < 0; });
+      kit().sample(pool, (corrects.length + 1) - out.length).forEach(function (a) { out.push(a); });
+    }
+    return out;
+  }
+
   // Accept BOTH the new multi-blank schema and the legacy single-blank case
   // rows (sentence + correct + distractors) a teacher may have in the editor,
   // and normalise to { sentence, blanks:[{id,correct}], wordBank, explanation }.
   function normBlankEntry(s) {
     if (!s) return null;
     if (Array.isArray(s.blanks) && s.blanks.length) {
+      var sentence = String(s.sentence || "");
+      if (sentence.indexOf("___") < 0) return null;               // no blank marker
       var blanks = s.blanks.map(function (b, i) {
         return { id: (b.id != null ? b.id : i + 1), correct: String(b.correct == null ? "" : b.correct).trim() };
       }).filter(function (b) { return b.correct !== ""; });
       if (!blanks.length) return null;
-      var wordBank = (Array.isArray(s.wordBank) && s.wordBank.length)
-        ? s.wordBank.map(function (w) { return String(w).trim(); }).filter(Boolean)
-        : blanks.map(function (b) { return b.correct; });
-      return { sentence: ensureNumbered(String(s.sentence || ""), blanks), blanks: blanks, wordBank: wordBank, explanation: s.explanation || "" };
+      // Skip half-finished rows: an unfilled gap would render a slot that can't
+      // be scored, so only play sentences whose gaps all have answers.
+      if (countGaps(sentence) !== blanks.length) return null;
+      var wordBank = buildWordBank(blanks.map(function (b) { return b.correct; }), s.wordBank);
+      return { sentence: ensureNumbered(sentence, blanks), blanks: blanks, wordBank: wordBank, explanation: s.explanation || "" };
     }
     // Legacy: one blank marked by "___", with a single correct article.
     if (s.sentence && String(s.sentence).indexOf("___") >= 0 && s.correct) {

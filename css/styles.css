@@ -544,6 +544,13 @@ kbd {
 .adm-case-line:last-child { margin-bottom: 0; }
 .adm-case-line > .adm-input { flex: 1 1 140px; }
 .adm-case-line > .adm-article { flex: 0 0 78px; text-align: center; font-weight: 800; }
+.adm-case-line > .adm-ta { flex: 1 1 100%; }
+/* Per-blank answer fields (one row, wraps on small screens) */
+.adm-case-blanks { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 2px 0 10px; }
+.adm-blank-field { display: inline-flex; align-items: center; gap: 6px; background: #f4f7ff; border: 1px solid var(--line); border-radius: 9px; padding: 4px 8px; }
+.adm-blank-num { font-size: 0.72rem; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; }
+.adm-blank-field > .adm-article { flex: 0 0 90px; }
+.adm-blank-hint { color: var(--ink-soft); font-size: 0.85rem; font-style: italic; }
 
 /* Wortmonster (compounds) editor */
 .adm-compound-row {

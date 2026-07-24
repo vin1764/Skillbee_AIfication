@@ -302,14 +302,15 @@
         renderGames(body);
       }
 
-      /* ---- Fall-Detektiv: case sentences, grouped by case within one exercise ---- */
+      /* ---- Lücken-Text: fill-in sentences (one or many blanks), by case ---- */
       function renderCases(body, ex) {
         body.appendChild(
           el("p", {
             class: "adm-hint",
             html:
-              "These sentences power <b>✏️ Lücken-Text</b> (fill in the blank) in Live Class Mode. Put <code>___</code> where the missing word belongs, then give the correct word. " +
-              "Group them by case below; when the class plays this exercise, <b>all</b> its sentences are used. Changes save automatically."
+              "These sentences power <b>✏️ Lücken-Text</b> (fill in the blank) in Live Class Mode. Type <code>___</code> wherever a word is missing — " +
+              "<b>one or several blanks per sentence</b> — then give the correct word for each. The <b>word bank</b> (answers + wrong choices) is what students " +
+              "pick from in Tap mode; leave it blank and the game fills in plausible articles. Group by case; the class plays <b>all</b> the exercise's sentences. Changes save automatically."
           })
         );
         var C = ex;
@@ -323,28 +324,61 @@
           body.appendChild(el("h3", { class: "adm-case-h", text: sec[2] + " " + sec[1] + "  (" + list.length + ")" }));
           list.forEach(function (entry, i) { body.appendChild(caseRow(entry, list, i)); });
           body.appendChild(addRowBtn("+ Sentence", function () {
-            list.push({ sentence: "", correct: "", clueWord: "", explanation: "" });
+            list.push({ sentence: "", blanks: [], wordBank: [], explanation: "" });
             store.save();
             render();
           }));
         });
       }
 
+      // Count the ___ gaps in a sentence and keep entry.blanks the same length,
+      // preserving the answers already typed (so editing text mid-sentence is safe).
+      function syncBlanks(entry) {
+        var n = (String(entry.sentence || "").match(/_{2,}/g) || []).length;
+        if (!Array.isArray(entry.blanks)) entry.blanks = [];
+        while (entry.blanks.length < n) entry.blanks.push({ id: entry.blanks.length + 1, correct: "" });
+        if (entry.blanks.length > n) entry.blanks = entry.blanks.slice(0, n);
+        entry.blanks.forEach(function (b, i) { b.id = i + 1; if (b.correct == null) b.correct = ""; });
+      }
+
       function caseRow(entry, list, index) {
+        if (!Array.isArray(entry.blanks)) entry.blanks = [];
+        syncBlanks(entry);
         var card = el("div", { class: "adm-case" });
+        var blanksWrap = el("div", { class: "adm-case-blanks" });
+
+        function renderBlanks() {
+          blanksWrap.innerHTML = "";
+          if (!entry.blanks.length) {
+            blanksWrap.appendChild(el("span", { class: "adm-blank-hint", text: "Type ___ in the sentence above to add a blank." }));
+            return;
+          }
+          entry.blanks.forEach(function (b, i) {
+            blanksWrap.appendChild(el("label", { class: "adm-blank-field" }, [
+              el("span", { class: "adm-blank-num", text: "Blank " + (i + 1) }),
+              input(b, "correct", "answer", "adm-input adm-article", 14)
+            ]));
+          });
+        }
+
+        var sentInput = textareaInput(entry, "sentence", "e.g. Ich sehe ___ Mann und gebe ___ Frau ein Buch.", "adm-ta grow");
+        // Re-sync the per-blank answer fields live as the teacher edits the text,
+        // without rebuilding the textarea (keeps their cursor/focus in place).
+        sentInput.addEventListener("input", function () { syncBlanks(entry); renderBlanks(); store.save(); });
+
         card.appendChild(el("div", { class: "adm-case-line" }, [
-          input(entry, "sentence", "e.g. Ich sehe ___ Mann.", "adm-input grow"),
-          input(entry, "correct", "den", "adm-input adm-article", 5),
+          sentInput,
           el("button", {
             class: "adm-del", html: "🗑", attrs: { title: "Remove sentence" },
             on: { click: function () { list.splice(index, 1); store.save(); render(); } }
           })
         ]));
+        card.appendChild(blanksWrap);
         card.appendChild(el("div", { class: "adm-case-line" }, [
-          input(entry, "clueWord", "clue word (the verb or preposition)", "adm-input"),
-          optionsInput(entry, "distractors", "wrong articles (optional, auto if blank)"),
+          optionsInput(entry, "wordBank", "word bank — answers + wrong choices (comma-separated; blank = auto)"),
           input(entry, "explanation", "why it's correct (shown at reveal)", "adm-input grow")
         ]));
+        renderBlanks();
         return card;
       }
 
