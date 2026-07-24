@@ -7,6 +7,87 @@
    (You normally don't need to edit this file to add vocabulary.)
    ===================================================================== */
 
+/* =====================================================================
+   AppNav — makes the browser Back button move to the PREVIOUS SCREEN
+   instead of leaving the site, and asks "Leave the game?" before quitting
+   an in-progress game (so a stray Back — the games' or the browser's —
+   doesn't lose a student's progress).
+
+   Each screen registers its Back behaviour with AppNav.set(backFn, guardFn):
+     backFn()  — what "go back" does here (null at the very top = stay).
+     guardFn() — return true to confirm before leaving (e.g. mid-game).
+   On-screen "back" buttons call AppNav.leave(cb) to get the same guard.
+   ===================================================================== */
+window.AppNav = (function () {
+  var backFn = null, guardFn = null, navigatingBack = false, ready = false, confirming = false;
+
+  function seed() { try { history.pushState({ skb: 1 }, ""); } catch (e) {} }
+
+  function init() {
+    if (ready) return;
+    ready = true;
+    seed(); // one spare entry so the first Back is captured, not an exit
+    window.addEventListener("popstate", function () {
+      seed();          // immediately re-arm so Back can never fall off the app
+      requestBack();   // treat the Back press as an in-app "go back"
+    });
+  }
+
+  // Called by each screen as it renders.
+  function set(fn, guard) {
+    backFn = fn || null;
+    guardFn = guard || null;
+    if (ready && !navigatingBack) seed(); // a forward move adds a history entry
+  }
+
+  function doBack() {
+    if (!backFn) return; // top of the app — nothing to go back to
+    navigatingBack = true;
+    try { backFn(); } catch (e) {}
+    navigatingBack = false;
+  }
+
+  function requestBack() {
+    if (guardFn && guardFn()) confirmLeave(doBack);
+    else doBack();
+  }
+
+  // For on-screen Back buttons: confirm if the current screen's guard says so.
+  function leave(cb) {
+    if (guardFn && guardFn()) confirmLeave(cb);
+    else cb();
+  }
+
+  function confirmLeave(onYes) {
+    if (confirming) return;
+    confirming = true;
+    var overlay = document.createElement("div");
+    overlay.className = "leave-overlay";
+    var card = document.createElement("div");
+    card.className = "leave-card";
+    card.innerHTML =
+      '<div class="leave-emoji">🎮</div>' +
+      '<h3 class="leave-title">Leave the game?</h3>' +
+      '<p class="leave-msg">Your progress in this game will be lost.</p>';
+    var actions = document.createElement("div");
+    actions.className = "leave-actions";
+    var stay = document.createElement("button");
+    stay.className = "btn primary"; stay.textContent = "Stay in game";
+    var go = document.createElement("button");
+    go.className = "btn danger"; go.textContent = "Leave";
+    function close() { confirming = false; overlay.remove(); }
+    stay.onclick = close;
+    go.onclick = function () { close(); try { onYes(); } catch (e) {} };
+    overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
+    actions.appendChild(stay); actions.appendChild(go);
+    card.appendChild(actions);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+  }
+
+  return { init: init, set: set, requestBack: requestBack, leave: leave, guarded: function () { return !!(guardFn && guardFn()); } };
+})();
+
 const App = (function () {
   const games = [];
   let root = null;
@@ -241,6 +322,7 @@ const App = (function () {
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(false);
     kit.hush();
+    window.AppNav.set(null, null); // top of the app — Back stays here
     const main = document.getElementById("screen");
     main.innerHTML = "";
     main.appendChild(
@@ -270,6 +352,7 @@ const App = (function () {
   function showLive() {
     kit.hush();
     setAdminVisible(false);
+    window.AppNav.set(function () { showModeSelect(); }, null); // Live sub-screens override this
     const main = document.getElementById("screen");
     main.innerHTML = "";
     if (window.LiveMode) {
@@ -281,6 +364,7 @@ const App = (function () {
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(true);
     kit.hush();
+    window.AppNav.set(function () { showModeSelect(); }, null);
     const main = document.getElementById("screen");
     main.innerHTML = "";
 
@@ -334,6 +418,7 @@ const App = (function () {
   /* ---- exercise picker (shown before a game starts) ---------------- */
   function openTopicPicker(game) {
     kit.hush();
+    window.AppNav.set(function () { showHome(); }, null);
     const main = document.getElementById("screen");
     main.innerHTML = "";
 
@@ -388,6 +473,10 @@ const App = (function () {
   /* ---- launch a game with a chosen topic --------------------------- */
   function launch(game, topic) {
     kit.hush();
+    // In a game: Back goes to the exercise picker, but confirm first while a
+    // round is in progress (no confirm once the result screen is showing).
+    const playing = () => !document.querySelector(".result-card");
+    window.AppNav.set(function () { openTopicPicker(game); }, playing);
     const main = document.getElementById("screen");
     main.innerHTML = "";
     const stage = el("div", { class: "stage" });
@@ -398,9 +487,10 @@ const App = (function () {
       topic,
       addScore,
       el,
-      exit: () => showHome(),
+      // The games' own "← Menu" / "Other exercise" buttons get the same guard.
+      exit: () => window.AppNav.leave(() => showHome()),
       restart: () => launch(game, topic),
-      backToTopics: () => openTopicPicker(game)
+      backToTopics: () => window.AppNav.leave(() => openTopicPicker(game))
     };
     game.mount(stage, api);
   }
@@ -416,6 +506,7 @@ const App = (function () {
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(false);
     kit.hush();
+    window.AppNav.set(function () { (typeof onExit === "function" ? onExit : showHome)(); }, null);
     const main = document.getElementById("screen");
     main.innerHTML = "";
     const container = el("div", { class: "admin" });
@@ -489,6 +580,7 @@ const App = (function () {
     if ("speechSynthesis" in window) window.speechSynthesis.getVoices();
     // Start cloud content sync now that Firebase (if present) has loaded.
     if (window.ContentStore && window.ContentStore.initCloud) window.ContentStore.initCloud();
+    window.AppNav.init(); // capture the browser Back button (keeps students in the app)
     showModeSelect();
   }
 

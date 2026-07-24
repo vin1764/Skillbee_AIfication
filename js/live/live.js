@@ -52,6 +52,7 @@ window.LiveMode = (function () {
 
   function landing() {
     stop();
+    window.AppNav.set(function () { goBack(); }, null);
     show(screen("live-center", [
       el("button", { class: "back-link", html: "← Back", on: { click: goBack } }),
       el("div", { class: "live-big-emoji", text: "📡" }),
@@ -104,6 +105,7 @@ window.LiveMode = (function () {
 
   function hostRosters() {
     stop();
+    window.AppNav.set(landing, null);
     var ids = myRosterIds();
     var wrap = screen("", [
       el("button", { class: "back-link", html: "← Back", on: { click: landing } }),
@@ -139,6 +141,7 @@ window.LiveMode = (function () {
 
   function rosterEditor(existing) {
     stop();
+    window.AppNav.set(hostRosters, null);
     var nameInput = el("input", { class: "adm-input", attrs: { type: "text", placeholder: "Class name (e.g. Period 3 German)", value: existing ? existing.name : "" } });
     var namesArea = el("textarea", {
       class: "roster-textarea",
@@ -189,6 +192,7 @@ window.LiveMode = (function () {
   //         onStart({ gameId, topic, answerMode, persistMode, adapter, rounds }) }
   function gamePicker(opts) {
     stop();
+    window.AppNav.set(opts.back, null);
     var gameId = null, topic = null, persistMode = "fresh", answerMode = "options", speed = 1;
     var gameIds = Object.keys(window.LiveGames);
     var SPEEDS = [
@@ -360,6 +364,8 @@ window.LiveMode = (function () {
      ============================================================ */
   function hostRun(code, adapter, rounds, roster) {
     stop();
+    // Back closes the room; confirm while a question/reveal is on screen (mid-game).
+    window.AppNav.set(function () { closeRoom(); }, function () { return !!document.querySelector(".host-controls, .reveal-answer"); });
     var sess = null;
     var answersUnsub = null;
     var latestAnswers = []; // answers delivered by the live listener for the current question
@@ -682,6 +688,7 @@ window.LiveMode = (function () {
      ============================================================ */
   function playerJoin(prefill) {
     stop();
+    window.AppNav.set(landing, null);
     var codeInput = el("input", {
       class: "code-input",
       attrs: { type: "text", maxlength: 4, placeholder: "CODE", autocapitalize: "characters", value: typeof prefill === "string" ? prefill : "" }
@@ -712,6 +719,7 @@ window.LiveMode = (function () {
 
   function playerPickName(code, s) {
     stop();
+    window.AppNav.set(function () { playerJoin(); }, null);
     var joined = s.joined || {};
     var grid = el("div", { class: "name-grid" }, (s.students || []).map(function (stu) {
       var taken = !!joined[stu.id];
@@ -734,6 +742,8 @@ window.LiveMode = (function () {
 
   function playerRun(code, stu) {
     stop();
+    // Back leaves the room; confirm while the student is on an answering screen.
+    window.AppNav.set(function () { landing(); }, function () { return !!document.querySelector(".match-board, .live-q-options.phone, .cases-player, .wm-player"); });
     var answeredIndex = -1;
     var lastStatus = null, lastQ = -1, lastSeq = null;
     var matchRenderedQ = -1; // match board is stateful — render it once per round

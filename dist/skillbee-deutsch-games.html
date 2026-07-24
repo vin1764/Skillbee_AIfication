@@ -449,6 +449,22 @@ kbd {
 }
 .adm-modal-title { font-weight: 800; font-size: 1.1rem; margin-bottom: 6px; }
 .adm-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+
+/* "Leave the game?" confirm (browser Back / in-game Back) */
+.leave-overlay {
+  position: fixed; inset: 0; z-index: 1200; padding: 18px;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex; align-items: center; justify-content: center;
+}
+.leave-card {
+  background: var(--card); border-radius: 20px; padding: 26px 24px; width: 100%; max-width: 380px;
+  text-align: center; box-shadow: var(--shadow-lg); animation: rise 0.2s backwards;
+}
+.leave-emoji { font-size: 2.6rem; line-height: 1; }
+.leave-title { margin: 10px 0 4px; font-size: 1.3rem; font-weight: 900; }
+.leave-msg { color: var(--ink-soft); font-weight: 600; margin: 0 0 4px; }
+.leave-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+.leave-actions .btn { width: 100%; }
 /* Reset is dangerous — keep it visually quiet (muted, no border) until hover. */
 .adm-reset { opacity: 0.55; color: var(--ink-soft); box-shadow: none; }
 .adm-reset:hover { opacity: 1; color: #fff; background: var(--bad); border-color: var(--bad); }
@@ -1977,6 +1993,87 @@ window.TeacherGate = (function () {
    (You normally don't need to edit this file to add vocabulary.)
    ===================================================================== */
 
+/* =====================================================================
+   AppNav — makes the browser Back button move to the PREVIOUS SCREEN
+   instead of leaving the site, and asks "Leave the game?" before quitting
+   an in-progress game (so a stray Back — the games' or the browser's —
+   doesn't lose a student's progress).
+
+   Each screen registers its Back behaviour with AppNav.set(backFn, guardFn):
+     backFn()  — what "go back" does here (null at the very top = stay).
+     guardFn() — return true to confirm before leaving (e.g. mid-game).
+   On-screen "back" buttons call AppNav.leave(cb) to get the same guard.
+   ===================================================================== */
+window.AppNav = (function () {
+  var backFn = null, guardFn = null, navigatingBack = false, ready = false, confirming = false;
+
+  function seed() { try { history.pushState({ skb: 1 }, ""); } catch (e) {} }
+
+  function init() {
+    if (ready) return;
+    ready = true;
+    seed(); // one spare entry so the first Back is captured, not an exit
+    window.addEventListener("popstate", function () {
+      seed();          // immediately re-arm so Back can never fall off the app
+      requestBack();   // treat the Back press as an in-app "go back"
+    });
+  }
+
+  // Called by each screen as it renders.
+  function set(fn, guard) {
+    backFn = fn || null;
+    guardFn = guard || null;
+    if (ready && !navigatingBack) seed(); // a forward move adds a history entry
+  }
+
+  function doBack() {
+    if (!backFn) return; // top of the app — nothing to go back to
+    navigatingBack = true;
+    try { backFn(); } catch (e) {}
+    navigatingBack = false;
+  }
+
+  function requestBack() {
+    if (guardFn && guardFn()) confirmLeave(doBack);
+    else doBack();
+  }
+
+  // For on-screen Back buttons: confirm if the current screen's guard says so.
+  function leave(cb) {
+    if (guardFn && guardFn()) confirmLeave(cb);
+    else cb();
+  }
+
+  function confirmLeave(onYes) {
+    if (confirming) return;
+    confirming = true;
+    var overlay = document.createElement("div");
+    overlay.className = "leave-overlay";
+    var card = document.createElement("div");
+    card.className = "leave-card";
+    card.innerHTML =
+      '<div class="leave-emoji">🎮</div>' +
+      '<h3 class="leave-title">Leave the game?</h3>' +
+      '<p class="leave-msg">Your progress in this game will be lost.</p>';
+    var actions = document.createElement("div");
+    actions.className = "leave-actions";
+    var stay = document.createElement("button");
+    stay.className = "btn primary"; stay.textContent = "Stay in game";
+    var go = document.createElement("button");
+    go.className = "btn danger"; go.textContent = "Leave";
+    function close() { confirming = false; overlay.remove(); }
+    stay.onclick = close;
+    go.onclick = function () { close(); try { onYes(); } catch (e) {} };
+    overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
+    actions.appendChild(stay); actions.appendChild(go);
+    card.appendChild(actions);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+  }
+
+  return { init: init, set: set, requestBack: requestBack, leave: leave, guarded: function () { return !!(guardFn && guardFn()); } };
+})();
+
 const App = (function () {
   const games = [];
   let root = null;
@@ -2211,6 +2308,7 @@ const App = (function () {
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(false);
     kit.hush();
+    window.AppNav.set(null, null); // top of the app — Back stays here
     const main = document.getElementById("screen");
     main.innerHTML = "";
     main.appendChild(
@@ -2240,6 +2338,7 @@ const App = (function () {
   function showLive() {
     kit.hush();
     setAdminVisible(false);
+    window.AppNav.set(function () { showModeSelect(); }, null); // Live sub-screens override this
     const main = document.getElementById("screen");
     main.innerHTML = "";
     if (window.LiveMode) {
@@ -2251,6 +2350,7 @@ const App = (function () {
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(true);
     kit.hush();
+    window.AppNav.set(function () { showModeSelect(); }, null);
     const main = document.getElementById("screen");
     main.innerHTML = "";
 
@@ -2304,6 +2404,7 @@ const App = (function () {
   /* ---- exercise picker (shown before a game starts) ---------------- */
   function openTopicPicker(game) {
     kit.hush();
+    window.AppNav.set(function () { showHome(); }, null);
     const main = document.getElementById("screen");
     main.innerHTML = "";
 
@@ -2358,6 +2459,10 @@ const App = (function () {
   /* ---- launch a game with a chosen topic --------------------------- */
   function launch(game, topic) {
     kit.hush();
+    // In a game: Back goes to the exercise picker, but confirm first while a
+    // round is in progress (no confirm once the result screen is showing).
+    const playing = () => !document.querySelector(".result-card");
+    window.AppNav.set(function () { openTopicPicker(game); }, playing);
     const main = document.getElementById("screen");
     main.innerHTML = "";
     const stage = el("div", { class: "stage" });
@@ -2368,9 +2473,10 @@ const App = (function () {
       topic,
       addScore,
       el,
-      exit: () => showHome(),
+      // The games' own "← Menu" / "Other exercise" buttons get the same guard.
+      exit: () => window.AppNav.leave(() => showHome()),
       restart: () => launch(game, topic),
-      backToTopics: () => openTopicPicker(game)
+      backToTopics: () => window.AppNav.leave(() => openTopicPicker(game))
     };
     game.mount(stage, api);
   }
@@ -2386,6 +2492,7 @@ const App = (function () {
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(false);
     kit.hush();
+    window.AppNav.set(function () { (typeof onExit === "function" ? onExit : showHome)(); }, null);
     const main = document.getElementById("screen");
     main.innerHTML = "";
     const container = el("div", { class: "admin" });
@@ -2459,6 +2566,7 @@ const App = (function () {
     if ("speechSynthesis" in window) window.speechSynthesis.getVoices();
     // Start cloud content sync now that Firebase (if present) has loaded.
     if (window.ContentStore && window.ContentStore.initCloud) window.ContentStore.initCloud();
+    window.AppNav.init(); // capture the browser Back button (keeps students in the app)
     showModeSelect();
   }
 
@@ -6145,6 +6253,7 @@ window.LiveMode = (function () {
 
   function landing() {
     stop();
+    window.AppNav.set(function () { goBack(); }, null);
     show(screen("live-center", [
       el("button", { class: "back-link", html: "← Back", on: { click: goBack } }),
       el("div", { class: "live-big-emoji", text: "📡" }),
@@ -6197,6 +6306,7 @@ window.LiveMode = (function () {
 
   function hostRosters() {
     stop();
+    window.AppNav.set(landing, null);
     var ids = myRosterIds();
     var wrap = screen("", [
       el("button", { class: "back-link", html: "← Back", on: { click: landing } }),
@@ -6232,6 +6342,7 @@ window.LiveMode = (function () {
 
   function rosterEditor(existing) {
     stop();
+    window.AppNav.set(hostRosters, null);
     var nameInput = el("input", { class: "adm-input", attrs: { type: "text", placeholder: "Class name (e.g. Period 3 German)", value: existing ? existing.name : "" } });
     var namesArea = el("textarea", {
       class: "roster-textarea",
@@ -6282,6 +6393,7 @@ window.LiveMode = (function () {
   //         onStart({ gameId, topic, answerMode, persistMode, adapter, rounds }) }
   function gamePicker(opts) {
     stop();
+    window.AppNav.set(opts.back, null);
     var gameId = null, topic = null, persistMode = "fresh", answerMode = "options", speed = 1;
     var gameIds = Object.keys(window.LiveGames);
     var SPEEDS = [
@@ -6453,6 +6565,8 @@ window.LiveMode = (function () {
      ============================================================ */
   function hostRun(code, adapter, rounds, roster) {
     stop();
+    // Back closes the room; confirm while a question/reveal is on screen (mid-game).
+    window.AppNav.set(function () { closeRoom(); }, function () { return !!document.querySelector(".host-controls, .reveal-answer"); });
     var sess = null;
     var answersUnsub = null;
     var latestAnswers = []; // answers delivered by the live listener for the current question
@@ -6775,6 +6889,7 @@ window.LiveMode = (function () {
      ============================================================ */
   function playerJoin(prefill) {
     stop();
+    window.AppNav.set(landing, null);
     var codeInput = el("input", {
       class: "code-input",
       attrs: { type: "text", maxlength: 4, placeholder: "CODE", autocapitalize: "characters", value: typeof prefill === "string" ? prefill : "" }
@@ -6805,6 +6920,7 @@ window.LiveMode = (function () {
 
   function playerPickName(code, s) {
     stop();
+    window.AppNav.set(function () { playerJoin(); }, null);
     var joined = s.joined || {};
     var grid = el("div", { class: "name-grid" }, (s.students || []).map(function (stu) {
       var taken = !!joined[stu.id];
@@ -6827,6 +6943,8 @@ window.LiveMode = (function () {
 
   function playerRun(code, stu) {
     stop();
+    // Back leaves the room; confirm while the student is on an answering screen.
+    window.AppNav.set(function () { landing(); }, function () { return !!document.querySelector(".match-board, .live-q-options.phone, .cases-player, .wm-player"); });
     var answeredIndex = -1;
     var lastStatus = null, lastQ = -1, lastSeq = null;
     var matchRenderedQ = -1; // match board is stateful — render it once per round
