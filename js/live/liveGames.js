@@ -804,8 +804,68 @@
     }
   };
 
+  /* ---- Passage (Lese & Hör): an ORCHESTRATOR, not a new question engine ------
+     A passage (text or audio, host/projector-only) followed by an ordered list
+     of questions, each in one of the EXISTING formats. buildRounds turns each
+     question into that format's normal round and tags it with `fmt` (the format's
+     LiveGames key). The Live controller reads `fmt` per round and dispatches to
+     the right format's hostContent/playerContent/score — reusing them unchanged.
+     The passage itself rides only on the in-memory round (r.passage); it is NEVER
+     written into the round doc, so it can never reach a student's phone. This
+     first pass covers mcq / lucken-text / true-false. */
+  function passageRound(pq, passage) {
+    if (!pq || typeof pq !== "object") return null;
+    var c = pq.content || {};
+    var base = { passage: passage };
+    if (pq.format === "mcq") {
+      var q = mcqSide(c.question, "text");
+      var opts = (c.options || []).map(function (o) { return { type: (o && o.type) || "text", value: String((o && o.value) || ""), correct: !!(o && o.correct) }; })
+        .filter(function (o) { return o.value !== ""; });
+      if (!q.value || opts.length < 2 || !opts.some(function (o) { return o.correct; })) return null;
+      return Object.assign(base, { type: "mcq", fmt: "quiz", question: q, options: kit().shuffle(opts.slice(0, 4)) });
+    }
+    if (pq.format === "lucken-text") {
+      var nb = normBlankEntry(c);
+      if (!nb) return null;
+      return Object.assign(base, { type: "blanks", fmt: "cases", sentence: nb.sentence, blanks: nb.blanks, wordBank: kit().shuffle(nb.wordBank.slice()), explanation: nb.explanation });
+    }
+    if (pq.format === "true-false") {
+      if (!c.statement || String((c.statement || {}).value || "").trim() === "") return null;
+      var ctx = (c.context && String((c.context || {}).value || "").trim() !== "") ? { type: c.context.type || "text", value: String(c.context.value) } : null;
+      return Object.assign(base, { type: "truefalse", fmt: "truefalse", context: ctx, statement: { type: (c.statement.type || "text"), value: String(c.statement.value) }, answer: !!c.answer });
+    }
+    return null;
+  }
+  var passageAdapter = {
+    meta: { name: "Lese & Hör", emoji: "📖", contentType: "passage" },
+    timeLimit: 20000,
+    pickLabel: "Exercise",
+    passage: true,               // routes to the passage-first + Show-Passage flow
+    getTopics: function () {
+      var store = window.ContentStore;
+      var list = (store && store.exercisesFor) ? store.exercisesFor("passage") : [];
+      return list.map(function (e) {
+        var n = (e.questions || []).length;
+        return { id: e.id, name: e.name, emoji: e.emoji || "📖", english: ((e.passage && e.passage.type === "audio") ? "🎧 " : "📄 ") + n + (n === 1 ? " question" : " questions") };
+      });
+    },
+    buildRounds: function (topic) {
+      var store = window.ContentStore;
+      var e = (store && store.exercise) ? store.exercise("passage", topic && topic.id) : null;
+      var passage = (e && e.passage && String((e.passage || {}).value || "").trim() !== "")
+        ? { type: e.passage.type === "audio" ? "audio" : "text", value: String(e.passage.value) } : null;
+      var rounds = [];
+      ((e && e.questions) || []).forEach(function (pq) {
+        var r = passageRound(pq, passage);
+        if (r) rounds.push(r);
+      });
+      return rounds.slice(0, 20);
+    }
+  };
+
   window.LiveGames = {
     quiz: choiceAdapter({ name: "Quiz-Blitz", emoji: "🎯", contentType: "vocab" }),
+    passage: passageAdapter,
     truefalse: truefalseAdapter,
     memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" }),
     cases: blanksAdapter,

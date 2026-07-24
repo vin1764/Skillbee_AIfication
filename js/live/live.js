@@ -406,6 +406,17 @@ window.LiveMode = (function () {
       } catch (e) {}
     }
 
+    // The Passage game sequences DIFFERENT formats — each round carries `fmt` (the
+    // format's LiveGames key). Every per-round render/score call resolves the
+    // adapter through here: a normal single-format session has no `fmt`, so it
+    // falls back to the session `adapter` and behaves exactly as before.
+    function adapterForRound(r) { return (r && r.fmt && window.LiveGames[r.fmt]) || adapter; }
+    // The passage (text/audio) rides only on the in-memory round — never written
+    // to the session doc, so it can never reach a phone. Kept here for the
+    // passage-first screen and the "Show passage again" overlay.
+    var passageInfo = null;
+    (rounds || []).some(function (r) { if (r && r.passage) { passageInfo = r.passage; return true; } return false; });
+
     track(window.LiveDB.listenSession(code, function (s) {
       sess = s;
       if (!s) return;
@@ -424,27 +435,86 @@ window.LiveMode = (function () {
         ]),
         el("div", { class: "join-count", text: names.length + " joined" }),
         chips,
-        el("button", { class: "btn primary big", text: "Start game ▶", attrs: names.length ? {} : { disabled: "true" }, on: { click: nextQuestion } }),
+        el("button", { class: "btn primary big", text: "Start game ▶", attrs: names.length ? {} : { disabled: "true" }, on: { click: (adapter.passage ? hostPassage : nextQuestion) } }),
         el("button", { class: "back-link small", html: "✕ Close room", on: { click: closeRoom } })
       ]));
     }
+
+    /* ---- Passage (Lese & Hör): the passage is shown ONLY on the host screen.
+       It is never written to the session doc, so it never reaches a phone. The
+       teacher shows it first, then advances to the questions; a "Show passage"
+       button re-displays it as a host-only overlay at any time without touching
+       the current question's state. */
+    function passageBodyNodes(passage) {
+      if (!passage) return [el("p", { class: "live-muted", text: "No passage." })];
+      if (passage.type === "audio") {
+        var plays = 0, btn;
+        var label = function () { return plays === 0 ? "🔊 Play the passage" : "🔁 Play again"; };
+        btn = el("button", { class: "btn primary big listen-play", on: { click: function () { plays++; try { window.MatchTiles.play(kit, passage, 1); } catch (e) {} btn.innerHTML = label(); } } });
+        btn.innerHTML = label();
+        return [el("div", { class: "passage-audio" }, [el("div", { class: "listen-emoji", text: "🎧" }), btn])];
+      }
+      return [el("div", { class: "passage-text", text: passage.value })];
+    }
+    function hostPassage() {
+      hostPhase = "passage";
+      // Phones get a "read on the board" wait — NO passage content is sent.
+      safeUpdate({ status: "passage" });
+      show(screen("host", [
+        el("div", { class: "host-topbar" }, [el("div", { class: "host-q-num", text: "📖 " + (sess.topicName || "Passage") })]),
+        el("div", { class: "passage-host" }, [
+          el("div", { class: "passage-tag", text: (passageInfo && passageInfo.type === "audio") ? "🎧 Listen to the passage" : "📖 Read the passage" })
+        ].concat(passageBodyNodes(passageInfo))),
+        el("div", { class: "host-controls" }, [
+          el("button", { class: "btn primary big", text: "Start questions ▶", on: { click: nextQuestion } })
+        ])
+      ]));
+    }
+    // Host-only overlay — sits ON TOP of the current screen (appended to <body>,
+    // not via show()), so the question underneath keeps its state and no session
+    // write happens (phones are untouched).
+    var passageOverlay = null;
+    function showPassageOverlay(passage) {
+      if (passageOverlay) return;
+      pauseClock(); // re-reading must never cost points (no-op until Timer Modes exists)
+      passageOverlay = el("div", { class: "passage-overlay" }, [
+        el("div", { class: "passage-overlay-card" }, [
+          el("div", { class: "passage-tag", text: (passage && passage.type === "audio") ? "🎧 Listen again" : "📖 Read again" })
+        ].concat(passageBodyNodes(passage)).concat([
+          el("button", { class: "btn primary big", text: "Close ✕", on: { click: closePassageOverlay } })
+        ]))
+      ]);
+      document.body.appendChild(passageOverlay);
+    }
+    function closePassageOverlay() {
+      if (passageOverlay) { try { passageOverlay.remove(); } catch (e) {} passageOverlay = null; }
+      try { if (window.VoiceBox && window.VoiceBox.stop) window.VoiceBox.stop(); } catch (e) {}
+      resumeClock();
+    }
+    // Timer-pause hooks. No-ops today: there is no running clock yet (Manual
+    // pacing only). When Per-Question / Speed Challenge Timer Modes are built,
+    // pause/resume the current question's clock here so re-showing the passage
+    // never eats a student's time.
+    function pauseClock() { /* Timer Modes: pause the current question clock */ }
+    function resumeClock() { /* Timer Modes: resume the current question clock */ }
 
     function nextQuestion() {
       var i = (sess.questionIndex == null ? -1 : sess.questionIndex) + 1;
       if (i >= rounds.length) return podium();
       var r = rounds[i];
+      var ra = adapterForRound(r); // this round's format adapter (== adapter, unless Passage)
       // Carry the session's answer mode onto the in-memory round so the host
       // view (hostContent) and scoring (score) both know Tap vs Type.
       r.answerMode = sess.answerMode || "options";
       safeUpdate({
         status: "question", questionIndex: i, reveal: null,
         round: {
-          index: i, type: r.type, de: r.de || null, emoji: r.emoji || null,
+          index: i, type: r.type, fmt: r.fmt || null, de: r.de || null, emoji: r.emoji || null,
           // MCQ: send the typed question + options WITHOUT the `correct` flag so a
           // phone can't peek which option wins. Other games keep options as-is
           // (e.g. Hör gut zu!'s tap board sends plain option strings).
-          question: (adapter.mcq && r.question) ? r.question : null,
-          options: (adapter.mcq && r.options)
+          question: (ra.mcq && r.question) ? r.question : null,
+          options: (ra.mcq && r.options)
             ? r.options.map(function (o) { return { type: o.type, value: o.value }; })
             : (r.options || null),
           sentence: r.sentence || null, blank: r.blank || null, clueWord: r.clueWord || null,
@@ -454,12 +524,13 @@ window.LiveMode = (function () {
           // Lücken-Text: phones need the blank ids (to lay out the gaps) and, in
           // tap mode, the shuffled word bank — but NEVER the correct answers, so
           // type mode can't be peeked. The bank naturally contains the answers.
-          blanks: (adapter.blanks && r.blanks) ? r.blanks.map(function (b) { return { id: b.id }; }) : null,
-          wordBank: (adapter.blanks && sess.answerMode !== "type") ? (r.wordBank || null) : null,
+          blanks: (ra.blanks && r.blanks) ? r.blanks.map(function (b) { return { id: b.id }; }) : null,
+          wordBank: (ra.blanks && sess.answerMode !== "type") ? (r.wordBank || null) : null,
           // Type mode needs the answer on the phone (to diff on submit). Only sent
           // for the type-diff game in type mode — tap mode still hides it.
-          correct: (adapter.typeResult && sess.answerMode === "type") ? (r.correct || r.word || null) : null,
+          correct: (ra.typeResult && sess.answerMode === "type") ? (r.correct || r.word || null) : null,
           startedAt: window.LiveDB.serverTs()
+          // NOTE: r.passage is deliberately NOT sent — the passage is host-only.
         }
       });
       watchAnswers(i, r);
@@ -490,7 +561,7 @@ window.LiveMode = (function () {
       // the reveal screen down and drop the teacher back onto the question, which
       // looked like "the Reveal button stopped working".
       if (hostPhase !== "question") return;
-      if (adapter.match) return renderMatchHost(i, r);
+      if (adapterForRound(r).match) return renderMatchHost(i, r);
       var joinedN = Object.keys(sess.joined || {}).length || (sess.students || []).length;
       // Build the question screen once per round; on every later answer just
       // update the "X of Y answered" counter in place. Calling show() on each
@@ -508,8 +579,11 @@ window.LiveMode = (function () {
           el("div", { class: "host-q-num", text: "Question " + (i + 1) + " / " + rounds.length }),
           el("div", { class: "host-answered", text: answered + " of " + joinedN + " answered" })
         ]),
-        adapter.hostContent(el, r),
+        adapterForRound(r).hostContent(el, r),
         el("div", { class: "host-controls" }, [
+          // Passage games: let the teacher re-show the passage mid-question without
+          // losing this question's state (it's a host-only overlay — see below).
+          r.passage ? el("button", { class: "btn ghost show-passage-btn", html: "📖 Show passage", on: { click: function () { showPassageOverlay(r.passage); } } }) : null,
           el("button", { class: "btn primary big", text: "Reveal answer ▶", on: { click: function () { reveal(i, r); } } })
         ])
       ]));
@@ -594,7 +668,7 @@ window.LiveMode = (function () {
       try { renderReveal(i, r, results, scores); return; } catch (e) {}
       var last = (i + 1) >= rounds.length;
       var correctText = "";
-      try { correctText = String(adapter.correctLabel(r) || ""); } catch (e2) {}
+      try { correctText = String(adapterForRound(r).correctLabel(r) || ""); } catch (e2) {}
       try {
         show(screen("host", [
           el("div", { class: "host-topbar" }, [el("div", { class: "host-q-num", text: "Question " + (i + 1) + " / " + rounds.length })]),
@@ -611,7 +685,8 @@ window.LiveMode = (function () {
       // Revealing is the teacher's call at ANY moment. Mark the phase first so a
       // late answer snapshot can't rebuild the question screen over this reveal.
       hostPhase = "reveal";
-      if (adapter.match) return revealMatch(i, r);
+      var ra = adapterForRound(r); // this round's format adapter
+      if (ra.match) return revealMatch(i, r);
       clearTimeout(timer);
       if (answersUnsub) { answersUnsub(); answersUnsub = null; }
       // Reuse the answers our live listener already delivered instead of
@@ -629,7 +704,7 @@ window.LiveMode = (function () {
           var ts = a.ts && a.ts.toMillis ? a.ts.toMillis() : null;
           var elapsed = (startedAt != null && ts != null) ? Math.max(0, ts - startedAt) : TL;
           // A bad answer payload must never brick the reveal — score defensively.
-          var sc; try { sc = adapter.score(r, a, elapsed, TL) || {}; } catch (e) { sc = { correct: false, points: 0 }; }
+          var sc; try { sc = ra.score(r, a, elapsed, TL) || {}; } catch (e) { sc = { correct: false, points: 0 }; }
           scores[stu.id] = (scores[stu.id] || 0) + (sc.points || 0);
           var row = { studentId: stu.id, name: stu.name, correct: !!sc.correct, points: sc.points || 0, answered: true };
           // Only the partial-credit scorers (Lücken-Text, type mode) return
@@ -644,16 +719,16 @@ window.LiveMode = (function () {
         });
         results.sort(function (x, y) { return y.points - x.points; });
         results.forEach(function (rr, idx) { rr.rank = idx + 1; });
-        var correctLabelText; try { correctLabelText = adapter.correctLabel(r); } catch (e) { correctLabelText = ""; }
+        var correctLabelText; try { correctLabelText = ra.correctLabel(r); } catch (e) { correctLabelText = ""; }
         var revealDoc = { index: i, correct: correctLabelText, explanation: r.explanation || null, results: results };
         // Lücken-Text: now that the round is over it's safe to ship the correct
         // answers so each phone can mark its own blanks right/wrong.
-        if (adapter.blanks) { revealDoc.blanks = r.blanks; revealDoc.sentence = r.sentence; }
+        if (ra.blanks) { revealDoc.blanks = r.blanks; revealDoc.sentence = r.sentence; }
         // MCQ: ship the correct option (type+value) so a picture/audio answer can
         // be rendered at reveal, not just its text value.
-        if (adapter.mcq) { revealDoc.correctOption = (r.options || []).filter(function (o) { return o.correct; })[0] || null; }
+        if (ra.mcq) { revealDoc.correctOption = (r.options || []).filter(function (o) { return o.correct; })[0] || null; }
         safeUpdate({ status: "reveal", scores: scores, reveal: revealDoc });
-        var german; try { german = adapter.speakOnReveal(r); } catch (e) { german = null; }
+        var german; try { german = ra.speakOnReveal(r); } catch (e) { german = null; }
         // Pronunciation is a nice-to-have — it must never stop the reveal screen.
         if (german) { try { kit.speak(german); } catch (e) {} }
         safeReveal(i, r, results, scores);
@@ -698,7 +773,7 @@ window.LiveMode = (function () {
       });
       results.sort(function (x, y) { return y.points - x.points; });
       results.forEach(function (rr, idx) { rr.rank = idx + 1; });
-      var mCorrect; try { mCorrect = adapter.correctLabel(r); } catch (e) { mCorrect = ""; }
+      var mCorrect; try { mCorrect = adapterForRound(r).correctLabel(r); } catch (e) { mCorrect = ""; }
       safeUpdate({
         status: "reveal", scores: scores,
         reveal: { index: i, correct: mCorrect, explanation: null, results: results, match: true }
@@ -707,9 +782,10 @@ window.LiveMode = (function () {
     }
 
     function renderReveal(i, r, results) {
+      var ra = adapterForRound(r); // this round's format adapter
       var last = (i + 1) >= rounds.length;
-      var isMatch = !!adapter.match;
-      var isBlanks = !!adapter.blanks;
+      var isMatch = !!ra.match;
+      var isBlanks = !!ra.blanks;
       var correctCount = results.filter(function (x) { return x.correct; }).length;
       var mtotal = (r.pairs || []).length;
       // Leaderboard for THIS question only (ranked by points earned this round).
@@ -728,7 +804,7 @@ window.LiveMode = (function () {
           el("div", { class: "reveal-sentence lt" }, blanksFilled(r.sentence, function (id) { return { cls: "rs-fill", text: byId[id] != null ? byId[id] : "___" }; })),
           r.explanation ? el("div", { class: "reveal-why", text: r.explanation }) : null
         ]);
-      } else if (adapter.mcq) {
+      } else if (ra.mcq) {
         // Render the winning option by its type (a picture answer shows the
         // picture, an icon the icon, etc.) — not just its raw value.
         var co = (r.options || []).filter(function (o) { return o.correct; })[0];
@@ -736,13 +812,13 @@ window.LiveMode = (function () {
           el("div", { class: "reveal-label", text: "Correct answer" }),
           (co && co.type && co.type !== "text")
             ? el("div", { class: "reveal-value mcq-reveal" }, window.MatchTiles.content(el, co))
-            : el("div", { class: "reveal-value", text: adapter.correctLabel(r) }),
+            : el("div", { class: "reveal-value", text: ra.correctLabel(r) }),
           r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null
         ]);
       } else {
         answerBlock = el("div", { class: "reveal-answer" }, [
           el("div", { class: "reveal-label", text: "Correct answer" }),
-          el("div", { class: "reveal-value", text: adapter.correctLabel(r) }),
+          el("div", { class: "reveal-value", text: ra.correctLabel(r) }),
           r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null,
           r.sentence ? el("div", { class: "reveal-sentence" }, filledSentence(r.sentence, r.correct)) : null,
           r.explanation ? el("div", { class: "reveal-why", text: r.explanation }) : null
@@ -768,7 +844,10 @@ window.LiveMode = (function () {
               ]);
             }))
           : el("p", { class: "live-muted", text: "No answers this round." }),
-        el("button", { class: "btn primary big", text: last ? "Finish ▶" : (isMatch ? "Next round ▶" : "Next question ▶"), on: { click: nextQuestion } })
+        el("div", { class: "reveal-actions" }, [
+          r.passage ? el("button", { class: "btn ghost show-passage-btn", html: "📖 Show passage", on: { click: function () { showPassageOverlay(r.passage); } } }) : null,
+          el("button", { class: "btn primary big", text: last ? "Finish ▶" : (isMatch ? "Next round ▶" : "Next question ▶"), on: { click: nextQuestion } })
+        ])
       ]));
     }
 
@@ -907,7 +986,10 @@ window.LiveMode = (function () {
   function playerRun(code, stu) {
     stop();
     // Back leaves the room; confirm while the student is on an answering screen.
-    window.AppNav.set(function () { landing(); }, function () { return !!document.querySelector(".match-board, .live-q-options.phone, .cases-player, .wm-player"); });
+    window.AppNav.set(function () { landing(); }, function () { return !!document.querySelector(".match-board, .live-q-options.phone, .cases-player, .wm-player, .tf-player"); });
+    // The Passage game runs different formats per question — resolve the phone's
+    // adapter from the CURRENT round's `fmt`, falling back to the session game.
+    function playerAdapter(s) { return (s && s.round && s.round.fmt && window.LiveGames[s.round.fmt]) || window.LiveGames[s.gameId]; }
     var answeredIndex = -1;
     var lastStatus = null, lastQ = -1, lastSeq = null;
     var matchRenderedQ = -1; // match board is stateful — render it once per round
@@ -929,8 +1011,10 @@ window.LiveMode = (function () {
       if (s.status !== "question") { try { if (window.VoiceBox && window.VoiceBox.stop) window.VoiceBox.stop(); } catch (e) {} }
 
       if (s.status === "lobby") return waitScreen("You're in! 🎉", "Get ready — watch the smartboard.");
+      // Passage games show the passage on the board only — the phone just waits.
+      if (s.status === "passage") return waitScreen("📖 Read the passage", "Follow along on the board — questions are coming.");
       if (s.status === "question") {
-        var qAdapter = window.LiveGames[s.gameId];
+        var qAdapter = playerAdapter(s);
         if (qAdapter && qAdapter.match) {
           // Individual match game: build the board once and never rebuild it
           // mid-round (that would reset the student's taps and re-shuffle).
@@ -957,7 +1041,7 @@ window.LiveMode = (function () {
         return answerScreen(s);
       }
       if (s.status === "reveal") {
-        var rAdapter = window.LiveGames[s.gameId];
+        var rAdapter = playerAdapter(s);
         if (rAdapter && rAdapter.typeResult && s.answerMode === "type") return typeRevealScreen(s, rAdapter);
         if (rAdapter && rAdapter.blanks) return blanksRevealScreen(s, rAdapter);
         return resultScreen(s);
@@ -977,7 +1061,7 @@ window.LiveMode = (function () {
     }
 
     function answerScreen(s) {
-      var adapter = window.LiveGames[s.gameId];
+      var adapter = playerAdapter(s);
       var r = s.round;
       var locked = false;
       var api = {

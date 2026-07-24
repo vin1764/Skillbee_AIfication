@@ -1166,3 +1166,26 @@ input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf
 .adm-tf-ans { padding: 9px 16px; border-radius: 999px; border: 2px solid var(--line-deep); background: #fff; font-weight: 800; cursor: pointer; color: var(--ink); }
 .adm-tf-ans.sel.true { background: var(--good); border-color: var(--good); color: #fff; }
 .adm-tf-ans.sel.false { background: var(--bad); border-color: var(--bad); color: #fff; }
+
+/* ===== Lese & Hör (Passage) ===== */
+/* Host: the passage shown on the board (never on phones). */
+.passage-host { text-align: center; max-width: 900px; margin: 0 auto; }
+.passage-tag { font-size: 0.9rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 14px; }
+.passage-text { font-size: clamp(1.3rem, 2.6vw, 1.9rem); line-height: 1.7; font-weight: 700; color: var(--ink); text-align: left; white-space: pre-wrap; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px 28px; box-shadow: var(--shadow); }
+.passage-audio { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.show-passage-btn { white-space: nowrap; }
+.reveal-actions { display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
+/* Host-only overlay for "Show passage again" — sits over the current question. */
+.passage-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(7, 21, 80, 0.55); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.passage-overlay-card { background: var(--card); border-radius: 22px; box-shadow: var(--shadow-lg); padding: 28px; max-width: 900px; width: 100%; max-height: 88vh; overflow: auto; text-align: center; }
+.passage-overlay-card .passage-text { box-shadow: none; }
+
+/* Content editor: passage block + per-question cards with reorder tools. */
+.adm-passage-block { background: var(--skb-tint); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin: 10px 0 6px; }
+.adm-passage-ta { min-height: 90px; width: 100%; }
+.adm-pq-card .adm-cpair-topbar { align-items: center; }
+.adm-pq-tools { display: inline-flex; gap: 6px; align-items: center; margin-left: auto; }
+.adm-pq-move { border: 1px solid var(--line-deep); background: #fff; border-radius: 8px; width: 30px; height: 30px; font-weight: 800; cursor: pointer; color: var(--ink); line-height: 1; }
+.adm-pq-move:hover { background: var(--skb-tint); }
+.adm-pq-body { margin-top: 10px; }
+.adm-pq-add { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }

@@ -334,12 +334,14 @@
         entry.blanks.forEach(function (b, i) { b.id = i + 1; if (b.correct == null) b.correct = ""; });
       }
 
-      function caseRow(entry, list, index) {
+      // The Lücken-Text editor body (sentence + live blanks + word bank + why),
+      // WITHOUT the card wrapper — reused standalone and embedded in a Passage
+      // question. `onDelete` (optional) adds the inline remove button to the
+      // sentence line; a Passage embeds it with no delete (the card handles that).
+      function blankBody(entry, onDelete) {
         if (!Array.isArray(entry.blanks)) entry.blanks = [];
         syncBlanks(entry);
-        var card = el("div", { class: "adm-case" });
         var blanksWrap = el("div", { class: "adm-case-blanks" });
-
         function renderBlanks() {
           blanksWrap.innerHTML = "";
           if (!entry.blanks.length) {
@@ -353,32 +355,31 @@
             ]));
           });
         }
-
         var sentInput = textareaInput(entry, "sentence", "e.g. Ich sehe ___ Mann und gebe ___ Frau ein Buch.", "adm-ta grow");
         // Re-sync the per-blank answer fields live as the teacher edits the text,
         // without rebuilding the textarea (keeps their cursor/focus in place).
         sentInput.addEventListener("input", function () { syncBlanks(entry); renderBlanks(); store.save(); });
-
-        card.appendChild(el("div", { class: "adm-case-line" }, [
-          sentInput,
-          el("button", {
-            class: "adm-del", html: "🗑", attrs: { title: "Remove sentence" },
-            on: { click: function () { list.splice(index, 1); store.save(); render(); } }
-          })
-        ]));
-        card.appendChild(blanksWrap);
-        // Word bank + explanation each get their own full-width row with a short
-        // label, so the guidance is never clipped inside a narrow input.
-        card.appendChild(el("div", { class: "adm-case-line" }, [
-          el("span", { class: "adm-field-lbl", text: "Word bank" }),
-          optionsInput(entry, "wordBank", "e.g. den, der, dem, des  ·  answers + wrong choices, blank = auto")
-        ]));
-        card.appendChild(el("div", { class: "adm-case-line" }, [
-          el("span", { class: "adm-field-lbl", text: "Why" }),
-          input(entry, "explanation", "shown to students at reveal (optional)", "adm-input grow")
-        ]));
+        var sentLine = [sentInput];
+        if (onDelete) sentLine.push(el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove sentence" }, on: { click: onDelete } }));
+        var nodes = [
+          el("div", { class: "adm-case-line" }, sentLine),
+          blanksWrap,
+          // Word bank + explanation each get their own full-width row with a short
+          // label, so the guidance is never clipped inside a narrow input.
+          el("div", { class: "adm-case-line" }, [
+            el("span", { class: "adm-field-lbl", text: "Word bank" }),
+            optionsInput(entry, "wordBank", "e.g. den, der, dem, des  ·  answers + wrong choices, blank = auto")
+          ]),
+          el("div", { class: "adm-case-line" }, [
+            el("span", { class: "adm-field-lbl", text: "Why" }),
+            input(entry, "explanation", "shown to students at reveal (optional)", "adm-input grow")
+          ])
+        ];
         renderBlanks();
-        return card;
+        return nodes;
+      }
+      function caseRow(entry, list, index) {
+        return el("div", { class: "adm-case" }, blankBody(entry, function () { list.splice(index, 1); store.save(); render(); }));
       }
 
       /* ---- Wortmonster: compound words (Part 1 + Part 2) ---- */
@@ -516,12 +517,14 @@
         { id: "compounds", name: "Wortmonster", emoji: "🧟", color: "#22c55e" },
         { id: "listening", name: "Hör gut zu!", emoji: "👂", color: "#0ea5b7" },
         { id: "hoerpaare", name: "Match the Following", emoji: "🔗", color: "#06b6d4" },
-        { id: "truefalse", name: "Wahr oder Falsch?", emoji: "⚖️", color: "#f59e0b" }
+        { id: "truefalse", name: "Wahr oder Falsch?", emoji: "⚖️", color: "#f59e0b" },
+        { id: "passage", name: "Lese & Hör", emoji: "📖", color: "#ec4899" }
       ];
       function liveKind(id) {
         if (id === "cases") return "cases";
         if (id === "hoerpaare") return "pairs";
         if (id === "truefalse") return "truefalse";
+        if (id === "passage") return "passage";
         return "items";
       }
       // The full set of content games (Solo word/sentence games + Live games),
@@ -587,7 +590,7 @@
         if (kind === "cases") return (ex.items || []).length || ((ex.accusative || []).length + (ex.dative || []).length + (ex.genitive || []).length);
         if (kind === "words") return (ex.words || []).length;
         if (kind === "sentences") return (ex.sentences || []).length;
-        if (kind === "pairs" || kind === "truefalse") return (ex.questions || []).length;
+        if (kind === "pairs" || kind === "truefalse" || kind === "passage") return (ex.questions || []).length;
         return (ex.items || []).length;
       }
       function unitFor(id, kind) {
@@ -595,6 +598,7 @@
         if (kind === "sentences") return " sentences";
         if (kind === "pairs") return " questions";
         if (kind === "truefalse") return " statements";
+        if (kind === "passage") return " questions";
         if (id === "listening") return " prompts";
         return " words";
       }
@@ -710,6 +714,7 @@
         else if (game.kind === "sentences") renderSentencesExercise(body, ex);
         else if (game.kind === "pairs") renderPairsExercise(body, ex);
         else if (game.kind === "truefalse") renderTrueFalse(body, ex);
+        else if (game.kind === "passage") renderPassage(body, ex);
         else if (currentGame === "cases") renderCases(body, ex);
         else if (currentGame === "compounds") renderCompounds(body, ex);
         else if (currentGame === "listening") renderListening(body, ex);
@@ -780,22 +785,12 @@
         }));
       }
 
-      function mcqQuestionCard(m, arr, index) {
+      // The MCQ editor body (question picker + options), WITHOUT the card chrome —
+      // reused as-is both standalone and embedded in a Passage question.
+      function mcqBody(m) {
         if (!m.question || typeof m.question !== "object") m.question = { type: "text", value: "" };
         if (!Array.isArray(m.options) || m.options.length < 2) m.options = [{ type: "text", value: "", correct: true }, { type: "text", value: "", correct: false }, { type: "text", value: "", correct: false }, { type: "text", value: "", correct: false }];
         var optType = m.options[0].type || "text";
-        var card = el("div", { class: "adm-cpair" });
-        card.appendChild(el("div", { class: "adm-cpair-topbar" }, [
-          el("span", { class: "adm-cpair-n", text: "Question " + (index + 1) }),
-          el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove question" }, on: { click: function () { arr.splice(index, 1); store.save(); render(); } } })
-        ]));
-        // Question: type picker + one value input of that type.
-        card.appendChild(el("div", { class: "adm-mcq-q" }, [
-          typePickerRow("Question", m.question, "type"),
-          el("div", { class: "adm-mcq-field" }, [entryInput(m.question, "value", m.question.type)])
-        ]));
-        // Options: one type for all four, then a correct-marker + value each.
-        card.appendChild(mcqOptionsTypePicker(m));
         var optsWrap = el("div", { class: "adm-mcq-options" });
         m.options.slice(0, 4).forEach(function (o) {
           optsWrap.appendChild(el("div", { class: "adm-mcq-opt" }, [
@@ -803,7 +798,22 @@
             el("div", { class: "adm-mcq-field" }, [entryInput(o, "value", optType)])
           ]));
         });
-        card.appendChild(optsWrap);
+        return [
+          el("div", { class: "adm-mcq-q" }, [
+            typePickerRow("Question", m.question, "type"),
+            el("div", { class: "adm-mcq-field" }, [entryInput(m.question, "value", m.question.type)])
+          ]),
+          mcqOptionsTypePicker(m),
+          optsWrap
+        ];
+      }
+      function mcqQuestionCard(m, arr, index) {
+        var card = el("div", { class: "adm-cpair" });
+        card.appendChild(el("div", { class: "adm-cpair-topbar" }, [
+          el("span", { class: "adm-cpair-n", text: "Question " + (index + 1) }),
+          el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove question" }, on: { click: function () { arr.splice(index, 1); store.save(); render(); } } })
+        ]));
+        mcqBody(m).forEach(function (n) { card.appendChild(n); });
         return card;
       }
 
@@ -956,26 +966,31 @@
         }));
       }
 
-      function tfQuestionCard(q, arr, index) {
+      // The True/False editor body (context + statement + answer), WITHOUT the
+      // card chrome — reused standalone and embedded in a Passage question.
+      function tfBody(q) {
         if (!q.statement || typeof q.statement !== "object") q.statement = { type: "text", value: "" };
         if (q.context != null && typeof q.context !== "object") q.context = null;
         if (typeof q.answer !== "boolean") q.answer = true;
+        // Context block (optional — includes a "No context" choice).
+        var ctxBlock = el("div", { class: "adm-tf-block" }, [tfContextPicker(q)]);
+        if (q.context) ctxBlock.appendChild(el("div", { class: "adm-mcq-field" }, [entryInput(q.context, "value", q.context.type)]));
+        return [
+          ctxBlock,
+          el("div", { class: "adm-tf-block" }, [
+            typePickerRow("Statement", q.statement, "type"),
+            el("div", { class: "adm-mcq-field" }, [entryInput(q.statement, "value", q.statement.type)])
+          ]),
+          tfAnswerToggle(q)
+        ];
+      }
+      function tfQuestionCard(q, arr, index) {
         var card = el("div", { class: "adm-cpair adm-tf-card" });
         card.appendChild(el("div", { class: "adm-cpair-topbar" }, [
           el("span", { class: "adm-cpair-n", text: "Statement " + (index + 1) }),
           el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove statement" }, on: { click: function () { arr.splice(index, 1); store.save(); render(); } } })
         ]));
-        // Context block (optional — includes a "No context" choice).
-        var ctxBlock = el("div", { class: "adm-tf-block" }, [tfContextPicker(q)]);
-        if (q.context) ctxBlock.appendChild(el("div", { class: "adm-mcq-field" }, [entryInput(q.context, "value", q.context.type)]));
-        card.appendChild(ctxBlock);
-        // Statement block (required).
-        card.appendChild(el("div", { class: "adm-tf-block" }, [
-          typePickerRow("Statement", q.statement, "type"),
-          el("div", { class: "adm-mcq-field" }, [entryInput(q.statement, "value", q.statement.type)])
-        ]));
-        // Answer.
-        card.appendChild(tfAnswerToggle(q));
+        tfBody(q).forEach(function (n) { card.appendChild(n); });
         return card;
       }
 
@@ -1002,6 +1017,75 @@
           el("button", { class: "adm-tf-ans" + (q.answer === true ? " sel true" : ""), attrs: { type: "button" }, on: { click: function () { q.answer = true; store.save(); render(); } }, text: "✓ True (Wahr)" }),
           el("button", { class: "adm-tf-ans" + (q.answer === false ? " sel false" : ""), attrs: { type: "button" }, on: { click: function () { q.answer = false; store.save(); render(); } }, text: "✗ False (Falsch)" })
         ]);
+      }
+
+      /* ---- Lese & Hör (Passage) editor: a passage (text/audio) at the top, then
+             an ORDERED list of questions, each in one of the reusable formats.
+             Each question embeds that format's own editor body (mcqBody /
+             blankBody / tfBody) — nothing about those editors changes. */
+      function renderPassage(body, ex) {
+        if (!ex.passage || typeof ex.passage !== "object") ex.passage = { type: "text", value: "" };
+        if (!Array.isArray(ex.questions)) ex.questions = [];
+        body.appendChild(el("p", { class: "adm-hint", html:
+          "These power <b>📖 Lese & Hör</b> in Live Class Mode. Add a <b>passage</b> — text the class reads, or audio they listen to — shown <b>only on the board</b>, " +
+          "then an <b>ordered list of questions</b>, each in any format (MCQ · Lücken-Text · Wahr oder Falsch?). Students answer on their phones; the passage never " +
+          "appears there. Reorder with ↑ ↓. Changes save automatically." }));
+        body.appendChild(el("div", { class: "adm-ex-head" }, [
+          input(ex, "emoji", "📖", "adm-emoji", 6),
+          input(ex, "english", "Short description (optional, e.g. Anna's day)", "adm-input")
+        ]));
+        body.appendChild(passageBlockEditor(ex.passage));
+        body.appendChild(el("div", { class: "adm-cpair-sep", text: "Questions — in the order they're asked" }));
+        var list = ex.questions;
+        if (!list.length) body.appendChild(emptyState("No questions yet — add one below."));
+        list.forEach(function (pq, qi) { body.appendChild(passageQuestionCard(pq, list, qi)); });
+        body.appendChild(el("div", { class: "adm-pq-add" }, [
+          el("span", { class: "adm-side-lbl", text: "Add question:" }),
+          addRowBtn("🎯 MCQ", function () { list.push({ format: "mcq", content: {} }); store.save(); render(); }),
+          addRowBtn("✏️ Lücken-Text", function () { list.push({ format: "lucken-text", content: { sentence: "", blanks: [], wordBank: [], explanation: "" } }); store.save(); render(); }),
+          addRowBtn("⚖️ Wahr/Falsch", function () { list.push({ format: "true-false", content: { context: null, statement: { type: "text", value: "" }, answer: true } }); store.save(); render(); })
+        ]));
+      }
+      // The passage block: a Text/Audio picker + the matching input.
+      function passageBlockEditor(passage) {
+        var wrap = el("div", { class: "adm-passage-block" });
+        var TYPES = [["text", "Text", "📄"], ["audio", "Audio", "🎧"]];
+        var chipRow = el("div", { class: "adm-typechips" });
+        TYPES.forEach(function (T) {
+          chipRow.appendChild(el("button", { class: "adm-typechip" + (passage.type === T[0] ? " sel" : ""), attrs: { type: "button", title: T[1] }, on: { click: function () {
+            if (passage.type === T[0]) return; passage.type = T[0]; store.save(); render();
+          } } }, [el("span", { class: "adm-typechip-ic", text: T[2] }), el("span", { class: "adm-typechip-lbl", text: T[1] })]));
+        });
+        wrap.appendChild(el("div", { class: "adm-typepick" }, [el("span", { class: "adm-side-lbl", text: "Passage" }), chipRow]));
+        if (passage.type === "audio") {
+          var inp = input(passage, "value", "Type the German the class will hear (spoken on tap)", "adm-input grow");
+          var play = el("button", { class: "btn small adm-audio-prev", attrs: { type: "button", title: "Hear it" }, html: "▶", on: { click: function () { try { if (window.VoiceBox) window.VoiceBox.speak(passage.value || ""); } catch (e) {} } } });
+          wrap.appendChild(el("div", { class: "adm-side-row" }, [inp, play]));
+        } else {
+          wrap.appendChild(textareaInput(passage, "value", "Type the passage the class will read on the board…", "adm-ta grow adm-passage-ta"));
+        }
+        return wrap;
+      }
+      function passageQuestionCard(pq, list, index) {
+        if (!pq.content || typeof pq.content !== "object") pq.content = {};
+        var FMT = { "mcq": ["MCQ", "🎯"], "lucken-text": ["Lücken-Text", "✏️"], "true-false": ["Wahr/Falsch", "⚖️"] };
+        var f = FMT[pq.format] || FMT.mcq;
+        var card = el("div", { class: "adm-cpair adm-pq-card" });
+        card.appendChild(el("div", { class: "adm-cpair-topbar" }, [
+          el("span", { class: "adm-cpair-n", text: "Q" + (index + 1) + "  ·  " + f[1] + " " + f[0] }),
+          el("span", { class: "adm-pq-tools" }, [
+            el("button", { class: "adm-pq-move", html: "↑", attrs: { type: "button", title: "Move up" }, on: { click: function () { if (index > 0) { var t = list[index - 1]; list[index - 1] = list[index]; list[index] = t; store.save(); render(); } } } }),
+            el("button", { class: "adm-pq-move", html: "↓", attrs: { type: "button", title: "Move down" }, on: { click: function () { if (index < list.length - 1) { var t = list[index + 1]; list[index + 1] = list[index]; list[index] = t; store.save(); render(); } } } }),
+            el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove question" }, on: { click: function () { list.splice(index, 1); store.save(); render(); } } })
+          ])
+        ]));
+        var qbody = el("div", { class: "adm-pq-body" });
+        var nodes = (pq.format === "lucken-text") ? blankBody(pq.content, null)
+          : (pq.format === "true-false") ? tfBody(pq.content)
+          : mcqBody(pq.content);
+        nodes.forEach(function (n) { qbody.appendChild(n); });
+        card.appendChild(qbody);
+        return card;
       }
 
       // A labelled 4-chip type picker bound to obj[field]; a change re-renders.

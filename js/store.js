@@ -48,6 +48,7 @@
     if (gameKey === "cases") return "cases";
     if (gameKey === "hoerpaare") return "pairs";
     if (gameKey === "truefalse") return "truefalse";
+    if (gameKey === "passage") return "passage";
     if (WORD_GAMES.indexOf(gameKey) >= 0) return "words";
     return "items"; // compounds / listening
   }
@@ -244,6 +245,67 @@
     ];
   }
 
+  /* Passage-based comprehension: an exercise is a passage (text or audio) plus an
+     ORDERED list of questions, each in one of the reusable formats. A question is
+     { format, content } where content is that format's OWN standard schema —
+     nothing about the formats changes, they're just sequenced under one passage.
+     (Match the Following is a later addition; the first pass covers mcq /
+     lucken-text / true-false.) */
+  var PASSAGE_FORMATS = ["mcq", "lucken-text", "true-false"];
+  function normalizeMcqContent(m) {
+    m = (m && typeof m === "object") ? m : {};
+    var q = (m.question && typeof m.question === "object")
+      ? { type: m.question.type || "text", value: String(m.question.value == null ? "" : m.question.value) }
+      : { type: "text", value: "" };
+    var opts = (Array.isArray(m.options) ? m.options : []).map(function (o) {
+      return { type: (o && o.type) || "text", value: String((o && o.value) || ""), correct: !!(o && o.correct) };
+    });
+    while (opts.length < 4) opts.push({ type: (opts[0] || {}).type || "text", value: "", correct: false });
+    opts = opts.slice(0, 4);
+    if (!opts.some(function (o) { return o.correct; })) opts[0].correct = true;
+    return { question: q, options: opts };
+  }
+  function passageExercise(name, passage, questions) {
+    return {
+      id: exId(), name: name || "Exercise 1", emoji: "📖",
+      passage: (passage && typeof passage === "object")
+        ? { type: passage.type === "audio" ? "audio" : "text", value: String(passage.value == null ? "" : passage.value) }
+        : { type: "text", value: "" },
+      questions: Array.isArray(questions) ? clone(questions) : []
+    };
+  }
+  function normalizePassageQuestion(pq) {
+    if (!pq || typeof pq !== "object") return null;
+    var fmt = PASSAGE_FORMATS.indexOf(pq.format) >= 0 ? pq.format : "mcq";
+    var content = (pq.content && typeof pq.content === "object") ? pq.content : {};
+    if (fmt === "mcq") content = normalizeMcqContent(content);
+    else if (fmt === "lucken-text") content = migrateCaseEntry(content);
+    else if (fmt === "true-false") content = { context: tfBlock(content.context, true), statement: tfBlock(content.statement, false), answer: !!content.answer };
+    return { format: fmt, content: content };
+  }
+  function normalizePassageEx(e) {
+    if (!e.id) e.id = exId();
+    if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
+    if (typeof e.emoji !== "string") e.emoji = "📖";
+    if (!e.passage || typeof e.passage !== "object") e.passage = { type: "text", value: "" };
+    e.passage.type = e.passage.type === "audio" ? "audio" : "text";
+    e.passage.value = String(e.passage.value == null ? "" : e.passage.value);
+    if (!Array.isArray(e.questions)) e.questions = [];
+    e.questions = e.questions.map(normalizePassageQuestion).filter(Boolean);
+  }
+  function defaultPassageExercise() {
+    return passageExercise("Exercise 1",
+      { type: "text", value: "Anna wohnt in Berlin. Sie hat einen Hund und eine Katze. Jeden Morgen geht sie mit dem Hund im Park spazieren. Am Abend liest sie ein Buch." },
+      [
+        { format: "mcq", content: { question: { type: "text", value: "Wo wohnt Anna?" }, options: [
+          { type: "text", value: "In Berlin", correct: true }, { type: "text", value: "In München", correct: false },
+          { type: "text", value: "In Hamburg", correct: false }, { type: "text", value: "In Köln", correct: false }
+        ] } },
+        { format: "true-false", content: { context: null, statement: { type: "text", value: "Anna hat einen Hund." }, answer: true } },
+        { format: "lucken-text", content: { sentence: "Am Abend liest Anna ein ___1___.", blanks: [{ id: 1, correct: "Buch" }], wordBank: ["Buch", "Auto", "Haus", "Hund"], explanation: "" } }
+      ]);
+  }
+
   // The topics a legacy store's game offered (its selection subset, or all).
   function legacyTopicsFor(d, gameId, type) {
     var pool = (type === "sentences" ? d.sentences : d.vocab) || [];
@@ -273,7 +335,8 @@
       compounds: [listExercise("Exercise 1", defaultCompounds())],
       listening: [listExercise("Exercise 1", defaultListening())],
       hoerpaare: [pairsExercise("Exercise 1", defaultPairsQuestions())],
-      truefalse: [trueFalseExercise("Exercise 1", defaultTrueFalseQuestions())]
+      truefalse: [trueFalseExercise("Exercise 1", defaultTrueFalseQuestions())],
+      passage: [defaultPassageExercise()]
     };
   }
 
@@ -317,6 +380,10 @@
     if (!Array.isArray(ex.truefalse)) ex.truefalse = [trueFalseExercise("Exercise 1", defaultTrueFalseQuestions())];
     if (!ex.truefalse.length) ex.truefalse = [trueFalseExercise("Exercise 1", null)];
     ex.truefalse.forEach(normalizeTrueFalseEx);
+    // Passage-based comprehension
+    if (!Array.isArray(ex.passage)) ex.passage = [defaultPassageExercise()];
+    if (!ex.passage.length) ex.passage = [defaultPassageExercise()];
+    ex.passage.forEach(normalizePassageEx);
 
     // Legacy fields are now represented as exercises — drop them.
     delete d.vocab; delete d.sentences; delete d.games;
@@ -458,6 +525,7 @@
       if (kind === "sentences") return sentencesExercise(name, null);
       if (kind === "pairs") return pairsExercise(name, [{ words: [{ de: "", en: "", emoji: "" }, { de: "", en: "", emoji: "" }, { de: "", en: "", emoji: "" }] }]);
       if (kind === "truefalse") return trueFalseExercise(name, [{ context: null, statement: { type: "text", value: "" }, answer: true }]);
+      if (kind === "passage") return passageExercise(name, { type: "text", value: "" }, [{ format: "mcq", content: {} }]);
       return listExercise(name, null);
     },
     addExercise: function (gameKey, name) {

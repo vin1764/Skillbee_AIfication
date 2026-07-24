@@ -1175,6 +1175,29 @@ input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf
 .adm-tf-ans.sel.true { background: var(--good); border-color: var(--good); color: #fff; }
 .adm-tf-ans.sel.false { background: var(--bad); border-color: var(--bad); color: #fff; }
 
+/* ===== Lese & Hör (Passage) ===== */
+/* Host: the passage shown on the board (never on phones). */
+.passage-host { text-align: center; max-width: 900px; margin: 0 auto; }
+.passage-tag { font-size: 0.9rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 14px; }
+.passage-text { font-size: clamp(1.3rem, 2.6vw, 1.9rem); line-height: 1.7; font-weight: 700; color: var(--ink); text-align: left; white-space: pre-wrap; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px 28px; box-shadow: var(--shadow); }
+.passage-audio { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.show-passage-btn { white-space: nowrap; }
+.reveal-actions { display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
+/* Host-only overlay for "Show passage again" — sits over the current question. */
+.passage-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(7, 21, 80, 0.55); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.passage-overlay-card { background: var(--card); border-radius: 22px; box-shadow: var(--shadow-lg); padding: 28px; max-width: 900px; width: 100%; max-height: 88vh; overflow: auto; text-align: center; }
+.passage-overlay-card .passage-text { box-shadow: none; }
+
+/* Content editor: passage block + per-question cards with reorder tools. */
+.adm-passage-block { background: var(--skb-tint); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin: 10px 0 6px; }
+.adm-passage-ta { min-height: 90px; width: 100%; }
+.adm-pq-card .adm-cpair-topbar { align-items: center; }
+.adm-pq-tools { display: inline-flex; gap: 6px; align-items: center; margin-left: auto; }
+.adm-pq-move { border: 1px solid var(--line-deep); background: #fff; border-radius: 8px; width: 30px; height: 30px; font-weight: 800; cursor: pointer; color: var(--ink); line-height: 1; }
+.adm-pq-move:hover { background: var(--skb-tint); }
+.adm-pq-body { margin-top: 10px; }
+.adm-pq-add { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+
 </style>
 </head>
 <body>
@@ -1563,6 +1586,7 @@ window.SkillbeeBrand = {
     if (gameKey === "cases") return "cases";
     if (gameKey === "hoerpaare") return "pairs";
     if (gameKey === "truefalse") return "truefalse";
+    if (gameKey === "passage") return "passage";
     if (WORD_GAMES.indexOf(gameKey) >= 0) return "words";
     return "items"; // compounds / listening
   }
@@ -1759,6 +1783,67 @@ window.SkillbeeBrand = {
     ];
   }
 
+  /* Passage-based comprehension: an exercise is a passage (text or audio) plus an
+     ORDERED list of questions, each in one of the reusable formats. A question is
+     { format, content } where content is that format's OWN standard schema —
+     nothing about the formats changes, they're just sequenced under one passage.
+     (Match the Following is a later addition; the first pass covers mcq /
+     lucken-text / true-false.) */
+  var PASSAGE_FORMATS = ["mcq", "lucken-text", "true-false"];
+  function normalizeMcqContent(m) {
+    m = (m && typeof m === "object") ? m : {};
+    var q = (m.question && typeof m.question === "object")
+      ? { type: m.question.type || "text", value: String(m.question.value == null ? "" : m.question.value) }
+      : { type: "text", value: "" };
+    var opts = (Array.isArray(m.options) ? m.options : []).map(function (o) {
+      return { type: (o && o.type) || "text", value: String((o && o.value) || ""), correct: !!(o && o.correct) };
+    });
+    while (opts.length < 4) opts.push({ type: (opts[0] || {}).type || "text", value: "", correct: false });
+    opts = opts.slice(0, 4);
+    if (!opts.some(function (o) { return o.correct; })) opts[0].correct = true;
+    return { question: q, options: opts };
+  }
+  function passageExercise(name, passage, questions) {
+    return {
+      id: exId(), name: name || "Exercise 1", emoji: "📖",
+      passage: (passage && typeof passage === "object")
+        ? { type: passage.type === "audio" ? "audio" : "text", value: String(passage.value == null ? "" : passage.value) }
+        : { type: "text", value: "" },
+      questions: Array.isArray(questions) ? clone(questions) : []
+    };
+  }
+  function normalizePassageQuestion(pq) {
+    if (!pq || typeof pq !== "object") return null;
+    var fmt = PASSAGE_FORMATS.indexOf(pq.format) >= 0 ? pq.format : "mcq";
+    var content = (pq.content && typeof pq.content === "object") ? pq.content : {};
+    if (fmt === "mcq") content = normalizeMcqContent(content);
+    else if (fmt === "lucken-text") content = migrateCaseEntry(content);
+    else if (fmt === "true-false") content = { context: tfBlock(content.context, true), statement: tfBlock(content.statement, false), answer: !!content.answer };
+    return { format: fmt, content: content };
+  }
+  function normalizePassageEx(e) {
+    if (!e.id) e.id = exId();
+    if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
+    if (typeof e.emoji !== "string") e.emoji = "📖";
+    if (!e.passage || typeof e.passage !== "object") e.passage = { type: "text", value: "" };
+    e.passage.type = e.passage.type === "audio" ? "audio" : "text";
+    e.passage.value = String(e.passage.value == null ? "" : e.passage.value);
+    if (!Array.isArray(e.questions)) e.questions = [];
+    e.questions = e.questions.map(normalizePassageQuestion).filter(Boolean);
+  }
+  function defaultPassageExercise() {
+    return passageExercise("Exercise 1",
+      { type: "text", value: "Anna wohnt in Berlin. Sie hat einen Hund und eine Katze. Jeden Morgen geht sie mit dem Hund im Park spazieren. Am Abend liest sie ein Buch." },
+      [
+        { format: "mcq", content: { question: { type: "text", value: "Wo wohnt Anna?" }, options: [
+          { type: "text", value: "In Berlin", correct: true }, { type: "text", value: "In München", correct: false },
+          { type: "text", value: "In Hamburg", correct: false }, { type: "text", value: "In Köln", correct: false }
+        ] } },
+        { format: "true-false", content: { context: null, statement: { type: "text", value: "Anna hat einen Hund." }, answer: true } },
+        { format: "lucken-text", content: { sentence: "Am Abend liest Anna ein ___1___.", blanks: [{ id: 1, correct: "Buch" }], wordBank: ["Buch", "Auto", "Haus", "Hund"], explanation: "" } }
+      ]);
+  }
+
   // The topics a legacy store's game offered (its selection subset, or all).
   function legacyTopicsFor(d, gameId, type) {
     var pool = (type === "sentences" ? d.sentences : d.vocab) || [];
@@ -1788,7 +1873,8 @@ window.SkillbeeBrand = {
       compounds: [listExercise("Exercise 1", defaultCompounds())],
       listening: [listExercise("Exercise 1", defaultListening())],
       hoerpaare: [pairsExercise("Exercise 1", defaultPairsQuestions())],
-      truefalse: [trueFalseExercise("Exercise 1", defaultTrueFalseQuestions())]
+      truefalse: [trueFalseExercise("Exercise 1", defaultTrueFalseQuestions())],
+      passage: [defaultPassageExercise()]
     };
   }
 
@@ -1832,6 +1918,10 @@ window.SkillbeeBrand = {
     if (!Array.isArray(ex.truefalse)) ex.truefalse = [trueFalseExercise("Exercise 1", defaultTrueFalseQuestions())];
     if (!ex.truefalse.length) ex.truefalse = [trueFalseExercise("Exercise 1", null)];
     ex.truefalse.forEach(normalizeTrueFalseEx);
+    // Passage-based comprehension
+    if (!Array.isArray(ex.passage)) ex.passage = [defaultPassageExercise()];
+    if (!ex.passage.length) ex.passage = [defaultPassageExercise()];
+    ex.passage.forEach(normalizePassageEx);
 
     // Legacy fields are now represented as exercises — drop them.
     delete d.vocab; delete d.sentences; delete d.games;
@@ -1973,6 +2063,7 @@ window.SkillbeeBrand = {
       if (kind === "sentences") return sentencesExercise(name, null);
       if (kind === "pairs") return pairsExercise(name, [{ words: [{ de: "", en: "", emoji: "" }, { de: "", en: "", emoji: "" }, { de: "", en: "", emoji: "" }] }]);
       if (kind === "truefalse") return trueFalseExercise(name, [{ context: null, statement: { type: "text", value: "" }, answer: true }]);
+      if (kind === "passage") return passageExercise(name, { type: "text", value: "" }, [{ format: "mcq", content: {} }]);
       return listExercise(name, null);
     },
     addExercise: function (gameKey, name) {
@@ -4912,12 +5003,14 @@ document.addEventListener("DOMContentLoaded", App.init);
         entry.blanks.forEach(function (b, i) { b.id = i + 1; if (b.correct == null) b.correct = ""; });
       }
 
-      function caseRow(entry, list, index) {
+      // The Lücken-Text editor body (sentence + live blanks + word bank + why),
+      // WITHOUT the card wrapper — reused standalone and embedded in a Passage
+      // question. `onDelete` (optional) adds the inline remove button to the
+      // sentence line; a Passage embeds it with no delete (the card handles that).
+      function blankBody(entry, onDelete) {
         if (!Array.isArray(entry.blanks)) entry.blanks = [];
         syncBlanks(entry);
-        var card = el("div", { class: "adm-case" });
         var blanksWrap = el("div", { class: "adm-case-blanks" });
-
         function renderBlanks() {
           blanksWrap.innerHTML = "";
           if (!entry.blanks.length) {
@@ -4931,32 +5024,31 @@ document.addEventListener("DOMContentLoaded", App.init);
             ]));
           });
         }
-
         var sentInput = textareaInput(entry, "sentence", "e.g. Ich sehe ___ Mann und gebe ___ Frau ein Buch.", "adm-ta grow");
         // Re-sync the per-blank answer fields live as the teacher edits the text,
         // without rebuilding the textarea (keeps their cursor/focus in place).
         sentInput.addEventListener("input", function () { syncBlanks(entry); renderBlanks(); store.save(); });
-
-        card.appendChild(el("div", { class: "adm-case-line" }, [
-          sentInput,
-          el("button", {
-            class: "adm-del", html: "🗑", attrs: { title: "Remove sentence" },
-            on: { click: function () { list.splice(index, 1); store.save(); render(); } }
-          })
-        ]));
-        card.appendChild(blanksWrap);
-        // Word bank + explanation each get their own full-width row with a short
-        // label, so the guidance is never clipped inside a narrow input.
-        card.appendChild(el("div", { class: "adm-case-line" }, [
-          el("span", { class: "adm-field-lbl", text: "Word bank" }),
-          optionsInput(entry, "wordBank", "e.g. den, der, dem, des  ·  answers + wrong choices, blank = auto")
-        ]));
-        card.appendChild(el("div", { class: "adm-case-line" }, [
-          el("span", { class: "adm-field-lbl", text: "Why" }),
-          input(entry, "explanation", "shown to students at reveal (optional)", "adm-input grow")
-        ]));
+        var sentLine = [sentInput];
+        if (onDelete) sentLine.push(el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove sentence" }, on: { click: onDelete } }));
+        var nodes = [
+          el("div", { class: "adm-case-line" }, sentLine),
+          blanksWrap,
+          // Word bank + explanation each get their own full-width row with a short
+          // label, so the guidance is never clipped inside a narrow input.
+          el("div", { class: "adm-case-line" }, [
+            el("span", { class: "adm-field-lbl", text: "Word bank" }),
+            optionsInput(entry, "wordBank", "e.g. den, der, dem, des  ·  answers + wrong choices, blank = auto")
+          ]),
+          el("div", { class: "adm-case-line" }, [
+            el("span", { class: "adm-field-lbl", text: "Why" }),
+            input(entry, "explanation", "shown to students at reveal (optional)", "adm-input grow")
+          ])
+        ];
         renderBlanks();
-        return card;
+        return nodes;
+      }
+      function caseRow(entry, list, index) {
+        return el("div", { class: "adm-case" }, blankBody(entry, function () { list.splice(index, 1); store.save(); render(); }));
       }
 
       /* ---- Wortmonster: compound words (Part 1 + Part 2) ---- */
@@ -5094,12 +5186,14 @@ document.addEventListener("DOMContentLoaded", App.init);
         { id: "compounds", name: "Wortmonster", emoji: "🧟", color: "#22c55e" },
         { id: "listening", name: "Hör gut zu!", emoji: "👂", color: "#0ea5b7" },
         { id: "hoerpaare", name: "Match the Following", emoji: "🔗", color: "#06b6d4" },
-        { id: "truefalse", name: "Wahr oder Falsch?", emoji: "⚖️", color: "#f59e0b" }
+        { id: "truefalse", name: "Wahr oder Falsch?", emoji: "⚖️", color: "#f59e0b" },
+        { id: "passage", name: "Lese & Hör", emoji: "📖", color: "#ec4899" }
       ];
       function liveKind(id) {
         if (id === "cases") return "cases";
         if (id === "hoerpaare") return "pairs";
         if (id === "truefalse") return "truefalse";
+        if (id === "passage") return "passage";
         return "items";
       }
       // The full set of content games (Solo word/sentence games + Live games),
@@ -5165,7 +5259,7 @@ document.addEventListener("DOMContentLoaded", App.init);
         if (kind === "cases") return (ex.items || []).length || ((ex.accusative || []).length + (ex.dative || []).length + (ex.genitive || []).length);
         if (kind === "words") return (ex.words || []).length;
         if (kind === "sentences") return (ex.sentences || []).length;
-        if (kind === "pairs" || kind === "truefalse") return (ex.questions || []).length;
+        if (kind === "pairs" || kind === "truefalse" || kind === "passage") return (ex.questions || []).length;
         return (ex.items || []).length;
       }
       function unitFor(id, kind) {
@@ -5173,6 +5267,7 @@ document.addEventListener("DOMContentLoaded", App.init);
         if (kind === "sentences") return " sentences";
         if (kind === "pairs") return " questions";
         if (kind === "truefalse") return " statements";
+        if (kind === "passage") return " questions";
         if (id === "listening") return " prompts";
         return " words";
       }
@@ -5288,6 +5383,7 @@ document.addEventListener("DOMContentLoaded", App.init);
         else if (game.kind === "sentences") renderSentencesExercise(body, ex);
         else if (game.kind === "pairs") renderPairsExercise(body, ex);
         else if (game.kind === "truefalse") renderTrueFalse(body, ex);
+        else if (game.kind === "passage") renderPassage(body, ex);
         else if (currentGame === "cases") renderCases(body, ex);
         else if (currentGame === "compounds") renderCompounds(body, ex);
         else if (currentGame === "listening") renderListening(body, ex);
@@ -5358,22 +5454,12 @@ document.addEventListener("DOMContentLoaded", App.init);
         }));
       }
 
-      function mcqQuestionCard(m, arr, index) {
+      // The MCQ editor body (question picker + options), WITHOUT the card chrome —
+      // reused as-is both standalone and embedded in a Passage question.
+      function mcqBody(m) {
         if (!m.question || typeof m.question !== "object") m.question = { type: "text", value: "" };
         if (!Array.isArray(m.options) || m.options.length < 2) m.options = [{ type: "text", value: "", correct: true }, { type: "text", value: "", correct: false }, { type: "text", value: "", correct: false }, { type: "text", value: "", correct: false }];
         var optType = m.options[0].type || "text";
-        var card = el("div", { class: "adm-cpair" });
-        card.appendChild(el("div", { class: "adm-cpair-topbar" }, [
-          el("span", { class: "adm-cpair-n", text: "Question " + (index + 1) }),
-          el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove question" }, on: { click: function () { arr.splice(index, 1); store.save(); render(); } } })
-        ]));
-        // Question: type picker + one value input of that type.
-        card.appendChild(el("div", { class: "adm-mcq-q" }, [
-          typePickerRow("Question", m.question, "type"),
-          el("div", { class: "adm-mcq-field" }, [entryInput(m.question, "value", m.question.type)])
-        ]));
-        // Options: one type for all four, then a correct-marker + value each.
-        card.appendChild(mcqOptionsTypePicker(m));
         var optsWrap = el("div", { class: "adm-mcq-options" });
         m.options.slice(0, 4).forEach(function (o) {
           optsWrap.appendChild(el("div", { class: "adm-mcq-opt" }, [
@@ -5381,7 +5467,22 @@ document.addEventListener("DOMContentLoaded", App.init);
             el("div", { class: "adm-mcq-field" }, [entryInput(o, "value", optType)])
           ]));
         });
-        card.appendChild(optsWrap);
+        return [
+          el("div", { class: "adm-mcq-q" }, [
+            typePickerRow("Question", m.question, "type"),
+            el("div", { class: "adm-mcq-field" }, [entryInput(m.question, "value", m.question.type)])
+          ]),
+          mcqOptionsTypePicker(m),
+          optsWrap
+        ];
+      }
+      function mcqQuestionCard(m, arr, index) {
+        var card = el("div", { class: "adm-cpair" });
+        card.appendChild(el("div", { class: "adm-cpair-topbar" }, [
+          el("span", { class: "adm-cpair-n", text: "Question " + (index + 1) }),
+          el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove question" }, on: { click: function () { arr.splice(index, 1); store.save(); render(); } } })
+        ]));
+        mcqBody(m).forEach(function (n) { card.appendChild(n); });
         return card;
       }
 
@@ -5534,26 +5635,31 @@ document.addEventListener("DOMContentLoaded", App.init);
         }));
       }
 
-      function tfQuestionCard(q, arr, index) {
+      // The True/False editor body (context + statement + answer), WITHOUT the
+      // card chrome — reused standalone and embedded in a Passage question.
+      function tfBody(q) {
         if (!q.statement || typeof q.statement !== "object") q.statement = { type: "text", value: "" };
         if (q.context != null && typeof q.context !== "object") q.context = null;
         if (typeof q.answer !== "boolean") q.answer = true;
+        // Context block (optional — includes a "No context" choice).
+        var ctxBlock = el("div", { class: "adm-tf-block" }, [tfContextPicker(q)]);
+        if (q.context) ctxBlock.appendChild(el("div", { class: "adm-mcq-field" }, [entryInput(q.context, "value", q.context.type)]));
+        return [
+          ctxBlock,
+          el("div", { class: "adm-tf-block" }, [
+            typePickerRow("Statement", q.statement, "type"),
+            el("div", { class: "adm-mcq-field" }, [entryInput(q.statement, "value", q.statement.type)])
+          ]),
+          tfAnswerToggle(q)
+        ];
+      }
+      function tfQuestionCard(q, arr, index) {
         var card = el("div", { class: "adm-cpair adm-tf-card" });
         card.appendChild(el("div", { class: "adm-cpair-topbar" }, [
           el("span", { class: "adm-cpair-n", text: "Statement " + (index + 1) }),
           el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove statement" }, on: { click: function () { arr.splice(index, 1); store.save(); render(); } } })
         ]));
-        // Context block (optional — includes a "No context" choice).
-        var ctxBlock = el("div", { class: "adm-tf-block" }, [tfContextPicker(q)]);
-        if (q.context) ctxBlock.appendChild(el("div", { class: "adm-mcq-field" }, [entryInput(q.context, "value", q.context.type)]));
-        card.appendChild(ctxBlock);
-        // Statement block (required).
-        card.appendChild(el("div", { class: "adm-tf-block" }, [
-          typePickerRow("Statement", q.statement, "type"),
-          el("div", { class: "adm-mcq-field" }, [entryInput(q.statement, "value", q.statement.type)])
-        ]));
-        // Answer.
-        card.appendChild(tfAnswerToggle(q));
+        tfBody(q).forEach(function (n) { card.appendChild(n); });
         return card;
       }
 
@@ -5580,6 +5686,75 @@ document.addEventListener("DOMContentLoaded", App.init);
           el("button", { class: "adm-tf-ans" + (q.answer === true ? " sel true" : ""), attrs: { type: "button" }, on: { click: function () { q.answer = true; store.save(); render(); } }, text: "✓ True (Wahr)" }),
           el("button", { class: "adm-tf-ans" + (q.answer === false ? " sel false" : ""), attrs: { type: "button" }, on: { click: function () { q.answer = false; store.save(); render(); } }, text: "✗ False (Falsch)" })
         ]);
+      }
+
+      /* ---- Lese & Hör (Passage) editor: a passage (text/audio) at the top, then
+             an ORDERED list of questions, each in one of the reusable formats.
+             Each question embeds that format's own editor body (mcqBody /
+             blankBody / tfBody) — nothing about those editors changes. */
+      function renderPassage(body, ex) {
+        if (!ex.passage || typeof ex.passage !== "object") ex.passage = { type: "text", value: "" };
+        if (!Array.isArray(ex.questions)) ex.questions = [];
+        body.appendChild(el("p", { class: "adm-hint", html:
+          "These power <b>📖 Lese & Hör</b> in Live Class Mode. Add a <b>passage</b> — text the class reads, or audio they listen to — shown <b>only on the board</b>, " +
+          "then an <b>ordered list of questions</b>, each in any format (MCQ · Lücken-Text · Wahr oder Falsch?). Students answer on their phones; the passage never " +
+          "appears there. Reorder with ↑ ↓. Changes save automatically." }));
+        body.appendChild(el("div", { class: "adm-ex-head" }, [
+          input(ex, "emoji", "📖", "adm-emoji", 6),
+          input(ex, "english", "Short description (optional, e.g. Anna's day)", "adm-input")
+        ]));
+        body.appendChild(passageBlockEditor(ex.passage));
+        body.appendChild(el("div", { class: "adm-cpair-sep", text: "Questions — in the order they're asked" }));
+        var list = ex.questions;
+        if (!list.length) body.appendChild(emptyState("No questions yet — add one below."));
+        list.forEach(function (pq, qi) { body.appendChild(passageQuestionCard(pq, list, qi)); });
+        body.appendChild(el("div", { class: "adm-pq-add" }, [
+          el("span", { class: "adm-side-lbl", text: "Add question:" }),
+          addRowBtn("🎯 MCQ", function () { list.push({ format: "mcq", content: {} }); store.save(); render(); }),
+          addRowBtn("✏️ Lücken-Text", function () { list.push({ format: "lucken-text", content: { sentence: "", blanks: [], wordBank: [], explanation: "" } }); store.save(); render(); }),
+          addRowBtn("⚖️ Wahr/Falsch", function () { list.push({ format: "true-false", content: { context: null, statement: { type: "text", value: "" }, answer: true } }); store.save(); render(); })
+        ]));
+      }
+      // The passage block: a Text/Audio picker + the matching input.
+      function passageBlockEditor(passage) {
+        var wrap = el("div", { class: "adm-passage-block" });
+        var TYPES = [["text", "Text", "📄"], ["audio", "Audio", "🎧"]];
+        var chipRow = el("div", { class: "adm-typechips" });
+        TYPES.forEach(function (T) {
+          chipRow.appendChild(el("button", { class: "adm-typechip" + (passage.type === T[0] ? " sel" : ""), attrs: { type: "button", title: T[1] }, on: { click: function () {
+            if (passage.type === T[0]) return; passage.type = T[0]; store.save(); render();
+          } } }, [el("span", { class: "adm-typechip-ic", text: T[2] }), el("span", { class: "adm-typechip-lbl", text: T[1] })]));
+        });
+        wrap.appendChild(el("div", { class: "adm-typepick" }, [el("span", { class: "adm-side-lbl", text: "Passage" }), chipRow]));
+        if (passage.type === "audio") {
+          var inp = input(passage, "value", "Type the German the class will hear (spoken on tap)", "adm-input grow");
+          var play = el("button", { class: "btn small adm-audio-prev", attrs: { type: "button", title: "Hear it" }, html: "▶", on: { click: function () { try { if (window.VoiceBox) window.VoiceBox.speak(passage.value || ""); } catch (e) {} } } });
+          wrap.appendChild(el("div", { class: "adm-side-row" }, [inp, play]));
+        } else {
+          wrap.appendChild(textareaInput(passage, "value", "Type the passage the class will read on the board…", "adm-ta grow adm-passage-ta"));
+        }
+        return wrap;
+      }
+      function passageQuestionCard(pq, list, index) {
+        if (!pq.content || typeof pq.content !== "object") pq.content = {};
+        var FMT = { "mcq": ["MCQ", "🎯"], "lucken-text": ["Lücken-Text", "✏️"], "true-false": ["Wahr/Falsch", "⚖️"] };
+        var f = FMT[pq.format] || FMT.mcq;
+        var card = el("div", { class: "adm-cpair adm-pq-card" });
+        card.appendChild(el("div", { class: "adm-cpair-topbar" }, [
+          el("span", { class: "adm-cpair-n", text: "Q" + (index + 1) + "  ·  " + f[1] + " " + f[0] }),
+          el("span", { class: "adm-pq-tools" }, [
+            el("button", { class: "adm-pq-move", html: "↑", attrs: { type: "button", title: "Move up" }, on: { click: function () { if (index > 0) { var t = list[index - 1]; list[index - 1] = list[index]; list[index] = t; store.save(); render(); } } } }),
+            el("button", { class: "adm-pq-move", html: "↓", attrs: { type: "button", title: "Move down" }, on: { click: function () { if (index < list.length - 1) { var t = list[index + 1]; list[index + 1] = list[index]; list[index] = t; store.save(); render(); } } } }),
+            el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove question" }, on: { click: function () { list.splice(index, 1); store.save(); render(); } } })
+          ])
+        ]));
+        var qbody = el("div", { class: "adm-pq-body" });
+        var nodes = (pq.format === "lucken-text") ? blankBody(pq.content, null)
+          : (pq.format === "true-false") ? tfBody(pq.content)
+          : mcqBody(pq.content);
+        nodes.forEach(function (n) { qbody.appendChild(n); });
+        card.appendChild(qbody);
+        return card;
       }
 
       // A labelled 4-chip type picker bound to obj[field]; a change re-renders.
@@ -6778,8 +6953,68 @@ document.addEventListener("DOMContentLoaded", App.init);
     }
   };
 
+  /* ---- Passage (Lese & Hör): an ORCHESTRATOR, not a new question engine ------
+     A passage (text or audio, host/projector-only) followed by an ordered list
+     of questions, each in one of the EXISTING formats. buildRounds turns each
+     question into that format's normal round and tags it with `fmt` (the format's
+     LiveGames key). The Live controller reads `fmt` per round and dispatches to
+     the right format's hostContent/playerContent/score — reusing them unchanged.
+     The passage itself rides only on the in-memory round (r.passage); it is NEVER
+     written into the round doc, so it can never reach a student's phone. This
+     first pass covers mcq / lucken-text / true-false. */
+  function passageRound(pq, passage) {
+    if (!pq || typeof pq !== "object") return null;
+    var c = pq.content || {};
+    var base = { passage: passage };
+    if (pq.format === "mcq") {
+      var q = mcqSide(c.question, "text");
+      var opts = (c.options || []).map(function (o) { return { type: (o && o.type) || "text", value: String((o && o.value) || ""), correct: !!(o && o.correct) }; })
+        .filter(function (o) { return o.value !== ""; });
+      if (!q.value || opts.length < 2 || !opts.some(function (o) { return o.correct; })) return null;
+      return Object.assign(base, { type: "mcq", fmt: "quiz", question: q, options: kit().shuffle(opts.slice(0, 4)) });
+    }
+    if (pq.format === "lucken-text") {
+      var nb = normBlankEntry(c);
+      if (!nb) return null;
+      return Object.assign(base, { type: "blanks", fmt: "cases", sentence: nb.sentence, blanks: nb.blanks, wordBank: kit().shuffle(nb.wordBank.slice()), explanation: nb.explanation });
+    }
+    if (pq.format === "true-false") {
+      if (!c.statement || String((c.statement || {}).value || "").trim() === "") return null;
+      var ctx = (c.context && String((c.context || {}).value || "").trim() !== "") ? { type: c.context.type || "text", value: String(c.context.value) } : null;
+      return Object.assign(base, { type: "truefalse", fmt: "truefalse", context: ctx, statement: { type: (c.statement.type || "text"), value: String(c.statement.value) }, answer: !!c.answer });
+    }
+    return null;
+  }
+  var passageAdapter = {
+    meta: { name: "Lese & Hör", emoji: "📖", contentType: "passage" },
+    timeLimit: 20000,
+    pickLabel: "Exercise",
+    passage: true,               // routes to the passage-first + Show-Passage flow
+    getTopics: function () {
+      var store = window.ContentStore;
+      var list = (store && store.exercisesFor) ? store.exercisesFor("passage") : [];
+      return list.map(function (e) {
+        var n = (e.questions || []).length;
+        return { id: e.id, name: e.name, emoji: e.emoji || "📖", english: ((e.passage && e.passage.type === "audio") ? "🎧 " : "📄 ") + n + (n === 1 ? " question" : " questions") };
+      });
+    },
+    buildRounds: function (topic) {
+      var store = window.ContentStore;
+      var e = (store && store.exercise) ? store.exercise("passage", topic && topic.id) : null;
+      var passage = (e && e.passage && String((e.passage || {}).value || "").trim() !== "")
+        ? { type: e.passage.type === "audio" ? "audio" : "text", value: String(e.passage.value) } : null;
+      var rounds = [];
+      ((e && e.questions) || []).forEach(function (pq) {
+        var r = passageRound(pq, passage);
+        if (r) rounds.push(r);
+      });
+      return rounds.slice(0, 20);
+    }
+  };
+
   window.LiveGames = {
     quiz: choiceAdapter({ name: "Quiz-Blitz", emoji: "🎯", contentType: "vocab" }),
+    passage: passageAdapter,
     truefalse: truefalseAdapter,
     memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" }),
     cases: blanksAdapter,
@@ -7199,6 +7434,17 @@ window.LiveMode = (function () {
       } catch (e) {}
     }
 
+    // The Passage game sequences DIFFERENT formats — each round carries `fmt` (the
+    // format's LiveGames key). Every per-round render/score call resolves the
+    // adapter through here: a normal single-format session has no `fmt`, so it
+    // falls back to the session `adapter` and behaves exactly as before.
+    function adapterForRound(r) { return (r && r.fmt && window.LiveGames[r.fmt]) || adapter; }
+    // The passage (text/audio) rides only on the in-memory round — never written
+    // to the session doc, so it can never reach a phone. Kept here for the
+    // passage-first screen and the "Show passage again" overlay.
+    var passageInfo = null;
+    (rounds || []).some(function (r) { if (r && r.passage) { passageInfo = r.passage; return true; } return false; });
+
     track(window.LiveDB.listenSession(code, function (s) {
       sess = s;
       if (!s) return;
@@ -7217,27 +7463,86 @@ window.LiveMode = (function () {
         ]),
         el("div", { class: "join-count", text: names.length + " joined" }),
         chips,
-        el("button", { class: "btn primary big", text: "Start game ▶", attrs: names.length ? {} : { disabled: "true" }, on: { click: nextQuestion } }),
+        el("button", { class: "btn primary big", text: "Start game ▶", attrs: names.length ? {} : { disabled: "true" }, on: { click: (adapter.passage ? hostPassage : nextQuestion) } }),
         el("button", { class: "back-link small", html: "✕ Close room", on: { click: closeRoom } })
       ]));
     }
+
+    /* ---- Passage (Lese & Hör): the passage is shown ONLY on the host screen.
+       It is never written to the session doc, so it never reaches a phone. The
+       teacher shows it first, then advances to the questions; a "Show passage"
+       button re-displays it as a host-only overlay at any time without touching
+       the current question's state. */
+    function passageBodyNodes(passage) {
+      if (!passage) return [el("p", { class: "live-muted", text: "No passage." })];
+      if (passage.type === "audio") {
+        var plays = 0, btn;
+        var label = function () { return plays === 0 ? "🔊 Play the passage" : "🔁 Play again"; };
+        btn = el("button", { class: "btn primary big listen-play", on: { click: function () { plays++; try { window.MatchTiles.play(kit, passage, 1); } catch (e) {} btn.innerHTML = label(); } } });
+        btn.innerHTML = label();
+        return [el("div", { class: "passage-audio" }, [el("div", { class: "listen-emoji", text: "🎧" }), btn])];
+      }
+      return [el("div", { class: "passage-text", text: passage.value })];
+    }
+    function hostPassage() {
+      hostPhase = "passage";
+      // Phones get a "read on the board" wait — NO passage content is sent.
+      safeUpdate({ status: "passage" });
+      show(screen("host", [
+        el("div", { class: "host-topbar" }, [el("div", { class: "host-q-num", text: "📖 " + (sess.topicName || "Passage") })]),
+        el("div", { class: "passage-host" }, [
+          el("div", { class: "passage-tag", text: (passageInfo && passageInfo.type === "audio") ? "🎧 Listen to the passage" : "📖 Read the passage" })
+        ].concat(passageBodyNodes(passageInfo))),
+        el("div", { class: "host-controls" }, [
+          el("button", { class: "btn primary big", text: "Start questions ▶", on: { click: nextQuestion } })
+        ])
+      ]));
+    }
+    // Host-only overlay — sits ON TOP of the current screen (appended to <body>,
+    // not via show()), so the question underneath keeps its state and no session
+    // write happens (phones are untouched).
+    var passageOverlay = null;
+    function showPassageOverlay(passage) {
+      if (passageOverlay) return;
+      pauseClock(); // re-reading must never cost points (no-op until Timer Modes exists)
+      passageOverlay = el("div", { class: "passage-overlay" }, [
+        el("div", { class: "passage-overlay-card" }, [
+          el("div", { class: "passage-tag", text: (passage && passage.type === "audio") ? "🎧 Listen again" : "📖 Read again" })
+        ].concat(passageBodyNodes(passage)).concat([
+          el("button", { class: "btn primary big", text: "Close ✕", on: { click: closePassageOverlay } })
+        ]))
+      ]);
+      document.body.appendChild(passageOverlay);
+    }
+    function closePassageOverlay() {
+      if (passageOverlay) { try { passageOverlay.remove(); } catch (e) {} passageOverlay = null; }
+      try { if (window.VoiceBox && window.VoiceBox.stop) window.VoiceBox.stop(); } catch (e) {}
+      resumeClock();
+    }
+    // Timer-pause hooks. No-ops today: there is no running clock yet (Manual
+    // pacing only). When Per-Question / Speed Challenge Timer Modes are built,
+    // pause/resume the current question's clock here so re-showing the passage
+    // never eats a student's time.
+    function pauseClock() { /* Timer Modes: pause the current question clock */ }
+    function resumeClock() { /* Timer Modes: resume the current question clock */ }
 
     function nextQuestion() {
       var i = (sess.questionIndex == null ? -1 : sess.questionIndex) + 1;
       if (i >= rounds.length) return podium();
       var r = rounds[i];
+      var ra = adapterForRound(r); // this round's format adapter (== adapter, unless Passage)
       // Carry the session's answer mode onto the in-memory round so the host
       // view (hostContent) and scoring (score) both know Tap vs Type.
       r.answerMode = sess.answerMode || "options";
       safeUpdate({
         status: "question", questionIndex: i, reveal: null,
         round: {
-          index: i, type: r.type, de: r.de || null, emoji: r.emoji || null,
+          index: i, type: r.type, fmt: r.fmt || null, de: r.de || null, emoji: r.emoji || null,
           // MCQ: send the typed question + options WITHOUT the `correct` flag so a
           // phone can't peek which option wins. Other games keep options as-is
           // (e.g. Hör gut zu!'s tap board sends plain option strings).
-          question: (adapter.mcq && r.question) ? r.question : null,
-          options: (adapter.mcq && r.options)
+          question: (ra.mcq && r.question) ? r.question : null,
+          options: (ra.mcq && r.options)
             ? r.options.map(function (o) { return { type: o.type, value: o.value }; })
             : (r.options || null),
           sentence: r.sentence || null, blank: r.blank || null, clueWord: r.clueWord || null,
@@ -7247,12 +7552,13 @@ window.LiveMode = (function () {
           // Lücken-Text: phones need the blank ids (to lay out the gaps) and, in
           // tap mode, the shuffled word bank — but NEVER the correct answers, so
           // type mode can't be peeked. The bank naturally contains the answers.
-          blanks: (adapter.blanks && r.blanks) ? r.blanks.map(function (b) { return { id: b.id }; }) : null,
-          wordBank: (adapter.blanks && sess.answerMode !== "type") ? (r.wordBank || null) : null,
+          blanks: (ra.blanks && r.blanks) ? r.blanks.map(function (b) { return { id: b.id }; }) : null,
+          wordBank: (ra.blanks && sess.answerMode !== "type") ? (r.wordBank || null) : null,
           // Type mode needs the answer on the phone (to diff on submit). Only sent
           // for the type-diff game in type mode — tap mode still hides it.
-          correct: (adapter.typeResult && sess.answerMode === "type") ? (r.correct || r.word || null) : null,
+          correct: (ra.typeResult && sess.answerMode === "type") ? (r.correct || r.word || null) : null,
           startedAt: window.LiveDB.serverTs()
+          // NOTE: r.passage is deliberately NOT sent — the passage is host-only.
         }
       });
       watchAnswers(i, r);
@@ -7283,7 +7589,7 @@ window.LiveMode = (function () {
       // the reveal screen down and drop the teacher back onto the question, which
       // looked like "the Reveal button stopped working".
       if (hostPhase !== "question") return;
-      if (adapter.match) return renderMatchHost(i, r);
+      if (adapterForRound(r).match) return renderMatchHost(i, r);
       var joinedN = Object.keys(sess.joined || {}).length || (sess.students || []).length;
       // Build the question screen once per round; on every later answer just
       // update the "X of Y answered" counter in place. Calling show() on each
@@ -7301,8 +7607,11 @@ window.LiveMode = (function () {
           el("div", { class: "host-q-num", text: "Question " + (i + 1) + " / " + rounds.length }),
           el("div", { class: "host-answered", text: answered + " of " + joinedN + " answered" })
         ]),
-        adapter.hostContent(el, r),
+        adapterForRound(r).hostContent(el, r),
         el("div", { class: "host-controls" }, [
+          // Passage games: let the teacher re-show the passage mid-question without
+          // losing this question's state (it's a host-only overlay — see below).
+          r.passage ? el("button", { class: "btn ghost show-passage-btn", html: "📖 Show passage", on: { click: function () { showPassageOverlay(r.passage); } } }) : null,
           el("button", { class: "btn primary big", text: "Reveal answer ▶", on: { click: function () { reveal(i, r); } } })
         ])
       ]));
@@ -7387,7 +7696,7 @@ window.LiveMode = (function () {
       try { renderReveal(i, r, results, scores); return; } catch (e) {}
       var last = (i + 1) >= rounds.length;
       var correctText = "";
-      try { correctText = String(adapter.correctLabel(r) || ""); } catch (e2) {}
+      try { correctText = String(adapterForRound(r).correctLabel(r) || ""); } catch (e2) {}
       try {
         show(screen("host", [
           el("div", { class: "host-topbar" }, [el("div", { class: "host-q-num", text: "Question " + (i + 1) + " / " + rounds.length })]),
@@ -7404,7 +7713,8 @@ window.LiveMode = (function () {
       // Revealing is the teacher's call at ANY moment. Mark the phase first so a
       // late answer snapshot can't rebuild the question screen over this reveal.
       hostPhase = "reveal";
-      if (adapter.match) return revealMatch(i, r);
+      var ra = adapterForRound(r); // this round's format adapter
+      if (ra.match) return revealMatch(i, r);
       clearTimeout(timer);
       if (answersUnsub) { answersUnsub(); answersUnsub = null; }
       // Reuse the answers our live listener already delivered instead of
@@ -7422,7 +7732,7 @@ window.LiveMode = (function () {
           var ts = a.ts && a.ts.toMillis ? a.ts.toMillis() : null;
           var elapsed = (startedAt != null && ts != null) ? Math.max(0, ts - startedAt) : TL;
           // A bad answer payload must never brick the reveal — score defensively.
-          var sc; try { sc = adapter.score(r, a, elapsed, TL) || {}; } catch (e) { sc = { correct: false, points: 0 }; }
+          var sc; try { sc = ra.score(r, a, elapsed, TL) || {}; } catch (e) { sc = { correct: false, points: 0 }; }
           scores[stu.id] = (scores[stu.id] || 0) + (sc.points || 0);
           var row = { studentId: stu.id, name: stu.name, correct: !!sc.correct, points: sc.points || 0, answered: true };
           // Only the partial-credit scorers (Lücken-Text, type mode) return
@@ -7437,16 +7747,16 @@ window.LiveMode = (function () {
         });
         results.sort(function (x, y) { return y.points - x.points; });
         results.forEach(function (rr, idx) { rr.rank = idx + 1; });
-        var correctLabelText; try { correctLabelText = adapter.correctLabel(r); } catch (e) { correctLabelText = ""; }
+        var correctLabelText; try { correctLabelText = ra.correctLabel(r); } catch (e) { correctLabelText = ""; }
         var revealDoc = { index: i, correct: correctLabelText, explanation: r.explanation || null, results: results };
         // Lücken-Text: now that the round is over it's safe to ship the correct
         // answers so each phone can mark its own blanks right/wrong.
-        if (adapter.blanks) { revealDoc.blanks = r.blanks; revealDoc.sentence = r.sentence; }
+        if (ra.blanks) { revealDoc.blanks = r.blanks; revealDoc.sentence = r.sentence; }
         // MCQ: ship the correct option (type+value) so a picture/audio answer can
         // be rendered at reveal, not just its text value.
-        if (adapter.mcq) { revealDoc.correctOption = (r.options || []).filter(function (o) { return o.correct; })[0] || null; }
+        if (ra.mcq) { revealDoc.correctOption = (r.options || []).filter(function (o) { return o.correct; })[0] || null; }
         safeUpdate({ status: "reveal", scores: scores, reveal: revealDoc });
-        var german; try { german = adapter.speakOnReveal(r); } catch (e) { german = null; }
+        var german; try { german = ra.speakOnReveal(r); } catch (e) { german = null; }
         // Pronunciation is a nice-to-have — it must never stop the reveal screen.
         if (german) { try { kit.speak(german); } catch (e) {} }
         safeReveal(i, r, results, scores);
@@ -7491,7 +7801,7 @@ window.LiveMode = (function () {
       });
       results.sort(function (x, y) { return y.points - x.points; });
       results.forEach(function (rr, idx) { rr.rank = idx + 1; });
-      var mCorrect; try { mCorrect = adapter.correctLabel(r); } catch (e) { mCorrect = ""; }
+      var mCorrect; try { mCorrect = adapterForRound(r).correctLabel(r); } catch (e) { mCorrect = ""; }
       safeUpdate({
         status: "reveal", scores: scores,
         reveal: { index: i, correct: mCorrect, explanation: null, results: results, match: true }
@@ -7500,9 +7810,10 @@ window.LiveMode = (function () {
     }
 
     function renderReveal(i, r, results) {
+      var ra = adapterForRound(r); // this round's format adapter
       var last = (i + 1) >= rounds.length;
-      var isMatch = !!adapter.match;
-      var isBlanks = !!adapter.blanks;
+      var isMatch = !!ra.match;
+      var isBlanks = !!ra.blanks;
       var correctCount = results.filter(function (x) { return x.correct; }).length;
       var mtotal = (r.pairs || []).length;
       // Leaderboard for THIS question only (ranked by points earned this round).
@@ -7521,7 +7832,7 @@ window.LiveMode = (function () {
           el("div", { class: "reveal-sentence lt" }, blanksFilled(r.sentence, function (id) { return { cls: "rs-fill", text: byId[id] != null ? byId[id] : "___" }; })),
           r.explanation ? el("div", { class: "reveal-why", text: r.explanation }) : null
         ]);
-      } else if (adapter.mcq) {
+      } else if (ra.mcq) {
         // Render the winning option by its type (a picture answer shows the
         // picture, an icon the icon, etc.) — not just its raw value.
         var co = (r.options || []).filter(function (o) { return o.correct; })[0];
@@ -7529,13 +7840,13 @@ window.LiveMode = (function () {
           el("div", { class: "reveal-label", text: "Correct answer" }),
           (co && co.type && co.type !== "text")
             ? el("div", { class: "reveal-value mcq-reveal" }, window.MatchTiles.content(el, co))
-            : el("div", { class: "reveal-value", text: adapter.correctLabel(r) }),
+            : el("div", { class: "reveal-value", text: ra.correctLabel(r) }),
           r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null
         ]);
       } else {
         answerBlock = el("div", { class: "reveal-answer" }, [
           el("div", { class: "reveal-label", text: "Correct answer" }),
-          el("div", { class: "reveal-value", text: adapter.correctLabel(r) }),
+          el("div", { class: "reveal-value", text: ra.correctLabel(r) }),
           r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null,
           r.sentence ? el("div", { class: "reveal-sentence" }, filledSentence(r.sentence, r.correct)) : null,
           r.explanation ? el("div", { class: "reveal-why", text: r.explanation }) : null
@@ -7561,7 +7872,10 @@ window.LiveMode = (function () {
               ]);
             }))
           : el("p", { class: "live-muted", text: "No answers this round." }),
-        el("button", { class: "btn primary big", text: last ? "Finish ▶" : (isMatch ? "Next round ▶" : "Next question ▶"), on: { click: nextQuestion } })
+        el("div", { class: "reveal-actions" }, [
+          r.passage ? el("button", { class: "btn ghost show-passage-btn", html: "📖 Show passage", on: { click: function () { showPassageOverlay(r.passage); } } }) : null,
+          el("button", { class: "btn primary big", text: last ? "Finish ▶" : (isMatch ? "Next round ▶" : "Next question ▶"), on: { click: nextQuestion } })
+        ])
       ]));
     }
 
@@ -7700,7 +8014,10 @@ window.LiveMode = (function () {
   function playerRun(code, stu) {
     stop();
     // Back leaves the room; confirm while the student is on an answering screen.
-    window.AppNav.set(function () { landing(); }, function () { return !!document.querySelector(".match-board, .live-q-options.phone, .cases-player, .wm-player"); });
+    window.AppNav.set(function () { landing(); }, function () { return !!document.querySelector(".match-board, .live-q-options.phone, .cases-player, .wm-player, .tf-player"); });
+    // The Passage game runs different formats per question — resolve the phone's
+    // adapter from the CURRENT round's `fmt`, falling back to the session game.
+    function playerAdapter(s) { return (s && s.round && s.round.fmt && window.LiveGames[s.round.fmt]) || window.LiveGames[s.gameId]; }
     var answeredIndex = -1;
     var lastStatus = null, lastQ = -1, lastSeq = null;
     var matchRenderedQ = -1; // match board is stateful — render it once per round
@@ -7722,8 +8039,10 @@ window.LiveMode = (function () {
       if (s.status !== "question") { try { if (window.VoiceBox && window.VoiceBox.stop) window.VoiceBox.stop(); } catch (e) {} }
 
       if (s.status === "lobby") return waitScreen("You're in! 🎉", "Get ready — watch the smartboard.");
+      // Passage games show the passage on the board only — the phone just waits.
+      if (s.status === "passage") return waitScreen("📖 Read the passage", "Follow along on the board — questions are coming.");
       if (s.status === "question") {
-        var qAdapter = window.LiveGames[s.gameId];
+        var qAdapter = playerAdapter(s);
         if (qAdapter && qAdapter.match) {
           // Individual match game: build the board once and never rebuild it
           // mid-round (that would reset the student's taps and re-shuffle).
@@ -7750,7 +8069,7 @@ window.LiveMode = (function () {
         return answerScreen(s);
       }
       if (s.status === "reveal") {
-        var rAdapter = window.LiveGames[s.gameId];
+        var rAdapter = playerAdapter(s);
         if (rAdapter && rAdapter.typeResult && s.answerMode === "type") return typeRevealScreen(s, rAdapter);
         if (rAdapter && rAdapter.blanks) return blanksRevealScreen(s, rAdapter);
         return resultScreen(s);
@@ -7770,7 +8089,7 @@ window.LiveMode = (function () {
     }
 
     function answerScreen(s) {
-      var adapter = window.LiveGames[s.gameId];
+      var adapter = playerAdapter(s);
       var r = s.round;
       var locked = false;
       var api = {
