@@ -514,14 +514,45 @@
     speakOnReveal: function (round) { return round.correct; }
   };
 
-  /* ---- Hör gut zu! (Listen Carefully!): pick the word you heard ---- */
-  // The smartboard speaks the word (browser German voice); phones show 4
-  // look-alike options. The teacher may play it once more (one replay).
+  /* ---- Hör gut zu! (Listen Carefully!): pick OR type the word you heard ----
+     The smartboard speaks the word/sentence; the teacher picks Tap (4 options)
+     or Type at setup. Type mode is lenient about how it's typed (case,
+     punctuation, and ae/oe/ue/ss for ä/ö/ü/ß — most phones can't type those)
+     but strict about word CHOICE. It scores by the % of words right and shows
+     each phone a word-by-word green/red diff. Same logic for words & sentences. */
+
+  // Lenient normalisation for one word (used only for comparing, not display).
+  function typeNorm(w) {
+    w = String(w == null ? "" : w).toLowerCase();
+    w = w.replace(/[.,!?;:"'“”„«»()¡¿…\-–—]/g, "");
+    return w.replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").trim();
+  }
+  function typeWords(s) { return String(s == null ? "" : s).trim().split(/\s+/).filter(Boolean); }
+  // Position-sensitive word diff, shared by host scoring and the on-phone result.
+  function typeDiff(typed, correct) {
+    var t = typeWords(typed), c = typeWords(correct), matched = 0;
+    var typedRow = t.map(function (w, i) {
+      return { word: w, status: i >= c.length ? "extra" : (typeNorm(w) === typeNorm(c[i]) ? "correct" : "wrong") };
+    });
+    var correctRow = c.map(function (w, i) {
+      if (i < t.length && typeNorm(t[i]) === typeNorm(w)) matched++;
+      return { word: w, missing: i >= t.length };
+    });
+    return { typedRow: typedRow, correctRow: correctRow, matched: matched, total: c.length };
+  }
+
   var listenAdapter = {
     meta: { name: "Hör gut zu!", emoji: "👂", contentType: "listening" },
     timeLimit: 20000,
     pickLabel: "Exercise",
-    audioSpeed: true, // host can choose the playback speed at setup
+    audioSpeed: true,     // host can choose the playback speed at setup
+    supportsTyping: true, // teacher picks Tap or Type at setup
+    typeResult: true,     // Type mode uses the per-phone diff flow (see live.js)
+    diff: typeDiff,
+    typeLabels: {
+      options: ["Tap", "Pick the word from four choices"],
+      type: ["Type", "Students type exactly what they hear"]
+    },
     getTopics: function () {
       var store = window.ContentStore;
       var list = (store && store.exercisesFor) ? store.exercisesFor("listening") : [];
@@ -558,17 +589,21 @@
         on: { click: function () { if (round._plays < 2) { round._plays++; try { kit().speak(round.word, { rate: round.speed || 1 }); } catch (e) {} refresh(); } } }
       });
       refresh();
+      var typing = round.answerMode === "type";
       return el("div", { class: "live-q" }, [
-        el("div", { class: "live-q-tag", text: "👂 Which one did you hear?" }),
+        el("div", { class: "live-q-tag", text: typing ? "👂 Type what you hear" : "👂 Which one did you hear?" }),
         el("div", { class: "listen-audio" }, [el("div", { class: "listen-emoji", text: "🎧" }), btn]),
-        el("div", { class: "live-q-options board" }, round.options.map(function (opt, i) {
-          return el("div", { class: "live-opt board", attrs: { style: "--c:" + COLORS[i] } }, [
-            el("span", { class: "opt-shape", text: SHAPES[i] }),
-            el("span", { class: "opt-text", text: opt })
-          ]);
-        }))
+        typing
+          ? el("div", { class: "listen-typing-note", text: "✍️ Students are typing what they hear on their phones" })
+          : el("div", { class: "live-q-options board" }, round.options.map(function (opt, i) {
+              return el("div", { class: "live-opt board", attrs: { style: "--c:" + COLORS[i] } }, [
+                el("span", { class: "opt-shape", text: SHAPES[i] }),
+                el("span", { class: "opt-text", text: opt })
+              ]);
+            }))
       ]);
     },
+    // Tap-mode tiles. Type mode uses a custom screen in live.js (typePlayerScreen).
     playerContent: function (el, round, api) {
       return el("div", { class: "live-q-options phone" }, round.options.map(function (opt, i) {
         return el("button", {
@@ -578,6 +613,12 @@
       }));
     },
     score: function (round, payload, elapsedMs, timeLimit) {
+      if (round.answerMode === "type") {
+        // Accuracy only (no speed bonus) — % of words right, out of 1000.
+        var d = typeDiff((payload && payload.text) || "", round.correct);
+        var pct = d.total ? d.matched / d.total : 0;
+        return { correct: d.total > 0 && d.matched === d.total, points: Math.round(pct * 1000), matched: d.matched, total: d.total };
+      }
       if (!payload || payload.choice !== round.answer) return { correct: false, points: 0 };
       var frac = Math.max(0, 1 - elapsedMs / timeLimit);
       return { correct: true, points: Math.round(500 + 500 * frac) };

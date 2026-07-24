@@ -250,10 +250,11 @@ window.LiveMode = (function () {
         var gAdapter3 = window.LiveGames[gameId];
         var n = 3;
         if (gAdapter3.supportsTyping) {
+          var tl = gAdapter3.typeLabels || { options: ["Tap the article", "Multiple choice — faster"], type: ["Type the article", "Free recall — harder"] };
           step.appendChild(el("div", { class: "live-label", text: n + " · How students answer" }));
           step.appendChild(el("div", { class: "setup-modes" }, [
-            answerPill("options", "Tap the article", "Multiple choice — faster"),
-            answerPill("type", "Type the article", "Free recall — harder")
+            answerPill("options", tl.options[0], tl.options[1]),
+            answerPill("type", tl.type[0], tl.type[1])
           ]));
           n++;
         }
@@ -398,6 +399,9 @@ window.LiveMode = (function () {
       var i = (sess.questionIndex == null ? -1 : sess.questionIndex) + 1;
       if (i >= rounds.length) return podium();
       var r = rounds[i];
+      // Carry the session's answer mode onto the in-memory round so the host
+      // view (hostContent) and scoring (score) both know Tap vs Type.
+      r.answerMode = sess.answerMode || "options";
       window.LiveDB.updateSession(code, {
         status: "question", questionIndex: i, reveal: null,
         round: {
@@ -406,6 +410,9 @@ window.LiveMode = (function () {
           meaning: r.meaning || null, tiles: r.tiles || null,
           words: r.words || null, speed: r.speed || null,
           answerMode: sess.answerMode || "options",
+          // Type mode needs the answer on the phone (to diff on submit). Only sent
+          // for the type-diff game in type mode — tap mode still hides it.
+          correct: (adapter.typeResult && sess.answerMode === "type") ? (r.correct || r.word || null) : null,
           startedAt: window.LiveDB.serverTs()
         }
       });
@@ -511,7 +518,7 @@ window.LiveMode = (function () {
           var elapsed = (startedAt != null && ts != null) ? Math.max(0, ts - startedAt) : TL;
           var sc = adapter.score(r, a, elapsed, TL);
           scores[stu.id] = (scores[stu.id] || 0) + sc.points;
-          results.push({ studentId: stu.id, name: stu.name, correct: sc.correct, points: sc.points, answered: true });
+          results.push({ studentId: stu.id, name: stu.name, correct: sc.correct, points: sc.points, answered: true, matched: sc.matched, total: sc.total });
         });
         results.sort(function (x, y) { return y.points - x.points; });
         results.forEach(function (rr, idx) { rr.rank = idx + 1; });
@@ -747,12 +754,14 @@ window.LiveMode = (function () {
     var answeredIndex = -1;
     var lastStatus = null, lastQ = -1, lastSeq = null;
     var matchRenderedQ = -1; // match board is stateful — render it once per round
+    var typeRenderedQ = -1;  // type input is stateful too — render once per round
+    var typeState = { qi: -1, text: "" }; // this phone's last typed answer
 
     track(window.LiveDB.listenSession(code, function (s) {
       if (!s) { show(screen("player live-center", [el("div", { class: "live-card" }, [el("h2", { text: "Room closed" })])])); return; }
       // A new game in the same room resets question numbering — allow answering again.
       var seq = s.gameSeq || 0;
-      if (seq !== lastSeq) { answeredIndex = -1; matchRenderedQ = -1; lastSeq = seq; }
+      if (seq !== lastSeq) { answeredIndex = -1; matchRenderedQ = -1; typeRenderedQ = -1; lastSeq = seq; }
       var qi = s.round ? s.round.index : -1;
       if (s.status === lastStatus && qi === lastQ && s.status !== "question") return;
       lastStatus = s.status; lastQ = qi;
@@ -771,10 +780,20 @@ window.LiveMode = (function () {
           matchRenderedQ = qi;
           return matchPlayerScreen(s);
         }
+        if (qAdapter && qAdapter.typeResult && s.answerMode === "type") {
+          if (answeredIndex === qi) return;   // already submitted — keep their diff on screen
+          if (typeRenderedQ === qi) return;   // don't rebuild the text box under them
+          typeRenderedQ = qi;
+          return typePlayerScreen(s, qAdapter);
+        }
         if (answeredIndex === qi) return waitScreen("Answer locked ✔", "Waiting for the class…");
         return answerScreen(s);
       }
-      if (s.status === "reveal") return resultScreen(s);
+      if (s.status === "reveal") {
+        var rAdapter = window.LiveGames[s.gameId];
+        if (rAdapter && rAdapter.typeResult && s.answerMode === "type") return typeRevealScreen(s, rAdapter);
+        return resultScreen(s);
+      }
       if (s.status === "leaderboard") return standingScreen(s);
       if (s.status === "podium") return finalScreen(s);
       if (s.status === "ended") return waitScreen("Game over", "Thanks for playing!");
@@ -939,6 +958,81 @@ window.LiveMode = (function () {
         el("div", { class: "player-prompt-hint", text: "Tap 🔊 to hear it, then its meaning 👇" }),
         el("div", { class: "match-board" }, [speakerCol, meaningCol])
       ]));
+    }
+
+    /* ---- Hör gut zu! TYPE mode: type it, then see your own word-by-word diff ----
+       The phone shows a text box; on submit it immediately shows a green/red
+       diff of what they typed vs the correct answer (computed locally). If the
+       teacher reveals before this phone submits, it's locked out ("Too slow!"). */
+    function typePlayerScreen(s, adapter) {
+      var r = s.round;
+      var locked = false;
+      var input = el("input", { class: "type-input", attrs: { type: "text", placeholder: "Type what you heard…", autocapitalize: "off", autocomplete: "off", autocorrect: "off", spellcheck: "false" } });
+      function submit() {
+        if (locked || answeredIndex === r.index) return;
+        var text = (input.value || "").trim();
+        if (!text) return;
+        locked = true; answeredIndex = r.index;
+        typeState = { qi: r.index, text: text };
+        window.LiveDB.submitAnswer(code, r.index, stu.id, { text: text });
+        show(typeDiffNode(r, text, adapter, null)); // null = scored at reveal
+      }
+      input.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
+      setTimeout(function () { try { input.focus(); } catch (e) {} }, 60);
+      show(screen("player", [
+        el("div", { class: "player-topbar" }, [
+          el("div", { class: "player-name-tag", text: stu.name }),
+          el("div", { class: "player-qnum", text: "Q" + (r.index + 1) })
+        ]),
+        el("div", { class: "player-prompt-hint", text: "Type what you heard 👂" }),
+        el("div", { class: "type-row" }, [input, el("button", { class: "btn primary type-go", text: "Submit", on: { click: submit } })])
+      ]));
+    }
+
+    // Build the diff result card: "You typed:" (green/red/strikethrough) over
+    // "Correct answer:" (missing words shown as a distinct placeholder). `me` is
+    // the scored result (null while still waiting for the reveal).
+    function typeDiffNode(r, text, adapter, me) {
+      var d = adapter.diff(text, r.correct || "");
+      var typedLine = el("div", { class: "diff-line" }, d.typedRow.length
+        ? d.typedRow.map(function (x) { return el("span", { class: "diff-word diff-" + x.status, text: x.word }); })
+        : [el("span", { class: "diff-word diff-wrong", text: "(nothing)" })]);
+      var correctLine = el("div", { class: "diff-line ref" }, d.correctRow.map(function (x) {
+        return el("span", { class: "diff-word" + (x.missing ? " diff-missing" : ""), text: x.word });
+      }));
+      var body = [
+        el("div", { class: "player-name-tag", text: stu.name }),
+        el("div", { class: "diff-label", text: "You typed" }),
+        typedLine,
+        el("div", { class: "diff-label", text: "Correct answer" }),
+        correctLine
+      ];
+      if (me) {
+        body.push(el("div", { class: "player-points", text: (me.points > 0 ? "+" + me.points : "0") + " points" }));
+        body.push(el("div", { class: "diff-score", text: (me.matched || 0) + " of " + (me.total || d.total) + " words correct" }));
+      } else {
+        body.push(el("p", { class: "live-sub diff-wait", text: "Waiting for the class…" }));
+      }
+      var good = me ? me.correct : false;
+      return screen("player live-center " + (me ? (good ? "res-good" : "res-bad") : ""), [el("div", { class: "live-card diff-card" }, body)]);
+    }
+
+    function typeRevealScreen(s, adapter) {
+      var r = s.round;
+      // Didn't submit before the teacher revealed → locked out.
+      if (answeredIndex !== r.index || typeState.qi !== r.index) {
+        kit.beep("bad");
+        return show(screen("player live-center res-bad", [el("div", { class: "live-card" }, [
+          el("div", { class: "player-name-tag", text: stu.name }),
+          el("div", { class: "live-big-emoji", text: "⏰" }),
+          el("h2", { text: "Too slow!" }),
+          el("p", { class: "live-sub", text: "Answer: " + (r.correct || "") }),
+          el("div", { class: "player-points", text: "0 points" })
+        ])]));
+      }
+      var me = (s.reveal && s.reveal.results || []).filter(function (x) { return x.studentId === stu.id; })[0];
+      kit.beep(me && me.correct ? "good" : "bad");
+      show(typeDiffNode(r, typeState.text, adapter, me || { points: 0, matched: 0, total: 0 }));
     }
 
     function resultScreen(s) {
