@@ -27,7 +27,9 @@
     { key: "listen", name: "Hör gut zu!", emoji: "👂", color: "#0ea5b7", layout: "prompt",
       description: "Listen to the German word and pick what you heard." },
     { key: "hoerpaare", name: "Match the Following", emoji: "🔗", color: "#06b6d4", layout: "match",
-      description: "Match each tile to its pair — text, icons, pictures or audio." }
+      description: "Match each tile to its pair — text, icons, pictures or audio." },
+    { key: "truefalse", name: "Wahr oder Falsch?", emoji: "⚖️", color: "#f59e0b", layout: "prompt",
+      description: "Decide whether each statement is true or false." }
   ];
 
   function register() {

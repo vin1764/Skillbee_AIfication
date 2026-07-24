@@ -515,11 +515,13 @@
         { id: "cases", name: "Lücken-Text", emoji: "✏️", color: "#8b5cf6" },
         { id: "compounds", name: "Wortmonster", emoji: "🧟", color: "#22c55e" },
         { id: "listening", name: "Hör gut zu!", emoji: "👂", color: "#0ea5b7" },
-        { id: "hoerpaare", name: "Match the Following", emoji: "🔗", color: "#06b6d4" }
+        { id: "hoerpaare", name: "Match the Following", emoji: "🔗", color: "#06b6d4" },
+        { id: "truefalse", name: "Wahr oder Falsch?", emoji: "⚖️", color: "#f59e0b" }
       ];
       function liveKind(id) {
         if (id === "cases") return "cases";
         if (id === "hoerpaare") return "pairs";
+        if (id === "truefalse") return "truefalse";
         return "items";
       }
       // The full set of content games (Solo word/sentence games + Live games),
@@ -585,13 +587,14 @@
         if (kind === "cases") return (ex.items || []).length || ((ex.accusative || []).length + (ex.dative || []).length + (ex.genitive || []).length);
         if (kind === "words") return (ex.words || []).length;
         if (kind === "sentences") return (ex.sentences || []).length;
-        if (kind === "pairs") return (ex.questions || []).length;
+        if (kind === "pairs" || kind === "truefalse") return (ex.questions || []).length;
         return (ex.items || []).length;
       }
       function unitFor(id, kind) {
         if (kind === "words") return " words";
         if (kind === "sentences") return " sentences";
         if (kind === "pairs") return " questions";
+        if (kind === "truefalse") return " statements";
         if (id === "listening") return " prompts";
         return " words";
       }
@@ -706,6 +709,7 @@
         else if (game.kind === "words") renderWordsExercise(body, ex);
         else if (game.kind === "sentences") renderSentencesExercise(body, ex);
         else if (game.kind === "pairs") renderPairsExercise(body, ex);
+        else if (game.kind === "truefalse") renderTrueFalse(body, ex);
         else if (currentGame === "cases") renderCases(body, ex);
         else if (currentGame === "compounds") renderCompounds(body, ex);
         else if (currentGame === "listening") renderListening(body, ex);
@@ -927,6 +931,76 @@
           el("div", { class: "adm-custom-types" }, [typePickerRow("Left", q, "leftType"), typePickerRow("Right", q, "rightType")]),
           entriesWrap,
           addRowBtn("+ Entry", function () { q.entries.push({ left: "", right: "" }); store.save(); render(); })
+        ]);
+      }
+
+      /* ---- Wahr oder Falsch? editor: each statement has an optional context
+             block + a required statement block (text/audio/image/icon) and a
+             True/False answer. Reuses the shared type picker + per-type inputs. */
+      function renderTrueFalse(body, ex) {
+        if (!Array.isArray(ex.questions)) ex.questions = [];
+        body.appendChild(el("p", { class: "adm-hint", html:
+          "These power <b>⚖️ Wahr oder Falsch?</b> in Live Class Mode. Each statement has an <b>optional context</b> block " +
+          "(a picture, icon, audio or text — or skip it for a standalone claim) and a <b>required statement</b> block, then you mark " +
+          "it <b>True</b> or <b>False</b>. Students tap Wahr / Falsch on their phones. Changes save automatically." }));
+        body.appendChild(el("div", { class: "adm-ex-head" }, [
+          input(ex, "emoji", "⚖️", "adm-emoji", 6),
+          input(ex, "english", "Short description (optional, e.g. Unit 2 review)", "adm-input")
+        ]));
+        var list = ex.questions;
+        if (!list.length) body.appendChild(emptyState("No statements yet — add the first one below."));
+        list.forEach(function (q, qi) { body.appendChild(tfQuestionCard(q, list, qi)); });
+        body.appendChild(addRowBtn("+ Statement", function () {
+          list.push({ context: null, statement: { type: "text", value: "" }, answer: true });
+          store.save(); render();
+        }));
+      }
+
+      function tfQuestionCard(q, arr, index) {
+        if (!q.statement || typeof q.statement !== "object") q.statement = { type: "text", value: "" };
+        if (q.context != null && typeof q.context !== "object") q.context = null;
+        if (typeof q.answer !== "boolean") q.answer = true;
+        var card = el("div", { class: "adm-cpair adm-tf-card" });
+        card.appendChild(el("div", { class: "adm-cpair-topbar" }, [
+          el("span", { class: "adm-cpair-n", text: "Statement " + (index + 1) }),
+          el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove statement" }, on: { click: function () { arr.splice(index, 1); store.save(); render(); } } })
+        ]));
+        // Context block (optional — includes a "No context" choice).
+        var ctxBlock = el("div", { class: "adm-tf-block" }, [tfContextPicker(q)]);
+        if (q.context) ctxBlock.appendChild(el("div", { class: "adm-mcq-field" }, [entryInput(q.context, "value", q.context.type)]));
+        card.appendChild(ctxBlock);
+        // Statement block (required).
+        card.appendChild(el("div", { class: "adm-tf-block" }, [
+          typePickerRow("Statement", q.statement, "type"),
+          el("div", { class: "adm-mcq-field" }, [entryInput(q.statement, "value", q.statement.type)])
+        ]));
+        // Answer.
+        card.appendChild(tfAnswerToggle(q));
+        return card;
+      }
+
+      // Context type picker with an extra "No context" option (sets context null).
+      function tfContextPicker(q) {
+        var TYPES = [["none", "No context", "🚫"], ["text", "Text", "🔤"], ["icon", "Icon", "😀"], ["image", "Image", "🖼"], ["audio", "Audio", "🔊"]];
+        var cur = q.context ? (q.context.type || "text") : "none";
+        var chipRow = el("div", { class: "adm-typechips" });
+        TYPES.forEach(function (T) {
+          chipRow.appendChild(el("button", { class: "adm-typechip" + (cur === T[0] ? " sel" : ""), attrs: { type: "button", title: T[1] }, on: { click: function () {
+            if (cur === T[0]) return;
+            if (T[0] === "none") q.context = null;
+            else q.context = { type: T[0], value: (q.context && q.context.value) || "" };
+            store.save(); render();
+          } } }, [el("span", { class: "adm-typechip-ic", text: T[2] }), el("span", { class: "adm-typechip-lbl", text: T[1] })]));
+        });
+        return el("div", { class: "adm-typepick" }, [el("span", { class: "adm-side-lbl", text: "Context" }), chipRow]);
+      }
+
+      // True / False answer toggle for one statement.
+      function tfAnswerToggle(q) {
+        return el("div", { class: "adm-tf-answer" }, [
+          el("span", { class: "adm-side-lbl", text: "Answer" }),
+          el("button", { class: "adm-tf-ans" + (q.answer === true ? " sel true" : ""), attrs: { type: "button" }, on: { click: function () { q.answer = true; store.save(); render(); } }, text: "✓ True (Wahr)" }),
+          el("button", { class: "adm-tf-ans" + (q.answer === false ? " sel false" : ""), attrs: { type: "button" }, on: { click: function () { q.answer = false; store.save(); render(); } }, text: "✗ False (Falsch)" })
         ]);
       }
 

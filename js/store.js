@@ -47,6 +47,7 @@
     if (gameKey === "scramble") return "sentences";
     if (gameKey === "cases") return "cases";
     if (gameKey === "hoerpaare") return "pairs";
+    if (gameKey === "truefalse") return "truefalse";
     if (WORD_GAMES.indexOf(gameKey) >= 0) return "words";
     return "items"; // compounds / listening
   }
@@ -200,6 +201,49 @@
     });
   }
 
+  /* Wahr oder Falsch? (True or False) — an exercise is a list of statements. Each
+     statement has an OPTIONAL context block and a REQUIRED statement block, each
+     independently text / audio / image / icon, plus a true|false answer. A block
+     is { type, value }; context is null when there's no supporting context. The
+     shape is deliberately Passage-ready: a passage-embedded question is the same
+     object with context:null (the passage itself provides the context). */
+  var TF_BLOCK_TYPES = ["text", "audio", "image", "icon"];
+  function tfBlock(b, allowNull) {
+    if (allowNull && (b == null)) return null;
+    if (!b || typeof b !== "object") return { type: "text", value: "" };
+    return {
+      type: TF_BLOCK_TYPES.indexOf(b.type) >= 0 ? b.type : "text",
+      value: String(b.value == null ? "" : b.value)
+    };
+  }
+  function trueFalseExercise(name, questions) {
+    return { id: exId(), name: name || "Exercise 1", emoji: "⚖️", english: "", questions: Array.isArray(questions) ? clone(questions) : [] };
+  }
+  function normalizeTrueFalseEx(e) {
+    if (!e.id) e.id = exId();
+    if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
+    if (typeof e.emoji !== "string") e.emoji = "⚖️";
+    if (typeof e.english !== "string") e.english = "";
+    if (!Array.isArray(e.questions)) e.questions = [];
+    e.questions = e.questions.filter(function (q) { return q && typeof q === "object"; });
+    e.questions.forEach(function (q) {
+      q.context = tfBlock(q.context, true);          // optional → may stay null
+      q.statement = tfBlock(q.statement, false);     // required → always an object
+      q.answer = !!q.answer;
+    });
+  }
+  // A few ready-made statements covering all four combos (with/without context,
+  // audio/non-audio statement) so the game plays out of the box.
+  function defaultTrueFalseQuestions() {
+    return [
+      { context: null, statement: { type: "text", value: "Deutschland liegt in Europa." }, answer: true },
+      { context: null, statement: { type: "text", value: "Eine Katze ist ein Gemüse." }, answer: false },
+      { context: { type: "icon", value: "🐶" }, statement: { type: "text", value: "Das ist ein Hund." }, answer: true },
+      { context: { type: "icon", value: "🐱" }, statement: { type: "text", value: "Das ist ein großer Elefant." }, answer: false },
+      { context: null, statement: { type: "audio", value: "Berlin ist die Hauptstadt von Deutschland." }, answer: true }
+    ];
+  }
+
   // The topics a legacy store's game offered (its selection subset, or all).
   function legacyTopicsFor(d, gameId, type) {
     var pool = (type === "sentences" ? d.sentences : d.vocab) || [];
@@ -228,7 +272,8 @@
       cases: [caseExercise("Exercise 1", defaultCases())],
       compounds: [listExercise("Exercise 1", defaultCompounds())],
       listening: [listExercise("Exercise 1", defaultListening())],
-      hoerpaare: [pairsExercise("Exercise 1", defaultPairsQuestions())]
+      hoerpaare: [pairsExercise("Exercise 1", defaultPairsQuestions())],
+      truefalse: [trueFalseExercise("Exercise 1", defaultTrueFalseQuestions())]
     };
   }
 
@@ -268,6 +313,10 @@
     if (!Array.isArray(ex.hoerpaare)) ex.hoerpaare = [pairsExercise("Exercise 1", defaultPairsQuestions())];
     if (!ex.hoerpaare.length) ex.hoerpaare = [pairsExercise("Exercise 1", null)];
     ex.hoerpaare.forEach(normalizePairsEx);
+    // Wahr oder Falsch? (true/false)
+    if (!Array.isArray(ex.truefalse)) ex.truefalse = [trueFalseExercise("Exercise 1", defaultTrueFalseQuestions())];
+    if (!ex.truefalse.length) ex.truefalse = [trueFalseExercise("Exercise 1", null)];
+    ex.truefalse.forEach(normalizeTrueFalseEx);
 
     // Legacy fields are now represented as exercises — drop them.
     delete d.vocab; delete d.sentences; delete d.games;
@@ -408,6 +457,7 @@
       if (kind === "words") return wordsExercise(name, null);
       if (kind === "sentences") return sentencesExercise(name, null);
       if (kind === "pairs") return pairsExercise(name, [{ words: [{ de: "", en: "", emoji: "" }, { de: "", en: "", emoji: "" }, { de: "", en: "", emoji: "" }] }]);
+      if (kind === "truefalse") return trueFalseExercise(name, [{ context: null, statement: { type: "text", value: "" }, answer: true }]);
       return listExercise(name, null);
     },
     addExercise: function (gameKey, name) {

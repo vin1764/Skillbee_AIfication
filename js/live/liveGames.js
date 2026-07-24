@@ -713,8 +713,100 @@
     speakOnReveal: function () { return null; }
   };
 
+  /* ---- Wahr oder Falsch? (True or False) ----------------------------------
+     Two blocks: an OPTIONAL context block and a REQUIRED statement block, each
+     independently text / audio / image / icon (rendered by MatchTiles). Students
+     tap one of two fixed buttons: Wahr (True) / Falsch (False). The answer is
+     kept host-side only (the round doc sent to phones never carries it), so a
+     phone can't peek. The schema is Passage-ready: a passage question is the
+     same round with context null. Pacing/scoring is the shared timed model. */
+
+  // A host-side render of one block. Visual blocks (text/image/icon) stay on
+  // screen; an audio block becomes a labelled, replayable play button. Because
+  // VoiceBox.stop()s any playing clip before starting a new one, two audio
+  // blocks can never sound at once — the teacher plays context, then statement.
+  function tfBlockNode(el, block, cls, label) {
+    if (!block) return null;
+    if (block.type === "audio") {
+      var btn = el("button", {
+        class: "btn primary big tf-audio-btn",
+        on: { click: function () { try { window.MatchTiles.play(kit(), block, 1); } catch (e) {} } }
+      }, [el("span", { class: "tf-audio-ico", text: "🔊" }), el("span", { text: "Play the " + label.toLowerCase() })]);
+      return el("div", { class: "tf-block tf-" + cls }, [el("div", { class: "tf-block-lbl", text: label }), btn]);
+    }
+    return el("div", { class: "tf-block tf-" + cls }, [
+      el("div", { class: "tf-block-lbl", text: label }),
+      el("div", { class: "tf-block-tile mt-" + block.type }, window.MatchTiles.content(el, block))
+    ]);
+  }
+
+  var truefalseAdapter = {
+    meta: { name: "Wahr oder Falsch?", emoji: "⚖️", contentType: "truefalse" },
+    timeLimit: 20000,
+    pickLabel: "Exercise",
+    truefalse: true,
+    getTopics: function () {
+      var store = window.ContentStore;
+      var list = (store && store.exercisesFor) ? store.exercisesFor("truefalse") : [];
+      return list.map(function (e) {
+        var n = (e.questions || []).filter(function (q) { return q && q.statement && String((q.statement || {}).value || "").trim(); }).length;
+        return { id: e.id, name: e.name, emoji: e.emoji || "⚖️", english: n + (n === 1 ? " statement" : " statements") };
+      });
+    },
+    buildRounds: function (topic) {
+      var store = window.ContentStore;
+      var e = (store && store.exercise) ? store.exercise("truefalse", topic && topic.id) : null;
+      var items = ((e && e.questions) || []).filter(function (q) {
+        return q && q.statement && String((q.statement || {}).value || "").trim() !== "";
+      });
+      return kit().sample(items, Math.min(10, items.length)).map(function (q) {
+        var ctx = (q.context && String((q.context || {}).value || "").trim() !== "")
+          ? { type: q.context.type || "text", value: String(q.context.value) } : null;
+        return {
+          type: "truefalse",
+          context: ctx,
+          statement: { type: (q.statement.type || "text"), value: String(q.statement.value) },
+          answer: !!q.answer
+        };
+      });
+    },
+    hostContent: function (el, round) {
+      var both = round.context && round.context.type === "audio" && round.statement.type === "audio";
+      return el("div", { class: "live-q tf-host" }, [
+        el("div", { class: "live-q-tag", text: "⚖️ Wahr oder Falsch?" }),
+        tfBlockNode(el, round.context, "context", "Context"),
+        both ? el("div", { class: "tf-then", text: "then" }) : null,
+        tfBlockNode(el, round.statement, "statement", "Statement"),
+        el("div", { class: "tf-hostnote", text: "Is this true or false? Students tap Wahr / Falsch on their phones." })
+      ]);
+    },
+    playerContent: function (el, round, api) {
+      return el("div", { class: "tf-player" }, [
+        el("button", { class: "tf-btn tf-true", on: { click: function () { api.submit({ choice: true }); } } },
+          [el("span", { class: "tf-btn-ico", text: "✓" }), el("span", { class: "tf-btn-lbl", text: "Wahr / True" })]),
+        el("button", { class: "tf-btn tf-false", on: { click: function () { api.submit({ choice: false }); } } },
+          [el("span", { class: "tf-btn-ico", text: "✗" }), el("span", { class: "tf-btn-lbl", text: "Falsch / False" })])
+      ]);
+    },
+    score: function (round, payload, elapsedMs, timeLimit) {
+      if (!payload || typeof payload.choice !== "boolean" || payload.choice !== round.answer) return { correct: false, points: 0 };
+      var frac = Math.max(0, 1 - elapsedMs / timeLimit);
+      return { correct: true, points: Math.round(500 + 500 * frac) };
+    },
+    correctLabel: function (round) { return round.answer ? "Wahr (True)" : "Falsch (False)"; },
+    // Pronounce the statement's German (or the context's) at reveal, when spoken.
+    speakOnReveal: function (round) {
+      var s = round.statement || {};
+      if (s.type === "audio" || s.type === "text") return s.value;
+      var c = round.context || {};
+      if (c.type === "audio" || c.type === "text") return c.value;
+      return null;
+    }
+  };
+
   window.LiveGames = {
     quiz: choiceAdapter({ name: "Quiz-Blitz", emoji: "🎯", contentType: "vocab" }),
+    truefalse: truefalseAdapter,
     memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" }),
     cases: blanksAdapter,
     wortmonster: compoundAdapter,

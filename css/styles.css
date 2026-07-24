@@ -1134,3 +1134,35 @@ input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf
   .key { width: 40px; height: 46px; }
   .brand-text { font-size: 0.95rem; }
 }
+
+/* ===== Wahr oder Falsch? (True or False) ===== */
+/* Host smartboard: an optional context block above the statement block. */
+.tf-host { text-align: center; }
+.tf-block { margin: 16px auto; max-width: 760px; }
+.tf-block-lbl { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 8px; }
+.tf-block-tile { display: inline-flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
+.tf-block-tile .match-mtext { font-size: clamp(1.6rem, 4vw, 2.4rem); font-weight: 800; color: var(--ink); }
+.tf-block.tf-statement .tf-block-tile .match-mtext { font-size: clamp(2rem, 5vw, 3rem); }
+.tf-block-tile .match-memoji { font-size: 2rem; }
+.tf-block-tile .match-icon-big { font-size: clamp(3.5rem, 12vw, 7rem); line-height: 1; }
+.tf-block-tile .match-img { max-height: 40vh; max-width: min(60vh, 460px); object-fit: contain; border-radius: 14px; box-shadow: var(--shadow); }
+.tf-audio-btn { display: inline-flex; align-items: center; gap: 10px; }
+.tf-audio-ico { font-size: 1.3rem; }
+.tf-then { font-weight: 800; color: var(--ink-soft); margin: 4px 0; }
+.tf-hostnote { margin-top: 18px; color: var(--ink-soft); font-weight: 700; }
+
+/* Phone: two big True / False buttons. */
+.tf-player { display: flex; flex-direction: column; gap: 16px; padding: 8px 4px; }
+.tf-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 30px 16px; border: none; border-radius: 20px; color: #fff; font-weight: 900; font-size: 1.35rem; cursor: pointer; box-shadow: 0 6px 0 rgba(7, 21, 80, 0.18); }
+.tf-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(7, 21, 80, 0.18); }
+.tf-btn-ico { font-size: 2.6rem; line-height: 1; }
+.tf-true { background: var(--good); }
+.tf-false { background: var(--bad); }
+
+/* Content editor: statement card = context block + statement block + answer. */
+.adm-tf-block { margin: 12px 0; padding-top: 10px; border-top: 1px dashed var(--line); }
+.adm-tf-block:first-of-type { border-top: none; padding-top: 0; }
+.adm-tf-answer { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.adm-tf-ans { padding: 9px 16px; border-radius: 999px; border: 2px solid var(--line-deep); background: #fff; font-weight: 800; cursor: pointer; color: var(--ink); }
+.adm-tf-ans.sel.true { background: var(--good); border-color: var(--good); color: #fff; }
+.adm-tf-ans.sel.false { background: var(--bad); border-color: var(--bad); color: #fff; }
