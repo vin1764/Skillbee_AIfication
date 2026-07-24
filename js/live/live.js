@@ -10,6 +10,9 @@ window.LiveMode = (function () {
   var unsubs = [];
 
   function stop() {
+    // Silence any audio when leaving/changing a Live screen (host listen clip,
+    // reveal pronunciation, player match audio) — it must not outlive the screen.
+    try { if (window.VoiceBox && window.VoiceBox.stop) window.VoiceBox.stop(); } catch (e) {}
     unsubs.forEach(function (u) { try { u(); } catch (e) {} });
     unsubs = [];
   }
@@ -743,6 +746,9 @@ window.LiveMode = (function () {
       var qi = s.round ? s.round.index : -1;
       if (s.status === lastStatus && qi === lastQ && s.status !== "question") return;
       lastStatus = s.status; lastQ = qi;
+      // Leaving a question (to reveal / leaderboard / podium / ended): stop any
+      // audio the student started (e.g. a Hör-Paare tap) so it doesn't play on.
+      if (s.status !== "question") { try { if (window.VoiceBox && window.VoiceBox.stop) window.VoiceBox.stop(); } catch (e) {} }
 
       if (s.status === "lobby") return waitScreen("You're in! 🎉", "Get ready — watch the smartboard.");
       if (s.status === "question") {

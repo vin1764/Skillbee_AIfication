@@ -77,6 +77,23 @@
     } catch (e) { /* pronunciation is a nice-to-have */ }
   }
 
+  // The currently-playing Azure clip, kept so we can stop it (otherwise it keeps
+  // playing after you leave the screen).
+  var current = null;
+  function stopCurrent() {
+    if (current) {
+      try { current.pause(); current.currentTime = 0; current.src = ""; } catch (e) {}
+      current = null;
+    }
+  }
+
+  // Stop ALL audio immediately — the mp3 clip AND any browser speech. Call this
+  // on every navigation away so nothing keeps talking after the screen changes.
+  function stop() {
+    stopCurrent();
+    try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
+  }
+
   // Play a specific voice's Azure file if it exists; returns true if it started.
   // `rate` (1 = normal) sets the mp3 playback speed.
   function playAzureFile(voiceId, text, rate) {
@@ -85,8 +102,10 @@
     if (!manifest.files[h]) return false;
     try {
       var a = new Audio("audio/" + h + ".mp3");
+      current = a;
       if (rate && rate !== 1) { try { a.playbackRate = rate; } catch (e) {} }
-      a.play().catch(function () { speakBrowser(text, rate); });
+      a.addEventListener("ended", function () { if (current === a) current = null; });
+      a.play().catch(function () { if (current === a) current = null; speakBrowser(text, rate); });
       return true;
     } catch (e) { return false; }
   }
@@ -95,6 +114,7 @@
   function speak(text, opts) {
     text = String(text == null ? "" : text).trim();
     if (!text) return;
+    stopCurrent(); // never overlap a previous clip
     var rate = (opts && opts.rate) || 1;
     if (chosen && chosen.indexOf("azure:") === 0) {
       if (playAzureFile(chosen, text, rate)) return; // pre-generated file
@@ -124,7 +144,7 @@
     var el = window.App && window.App.kit && window.App.kit.el;
     var overlay = document.createElement("div");
     overlay.className = "voice-overlay";
-    function close() { overlay.remove(); }
+    function close() { stop(); overlay.remove(); }
     overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
 
     var card = document.createElement("div");
@@ -191,6 +211,7 @@
 
   window.VoiceBox = {
     speak: speak,
+    stop: stop,
     listVoices: listVoices,
     openSettings: openSettings,
     get: function () { return chosen; },

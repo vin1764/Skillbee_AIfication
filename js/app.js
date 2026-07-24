@@ -64,6 +64,15 @@ const App = (function () {
       }
     },
 
+    /* Stop all audio immediately (mp3 clip + browser speech). Call on every
+       screen change so nothing keeps talking after you navigate away. */
+    hush() {
+      try {
+        if (window.VoiceBox && window.VoiceBox.stop) window.VoiceBox.stop();
+        else if (window.speechSynthesis) window.speechSynthesis.cancel();
+      } catch (e) { /* ignore */ }
+    },
+
     /* A small "speaker" button that pronounces a German word. */
     speakerButton(text) {
       return el("button", {
@@ -231,7 +240,7 @@ const App = (function () {
   function showModeSelect() {
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(false);
-    window.speechSynthesis && window.speechSynthesis.cancel();
+    kit.hush();
     const main = document.getElementById("screen");
     main.innerHTML = "";
     main.appendChild(
@@ -259,6 +268,7 @@ const App = (function () {
   }
 
   function showLive() {
+    kit.hush();
     setAdminVisible(false);
     const main = document.getElementById("screen");
     main.innerHTML = "";
@@ -270,7 +280,7 @@ const App = (function () {
   function showHome() {
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(true);
-    window.speechSynthesis && window.speechSynthesis.cancel();
+    kit.hush();
     const main = document.getElementById("screen");
     main.innerHTML = "";
 
@@ -323,6 +333,7 @@ const App = (function () {
 
   /* ---- exercise picker (shown before a game starts) ---------------- */
   function openTopicPicker(game) {
+    kit.hush();
     const main = document.getElementById("screen");
     main.innerHTML = "";
 
@@ -376,6 +387,7 @@ const App = (function () {
 
   /* ---- launch a game with a chosen topic --------------------------- */
   function launch(game, topic) {
+    kit.hush();
     const main = document.getElementById("screen");
     main.innerHTML = "";
     const stage = el("div", { class: "stage" });
@@ -403,7 +415,7 @@ const App = (function () {
   function openAdmin(onExit) {
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(false);
-    window.speechSynthesis && window.speechSynthesis.cancel();
+    kit.hush();
     const main = document.getElementById("screen");
     main.innerHTML = "";
     const container = el("div", { class: "admin" });
