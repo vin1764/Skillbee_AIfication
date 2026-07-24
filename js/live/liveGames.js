@@ -813,8 +813,19 @@
   // so the manual authoring and the quick word-pair flow coexist in one round.
   function roundPairs(q) {
     var out = [];
+    // Manual authoring: the QUESTION picks a left + right type once, then holds
+    // a list of entries { left, right } that all share those two types.
+    if (q && Array.isArray(q.entries) && q.entries.length) {
+      var lt = q.leftType || "text", rt = q.rightType || "text";
+      q.entries.forEach(function (en) {
+        if (!en) return;
+        var lv = String(en.left == null ? "" : en.left).trim();
+        var rv = String(en.right == null ? "" : en.right).trim();
+        if (lv && rv) out.push({ q: { type: lt, value: lv }, a: { type: rt, value: rv } });
+      });
+    }
+    // Back-compat: the earlier per-pair form { question:{type,value}, answer:… }.
     if (q && Array.isArray(q.pairs)) {
-      // Manual authoring: [{ question:{type,value}, answer:{type,value} }, …]
       q.pairs.forEach(function (p) {
         if (!p || !p.question || !p.answer) return;
         var qv = String(p.question.value == null ? "" : p.question.value).trim();

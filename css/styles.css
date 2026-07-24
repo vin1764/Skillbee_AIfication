@@ -594,38 +594,42 @@ kbd {
 .adm-pairs-count.warn { color: var(--bad); }
 .adm-pairs-head .adm-del { margin-left: auto; }
 
-/* Match the Following — custom-pair authoring (mix tile types) */
+/* Match the Following — custom-pair authoring (per-question types + entries) */
 .adm-cpair-sep { margin: 14px 0 8px; font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-soft); border-top: 1px dashed var(--line); padding-top: 10px; }
-.adm-cpair { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; background: #f7f9ff; }
-.adm-cpair-topbar { display: flex; align-items: center; margin-bottom: 6px; }
-.adm-cpair-n { font-size: 0.78rem; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; }
-.adm-cpair-topbar .adm-del { margin-left: auto; }
-.adm-cpair-sides { display: flex; align-items: flex-start; gap: 8px; }
-.adm-cpair-side { flex: 1 1 0; min-width: 0; }
-.adm-cpair-mid { flex: 0 0 auto; align-self: center; font-size: 1.2rem; color: var(--ink-soft); padding-top: 18px; }
+.adm-custom { background: #f7f9ff; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+.adm-custom-types { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 12px; }
+.adm-typepick { flex: 1 1 220px; }
 .adm-side-lbl { font-size: 0.7rem; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
 /* 4-chip type picker */
-.adm-typechips { display: flex; gap: 4px; margin-bottom: 6px; }
+.adm-typechips { display: flex; gap: 4px; }
 .adm-typechip { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 2px; border: 1.5px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; }
 .adm-typechip .adm-typechip-ic { font-size: 1rem; line-height: 1; }
-.adm-typechip .adm-typechip-lbl { font-size: 0.62rem; font-weight: 700; color: var(--ink-soft); }
+.adm-typechip .adm-typechip-lbl { font-size: 0.64rem; font-weight: 700; color: var(--ink-soft); }
 .adm-typechip.sel { border-color: var(--skb); background: var(--skb-tint); }
 .adm-typechip.sel .adm-typechip-lbl { color: var(--skb-dark); }
-.adm-side-input .adm-input { width: 100%; }
+/* entry rows */
+.adm-entries { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.adm-entry { display: flex; align-items: center; gap: 6px; }
+.adm-entry-n { flex: 0 0 auto; width: 18px; text-align: right; font-size: 0.78rem; font-weight: 800; color: var(--ink-soft); }
+.adm-entry-side { flex: 1 1 0; min-width: 0; }
+.adm-entry-mid { flex: 0 0 auto; color: var(--ink-soft); font-size: 1rem; }
+.adm-entry-side .adm-input { width: 100%; }
 .adm-side-row { display: flex; gap: 6px; align-items: center; }
-.adm-side-row .adm-input { flex: 1 1 auto; }
+.adm-side-row .adm-input { flex: 1 1 auto; min-width: 0; }
 .adm-audio-prev { flex: 0 0 auto; }
-.adm-img-prev { display: block; max-width: 100%; max-height: 90px; margin-top: 6px; border-radius: 8px; border: 1px solid var(--line); object-fit: contain; }
-/* Icon picker */
-.adm-iconpick { border: 1px solid var(--line); border-radius: 8px; padding: 6px; background: #fff; }
-.adm-icon-head { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
-.adm-icon-lbl { font-size: 0.72rem; font-weight: 700; color: var(--ink-soft); }
-.adm-icon-preview { font-size: 1.4rem; line-height: 1; }
-.adm-icon-search { width: 100%; margin-bottom: 6px; }
-.adm-icon-grid { display: flex; flex-wrap: wrap; gap: 2px; max-height: 132px; overflow-y: auto; }
-.adm-icon-opt { font-size: 1.25rem; line-height: 1; padding: 3px; border: 1.5px solid transparent; border-radius: 7px; background: none; cursor: pointer; }
+.adm-img-prev { display: block; max-width: 100%; border-radius: 8px; border: 1px solid var(--line); object-fit: contain; }
+.adm-img-prev.sm { flex: 0 0 auto; width: 40px; height: 40px; }
+.adm-icon-btn { width: 100%; min-height: 40px; padding: 6px 10px; border: 1.5px solid var(--line); border-radius: 8px; background: #fff; font-size: 1.3rem; line-height: 1.1; cursor: pointer; }
+/* icon picker modal */
+.adm-modal-overlay { position: fixed; inset: 0; background: rgba(11, 21, 51, 0.45); display: flex; align-items: center; justify-content: center; z-index: 60; padding: 16px; }
+.adm-modal-card { background: #fff; border-radius: 14px; padding: 16px; width: min(460px, 96vw); max-height: 82vh; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 18px 50px rgba(11, 21, 51, 0.3); }
+.adm-modal-title { font-weight: 800; font-size: 1.05rem; color: var(--ink); }
+.adm-icon-grid { display: flex; flex-wrap: wrap; gap: 2px; overflow-y: auto; }
+.adm-icon-grid.big { max-height: 48vh; }
+.adm-icon-opt { font-size: 1.35rem; line-height: 1; padding: 4px; border: 1.5px solid transparent; border-radius: 7px; background: none; cursor: pointer; }
 .adm-icon-opt:hover { background: var(--skb-tint); }
 .adm-icon-opt.sel { border-color: var(--skb); background: var(--skb-tint); }
+.adm-modal-cancel { align-self: flex-end; }
 
 /* Auto-translate (German → English) — button, AI-draft marker, bulk bar */
 .adm-en-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }

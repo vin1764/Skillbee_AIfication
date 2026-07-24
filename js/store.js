@@ -158,18 +158,23 @@
     e.questions = e.questions.filter(function (q) { return q && typeof q === "object"; });
     e.questions.forEach(function (q) {
       if (!Array.isArray(q.words)) q.words = [];
-      // Manual "custom pairs": each side is { type: text|icon|image|audio, value }.
-      if (!Array.isArray(q.pairs)) q.pairs = [];
-      q.pairs = q.pairs.filter(function (p) { return p && typeof p === "object"; });
-      q.pairs.forEach(function (p, i) {
-        if (p.id == null) p.id = i + 1;
-        if (!p.question || typeof p.question !== "object") p.question = { type: "text", value: "" };
-        if (!p.answer || typeof p.answer !== "object") p.answer = { type: "text", value: "" };
-        ["question", "answer"].forEach(function (k) {
-          if (typeof p[k].type !== "string") p[k].type = "text";
-          if (p[k].value == null) p[k].value = "";
+      // Manual "custom pairs": the question picks a left + right tile type once,
+      // then holds entries { left, right } sharing those types.
+      if (typeof q.leftType !== "string") q.leftType = "text";
+      if (typeof q.rightType !== "string") q.rightType = "text";
+      if (!Array.isArray(q.entries)) q.entries = [];
+      // Migrate the brief earlier per-pair form into the per-question model.
+      if (Array.isArray(q.pairs) && q.pairs.length && !q.entries.length) {
+        var first = q.pairs[0] || {};
+        q.leftType = (first.question && first.question.type) || "text";
+        q.rightType = (first.answer && first.answer.type) || "text";
+        q.entries = q.pairs.map(function (p) {
+          return { left: String(((p && p.question) || {}).value || ""), right: String(((p && p.answer) || {}).value || "") };
         });
-      });
+      }
+      delete q.pairs;
+      q.entries = q.entries.filter(function (en) { return en && typeof en === "object"; });
+      q.entries.forEach(function (en) { if (en.left == null) en.left = ""; if (en.right == null) en.right = ""; });
     });
   }
   // Seed Hör-Paare with a few ready-made questions (4 words each) from the vocab.

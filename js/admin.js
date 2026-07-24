@@ -907,8 +907,8 @@
         if (!list.length) body.appendChild(emptyState("No questions yet — add the first one below."));
         list.forEach(function (q, qi) {
           if (!Array.isArray(q.words)) q.words = [];
-          if (!Array.isArray(q.pairs)) q.pairs = [];
-          var validCustom = q.pairs.filter(function (p) { return p && p.question && p.answer && String(p.question.value || "").trim() && String(p.answer.value || "").trim(); }).length;
+          if (!Array.isArray(q.entries)) q.entries = [];
+          var validCustom = q.entries.filter(function (en) { return en && String(en.left || "").trim() && String(en.right || "").trim(); }).length;
           var complete = q.words.filter(function (w) { return w.de && w.en; }).length + validCustom;
           var card = el("div", { class: "adm-pairs-q" });
           card.appendChild(el("div", { class: "adm-pairs-head" }, [
@@ -935,10 +935,9 @@
             ]));
           });
           card.appendChild(addRowBtn("+ Word", function () { q.words.push({ de: "", en: "", emoji: "" }); store.save(); render(); }));
-          // Custom pairs (mix tile types) — optional, added to the same round.
-          card.appendChild(el("div", { class: "adm-cpair-sep", text: "Custom pairs — mix text, icons, pictures & audio" }));
-          q.pairs.forEach(function (pp, pi) { card.appendChild(customPairRow(pp, q.pairs, pi)); });
-          card.appendChild(addRowBtn("+ Custom pair", function () { q.pairs.push({ id: q.pairs.length + 1, question: { type: "text", value: "" }, answer: { type: "text", value: "" } }); store.save(); render(); }));
+          // Custom pairs: pick a type for each side once, then add entries.
+          card.appendChild(el("div", { class: "adm-cpair-sep", text: "Custom pairs — pick a type for each side, then add entries" }));
+          card.appendChild(customSection(q));
           body.appendChild(card);
         });
         body.appendChild(addRowBtn("+ Question", function () {
@@ -947,88 +946,108 @@
         }));
       }
 
-      /* One custom pair: a left (question) side ⟷ a right (answer) side, each of
-         which independently picks a tile type and swaps in just that input. */
-      function customPairRow(pair, arr, index) {
-        var card = el("div", { class: "adm-cpair" });
-        card.appendChild(el("div", { class: "adm-cpair-topbar" }, [
-          el("span", { class: "adm-cpair-n", text: "Pair " + (index + 1) }),
-          el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove pair" }, on: { click: function () { arr.splice(index, 1); store.save(); render(); } } })
-        ]));
-        card.appendChild(el("div", { class: "adm-cpair-sides" }, [
-          el("div", { class: "adm-cpair-side" }, [el("div", { class: "adm-side-lbl", text: "Left" }), pairSideEditor(pair.question)]),
-          el("div", { class: "adm-cpair-mid", text: "⟷" }),
-          el("div", { class: "adm-cpair-side" }, [el("div", { class: "adm-side-lbl", text: "Right" }), pairSideEditor(pair.answer)])
-        ]));
-        return card;
+      /* Custom pairs for one question: pick a Left type + a Right type once, then
+         add entries { left, right } that all share those two types. Changing a
+         type only re-renders the entry inputs (the type pickers keep their state). */
+      function customSection(q) {
+        if (typeof q.leftType !== "string") q.leftType = "text";
+        if (typeof q.rightType !== "string") q.rightType = "text";
+        if (!Array.isArray(q.entries)) q.entries = [];
+        var entriesWrap = el("div", { class: "adm-entries" });
+
+        function renderEntries() {
+          entriesWrap.innerHTML = "";
+          if (!q.entries.length) { entriesWrap.appendChild(el("p", { class: "adm-blank-hint", text: "No entries yet — add at least 3 with “+ Entry”." })); return; }
+          q.entries.forEach(function (en, ei) {
+            entriesWrap.appendChild(el("div", { class: "adm-entry" }, [
+              el("span", { class: "adm-entry-n", text: (ei + 1) }),
+              el("div", { class: "adm-entry-side" }, [entryInput(en, "left", q.leftType)]),
+              el("span", { class: "adm-entry-mid", text: "⟷" }),
+              el("div", { class: "adm-entry-side" }, [entryInput(en, "right", q.rightType)]),
+              el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove entry" }, on: { click: function () { q.entries.splice(ei, 1); store.save(); renderEntries(); } } })
+            ]));
+          });
+        }
+
+        var types = el("div", { class: "adm-custom-types" }, [
+          typePickerRow("Left", q, "leftType", renderEntries),
+          typePickerRow("Right", q, "rightType", renderEntries)
+        ]);
+        renderEntries();
+        return el("div", { class: "adm-custom" }, [
+          types,
+          entriesWrap,
+          addRowBtn("+ Entry", function () { q.entries.push({ left: "", right: "" }); store.save(); renderEntries(); })
+        ]);
       }
 
-      // A four-chip type picker (Text / Icon / Image / Audio) that swaps in just
-      // the one input that type needs. `side` = { type, value } (mutated in place).
-      function pairSideEditor(side) {
-        if (typeof side.type !== "string") side.type = "text";
-        if (side.value == null) side.value = "";
+      // A labelled 4-chip type picker bound to obj[field]; onChange after a change.
+      function typePickerRow(label, obj, field, onChange) {
         var TYPES = [["text", "Text", "🔤"], ["icon", "Icon", "😀"], ["image", "Image", "🖼"], ["audio", "Audio", "🔊"]];
-        var chipRow = el("div", { class: "adm-typechips" });
-        var inputWrap = el("div", { class: "adm-side-input" });
         var chips = [];
-        function renderInput() {
-          inputWrap.innerHTML = "";
-          var t = side.type;
-          if (t === "text") {
-            inputWrap.appendChild(input(side, "value", "type the text", "adm-input"));
-          } else if (t === "audio") {
-            var inp = input(side, "value", "type the German word", "adm-input");
-            var play = el("button", { class: "btn small adm-audio-prev", attrs: { type: "button", title: "Hear it" }, html: "▶", on: { click: function () { try { if (window.VoiceBox) window.VoiceBox.speak(side.value || ""); } catch (e) {} } } });
-            inputWrap.appendChild(el("div", { class: "adm-side-row" }, [inp, play]));
-          } else if (t === "image") {
-            var urlInp = input(side, "value", "paste image link (right-click a Google image → Copy image address)", "adm-input");
-            var prev = el("img", { class: "adm-img-prev", attrs: { alt: "" } });
-            function upd() { if (side.value) { prev.src = side.value; prev.style.display = ""; } else { prev.removeAttribute("src"); prev.style.display = "none"; } }
-            urlInp.addEventListener("input", upd);
-            inputWrap.appendChild(urlInp); inputWrap.appendChild(prev); upd();
-          } else if (t === "icon") {
-            inputWrap.appendChild(iconPicker(side));
-          }
-        }
-        function selectType(t) {
-          if (side.type !== t) { side.type = t; side.value = ""; store.save(); }
-          chips.forEach(function (c) { c.btn.classList.toggle("sel", c.t === t); });
-          renderInput();
-        }
+        var chipRow = el("div", { class: "adm-typechips" });
         TYPES.forEach(function (T) {
-          var btn = el("button", { class: "adm-typechip" + (side.type === T[0] ? " sel" : ""), attrs: { type: "button", title: T[1] }, on: { click: function () { selectType(T[0]); } } }, [el("span", { class: "adm-typechip-ic", text: T[2] }), el("span", { class: "adm-typechip-lbl", text: T[1] })]);
+          var btn = el("button", { class: "adm-typechip" + (obj[field] === T[0] ? " sel" : ""), attrs: { type: "button", title: T[1] }, on: { click: function () {
+            if (obj[field] !== T[0]) { obj[field] = T[0]; store.save(); }
+            chips.forEach(function (c) { c.btn.classList.toggle("sel", c.t === T[0]); });
+            if (onChange) onChange();
+          } } }, [el("span", { class: "adm-typechip-ic", text: T[2] }), el("span", { class: "adm-typechip-lbl", text: T[1] })]);
           chips.push({ t: T[0], btn: btn });
           chipRow.appendChild(btn);
         });
-        renderInput();
-        return el("div", { class: "adm-side" }, [chipRow, inputWrap]);
+        return el("div", { class: "adm-typepick" }, [el("span", { class: "adm-side-lbl", text: label }), chipRow]);
       }
 
-      // Icon picker over the EXISTING emoji set (js/emoji.js) — search + a grid.
-      function iconPicker(side) {
-        var preview = el("span", { class: "adm-icon-preview", text: side.value || "—" });
-        var searchInp = el("input", { class: "adm-input adm-icon-search", attrs: { type: "text", placeholder: "search icons (dog, apple, red…)" } });
-        var grid = el("div", { class: "adm-icon-grid" });
-        function fillGrid(q) {
+      // The input for one entry side, matched to the question's chosen type.
+      function entryInput(en, field, type) {
+        if (en[field] == null) en[field] = "";
+        if (type === "audio") {
+          var inp = input(en, field, "German word", "adm-input");
+          var play = el("button", { class: "btn small adm-audio-prev", attrs: { type: "button", title: "Hear it" }, html: "▶", on: { click: function () { try { if (window.VoiceBox) window.VoiceBox.speak(en[field] || ""); } catch (e) {} } } });
+          return el("div", { class: "adm-side-row" }, [inp, play]);
+        }
+        if (type === "image") {
+          var urlInp = input(en, field, "paste image link", "adm-input");
+          var prev = el("img", { class: "adm-img-prev sm", attrs: { alt: "" } });
+          function upd() { if (en[field]) { prev.src = en[field]; prev.style.display = ""; } else { prev.removeAttribute("src"); prev.style.display = "none"; } }
+          urlInp.addEventListener("input", upd); upd();
+          return el("div", { class: "adm-side-row" }, [urlInp, prev]);
+        }
+        if (type === "icon") return iconButton(en, field);
+        return input(en, field, "type the text", "adm-input"); // text
+      }
+
+      // A compact icon button that opens the emoji picker modal (reuses js/emoji.js).
+      function iconButton(obj, field) {
+        var btn = el("button", { class: "adm-icon-btn", attrs: { type: "button" }, text: obj[field] || "＋ icon" });
+        btn.addEventListener("click", function () {
+          openIconModal(obj[field] || "", function (e) { obj[field] = e; btn.textContent = e || "＋ icon"; store.save(); });
+        });
+        return btn;
+      }
+
+      function openIconModal(current, onPick) {
+        var overlay = el("div", { class: "adm-modal-overlay" });
+        overlay.addEventListener("click", function (e) { if (e.target === overlay) overlay.remove(); });
+        var searchInp = el("input", { class: "adm-input", attrs: { type: "text", placeholder: "search icons (dog, apple, red…)" } });
+        var grid = el("div", { class: "adm-icon-grid big" });
+        function fill(qq) {
           grid.innerHTML = "";
-          var listE = (window.EmojiPick && window.EmojiPick.search) ? window.EmojiPick.search(q || "") : [];
+          var listE = (window.EmojiPick && window.EmojiPick.search) ? window.EmojiPick.search(qq || "") : [];
           if (!listE.length) { grid.appendChild(el("span", { class: "adm-blank-hint", text: "No icon — try another word." })); return; }
-          listE.slice(0, 120).forEach(function (e) {
-            var b = el("button", { class: "adm-icon-opt" + (side.value === e ? " sel" : ""), attrs: { type: "button" }, text: e, on: { click: function () {
-              side.value = e; preview.textContent = e; store.save();
-              Array.prototype.forEach.call(grid.children, function (c) { c.classList.remove("sel"); });
-              b.classList.add("sel");
-            } } });
-            grid.appendChild(b);
+          listE.slice(0, 200).forEach(function (e) {
+            grid.appendChild(el("button", { class: "adm-icon-opt" + (current === e ? " sel" : ""), attrs: { type: "button" }, text: e, on: { click: function () { onPick(e); overlay.remove(); } } }));
           });
         }
-        searchInp.addEventListener("input", function () { fillGrid(searchInp.value); });
-        fillGrid("");
-        return el("div", { class: "adm-iconpick" }, [
-          el("div", { class: "adm-icon-head" }, [el("span", { class: "adm-icon-lbl", text: "Chosen:" }), preview]),
-          searchInp, grid
-        ]);
+        searchInp.addEventListener("input", function () { fill(searchInp.value); });
+        fill("");
+        overlay.appendChild(el("div", { class: "adm-modal-card" }, [
+          el("div", { class: "adm-modal-title", text: "Pick an icon" }),
+          searchInp, grid,
+          el("button", { class: "btn ghost adm-modal-cancel", text: "Cancel", on: { click: function () { overlay.remove(); } } })
+        ]));
+        document.body.appendChild(overlay);
+        setTimeout(function () { try { searchInp.focus(); } catch (e) {} }, 50);
       }
 
       function delRowBtn(title, onClick) {
