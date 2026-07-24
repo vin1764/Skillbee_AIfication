@@ -83,7 +83,7 @@ function toBlanks(list) {
 }
 
 window.CaseData = {
-  accusative: toBlanks(CASE_DRILLS.accusative),
-  dative: toBlanks(CASE_DRILLS.dative),
-  genitive: toBlanks(CASE_DRILLS.genitive)
+  items: toBlanks(CASE_DRILLS.accusative)
+    .concat(toBlanks(CASE_DRILLS.dative))
+    .concat(toBlanks(CASE_DRILLS.genitive))
 };

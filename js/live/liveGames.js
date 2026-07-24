@@ -261,18 +261,17 @@
       var store = window.ContentStore;
       var list = (store && store.exercisesFor) ? store.exercisesFor("cases") : [];
       return list.map(function (e) {
-        var n = (e.accusative || []).length + (e.dative || []).length + (e.genitive || []).length;
+        var n = (e.items || []).length || ((e.accusative || []).length + (e.dative || []).length + (e.genitive || []).length);
         return { id: e.id, name: e.name, emoji: "✏️", english: n + (n === 1 ? " sentence" : " sentences") };
       });
     },
     buildRounds: function (topic) {
       var store = window.ContentStore;
       var e = (store && store.exercise) ? store.exercise("cases", topic && topic.id) : null;
-      var C = e || window.CaseData || { accusative: [], dative: [], genitive: [] };
-      // A case exercise mixes the three case groups it contains; a future flat
-      // content set may instead expose an "items" array — accept both.
-      var pool = (C.accusative || []).concat(C.dative || []).concat(C.genitive || []);
-      if (!pool.length && Array.isArray(C.items)) pool = C.items;
+      var C = e || window.CaseData || { items: [] };
+      // One flat list of sentences (older content may still be split into the
+      // accusative/dative/genitive groups — read those too, for safety).
+      var pool = Array.isArray(C.items) && C.items.length ? C.items.slice() : (C.accusative || []).concat(C.dative || []).concat(C.genitive || []);
       var norm = pool.map(normBlankEntry).filter(Boolean);
       return kit().sample(norm, Math.min(10, norm.length)).map(function (s) {
         return {
@@ -486,246 +485,6 @@
     },
     correctLabel: function (round) { return round.gender + " " + round.compound; },
     speakOnReveal: function (round) { return round.gender + " " + round.compound; }
-  };
-
-  /* ---- Plural-Palast (Plural Palace): pick a noun's correct plural ---- */
-  var pluralAdapter = {
-    meta: { name: "Plural-Palast", emoji: "🏰", contentType: "plurals" },
-    timeLimit: 20000,
-    pickLabel: "Exercise",
-    getTopics: function () {
-      var store = window.ContentStore;
-      var list = (store && store.exercisesFor) ? store.exercisesFor("plurals") : [];
-      return list.map(function (e) {
-        var n = (e.items || []).length;
-        return { id: e.id, name: e.name, emoji: "🏰", english: n + (n === 1 ? " noun" : " nouns") };
-      });
-    },
-    buildRounds: function (topic) {
-      var store = window.ContentStore;
-      var e = (store && store.exercise) ? store.exercise("plurals", topic && topic.id) : null;
-      var all = ((e && e.items) || window.PluralData || [])
-        .filter(function (p) { return p && p.singular && p.plural; });
-      var autoPool = all.map(function (p) { return p.plural; });
-      return kit().sample(all, Math.min(10, all.length)).map(function (p) {
-        return {
-          type: "plural", de: p.singular, en: p.en || "", emoji: p.emoji || "",
-          options: kit().shuffle([p.plural].concat(wrongOptions(p.wrong, p.plural, autoPool, 3))),
-          answer: p.plural, correct: p.plural
-        };
-      });
-    },
-    hostContent: function (el, round) {
-      return el("div", { class: "live-q" }, [
-        el("div", { class: "live-q-tag", text: "🏰 What is the plural?" }),
-        el("div", { class: "live-q-word" }, [
-          document.createTextNode(round.de + " "),
-          kit().speakerButton(round.de)
-        ]),
-        el("div", { class: "live-q-options board" }, round.options.map(function (opt, i) {
-          return el("div", { class: "live-opt board", attrs: { style: "--c:" + COLORS[i] } }, [
-            el("span", { class: "opt-shape", text: SHAPES[i] }),
-            el("span", { class: "opt-text", text: opt })
-          ]);
-        }))
-      ]);
-    },
-    playerContent: function (el, round, api) {
-      return el("div", { class: "live-q-options phone" }, round.options.map(function (opt, i) {
-        return el("button", {
-          class: "live-opt phone", attrs: { style: "--c:" + COLORS[i] },
-          on: { click: function () { api.submit({ choice: opt }); } }
-        }, [el("span", { class: "opt-shape", text: SHAPES[i] }), el("span", { class: "opt-text", text: opt })]);
-      }));
-    },
-    score: function (round, payload, elapsedMs, timeLimit) {
-      if (!payload || payload.choice !== round.answer) return { correct: false, points: 0 };
-      var frac = Math.max(0, 1 - elapsedMs / timeLimit);
-      return { correct: true, points: Math.round(500 + 500 * frac) };
-    },
-    correctLabel: function (round) { return "die " + round.correct; },
-    speakOnReveal: function (round) { return "die " + round.correct; }
-  };
-
-  /* ---- Konjugations-Karussell (Conjugation Carousel): conjugate a verb ---- */
-  var PRON_LABEL = { ich: "ich", du: "du", er: "er/sie/es", wir: "wir", ihr: "ihr", sie: "sie (they)" };
-  // Ask about du / er more often — that's where the stem changes (and errors) are.
-  var PRON_WEIGHTED = ["du", "du", "er", "er", "ich", "wir", "ihr", "sie"];
-
-  var verbAdapter = {
-    meta: { name: "Konjugations-Karussell", emoji: "🎠", contentType: "verbs" },
-    timeLimit: 15000, // fast-paced warm-up
-    pickLabel: "Exercise",
-    getTopics: function () {
-      var store = window.ContentStore;
-      var list = (store && store.exercisesFor) ? store.exercisesFor("verbs") : [];
-      return list.map(function (e) {
-        var n = (e.items || []).length;
-        return { id: e.id, name: e.name, emoji: "🎠", english: n + (n === 1 ? " verb" : " verbs") };
-      });
-    },
-    buildRounds: function (topic) {
-      var store = window.ContentStore;
-      var e = (store && store.exercise) ? store.exercise("verbs", topic && topic.id) : null;
-      var all = ((e && e.items) || window.VerbData || [])
-        .filter(function (v) { return v && v.inf && v.forms && v.forms.du; });
-      return kit().sample(all, Math.min(10, all.length)).map(function (v) {
-        var pron = kit().shuffle(PRON_WEIGHTED.slice())[0];
-        var correct = v.forms[pron];
-        // Distractors: the star trap (naive "no stem change" form, for du/er) plus
-        // this verb's other pronoun-forms — all realistic mistakes.
-        var opts = [];
-        if (v.naive && v.naive[pron] && v.naive[pron] !== correct) opts.push(v.naive[pron]);
-        var others = Object.keys(v.forms).map(function (k) { return v.forms[k]; })
-          .filter(function (f) { return f !== correct; });
-        kit().shuffle(others).forEach(function (f) { if (opts.length < 3 && opts.indexOf(f) < 0) opts.push(f); });
-        return {
-          type: "verb", inf: v.inf, en: v.en || "", pron: pron, pronLabel: PRON_LABEL[pron] || pron,
-          options: kit().shuffle([correct].concat(opts.slice(0, 3))), answer: correct, correct: correct
-        };
-      });
-    },
-    hostContent: function (el, round) {
-      return el("div", { class: "live-q" }, [
-        el("div", { class: "live-q-tag", text: "🎠 Conjugate the verb" }),
-        el("div", { class: "live-q-word" }, [
-          document.createTextNode(round.inf + "  —  " + round.pronLabel + " "),
-          kit().speakerButton(round.inf)
-        ]),
-        round.en ? el("div", { class: "live-q-en", text: round.en }) : null,
-        el("div", { class: "live-q-options board" }, round.options.map(function (opt, i) {
-          return el("div", { class: "live-opt board", attrs: { style: "--c:" + COLORS[i] } }, [
-            el("span", { class: "opt-shape", text: SHAPES[i] }),
-            el("span", { class: "opt-text", text: opt })
-          ]);
-        }))
-      ]);
-    },
-    playerContent: function (el, round, api) {
-      return el("div", { class: "live-q-options phone" }, round.options.map(function (opt, i) {
-        return el("button", {
-          class: "live-opt phone", attrs: { style: "--c:" + COLORS[i] },
-          on: { click: function () { api.submit({ choice: opt }); } }
-        }, [el("span", { class: "opt-shape", text: SHAPES[i] }), el("span", { class: "opt-text", text: opt })]);
-      }));
-    },
-    score: function (round, payload, elapsedMs, timeLimit) {
-      if (!payload || payload.choice !== round.answer) return { correct: false, points: 0 };
-      var frac = Math.max(0, 1 - elapsedMs / timeLimit);
-      return { correct: true, points: Math.round(500 + 500 * frac) };
-    },
-    correctLabel: function (round) { return round.pron + " " + round.correct; },
-    speakOnReveal: function (round) { return round.pron + " " + round.correct; }
-  };
-
-  /* ---- Uhrzeit-Blitz (Clock Flash): read the analog clock in German ---- */
-  // Pure generator — no content bank. German colloquial time follows fixed
-  // rules from the hands, so we build the correct phrase + plausible wrong
-  // ones (the halb trap, off-by-a-quarter, nach/vor swap, wrong hour).
-  var NUMW = ["", "eins", "zwei", "drei", "vier", "fünf", "sechs", "sieben", "acht", "neun", "zehn", "elf", "zwölf"];
-  function hourWord(h, uhr) { if (h === 1) return uhr ? "ein" : "eins"; return NUMW[h]; }
-  function nextHour(h) { return (h % 12) + 1; }
-  function prevHour(h) { return ((h + 10) % 12) + 1; }
-  function pad2(n) { return n < 10 ? "0" + n : "" + n; }
-  var MIN_NACH = { 5: "fünf", 10: "zehn", 20: "zwanzig" };
-  var MIN_VOR = { 40: "zwanzig", 50: "zehn", 55: "fünf" };
-  function timePhrase(h, m) {
-    var nh = nextHour(h);
-    if (m === 0) return hourWord(h, true) + " Uhr";
-    if (m === 15) return "viertel nach " + hourWord(h, false);
-    if (m === 30) return "halb " + hourWord(nh, false);
-    if (m === 45) return "viertel vor " + hourWord(nh, false);
-    if (MIN_NACH[m]) return MIN_NACH[m] + " nach " + hourWord(h, false);
-    if (MIN_VOR[m]) return MIN_VOR[m] + " vor " + hourWord(nh, false);
-    return hourWord(h, true) + " Uhr";
-  }
-  function timeDistractors(h, m, correct) {
-    var nh = nextHour(h), ph = prevHour(h), cands = [];
-    if (m === 30) cands.push("halb " + hourWord(h, false)); // THE trap: "half past h"
-    if (m === 15) cands.push("viertel vor " + hourWord(nh, false));
-    else if (m === 45) cands.push("viertel nach " + hourWord(h, false));
-    else if (MIN_NACH[m]) cands.push(MIN_NACH[m] + " vor " + hourWord(nh, false));
-    else if (MIN_VOR[m]) cands.push(MIN_VOR[m] + " nach " + hourWord(h, false));
-    cands.push(timePhrase(nh, m), timePhrase(ph, m)); // wrong hour
-    if (m === 0) cands.push("viertel nach " + hourWord(h, false));
-    if (m === 15) cands.push("halb " + hourWord(nh, false));
-    if (m === 30) cands.push("viertel nach " + hourWord(h, false));
-    if (m === 45) cands.push("halb " + hourWord(nh, false));
-    var seen = {}, out = [];
-    cands.forEach(function (c) { if (c && c !== correct && !seen[c]) { seen[c] = 1; out.push(c); } });
-    return out.slice(0, 3);
-  }
-  function clockSVG(h, m) {
-    function hand(angle, len, w, color) {
-      var r = (angle - 90) * Math.PI / 180;
-      return '<line x1="100" y1="100" x2="' + (100 + len * Math.cos(r)).toFixed(1) + '" y2="' +
-        (100 + len * Math.sin(r)).toFixed(1) + '" stroke="' + color + '" stroke-width="' + w + '" stroke-linecap="round"/>';
-    }
-    var ticks = "";
-    for (var i = 0; i < 12; i++) {
-      var a = (i * 30 - 90) * Math.PI / 180, big = i % 3 === 0;
-      ticks += '<line x1="' + (100 + 78 * Math.cos(a)).toFixed(1) + '" y1="' + (100 + 78 * Math.sin(a)).toFixed(1) +
-        '" x2="' + (100 + 90 * Math.cos(a)).toFixed(1) + '" y2="' + (100 + 90 * Math.sin(a)).toFixed(1) +
-        '" stroke="' + (big ? "#3b4de8" : "#c9d2e3") + '" stroke-width="' + (big ? 4 : 2) + '"/>';
-    }
-    var hAng = ((h % 12) + m / 60) * 30, mAng = m * 6;
-    return '<svg viewBox="0 0 200 200" class="clock-svg" role="img" aria-label="clock">' +
-      '<circle cx="100" cy="100" r="94" fill="#fff" stroke="#3b4de8" stroke-width="4"/>' + ticks +
-      hand(hAng, 50, 7, "#1b2440") + hand(mAng, 74, 4, "#3b4de8") +
-      '<circle cx="100" cy="100" r="5" fill="#1b2440"/></svg>';
-  }
-
-  var timeAdapter = {
-    meta: { name: "Uhrzeit-Blitz", emoji: "🕐", contentType: "time" },
-    timeLimit: 20000,
-    getTopics: function () {
-      return [{ id: "all", name: "Uhrzeit-Blitz", english: "Random times", emoji: "🕐" }];
-    },
-    buildRounds: function () {
-      // weight toward the quarter times (and halb — the trap)
-      var MINS = [0, 15, 30, 30, 45, 5, 10, 20, 40, 50, 55];
-      var used = {}, rounds = [];
-      for (var n = 0; n < 10; n++) {
-        var h, m, key, guard = 0;
-        do { h = 1 + Math.floor(Math.random() * 12); m = kit().sample(MINS, 1)[0]; key = h + ":" + m; guard++; }
-        while (used[key] && guard < 30);
-        used[key] = 1;
-        var correct = timePhrase(h, m);
-        rounds.push({
-          type: "time", h: h, m: m, correct: correct, answer: correct,
-          explanation: "(" + h + ":" + pad2(m) + ")",
-          options: kit().shuffle([correct].concat(timeDistractors(h, m, correct)))
-        });
-      }
-      return rounds;
-    },
-    hostContent: function (el, round) {
-      return el("div", { class: "live-q" }, [
-        el("div", { class: "live-q-tag", text: "🕐 What time is it?" }),
-        el("div", { class: "clock-wrap", html: clockSVG(round.h, round.m) }),
-        el("div", { class: "live-q-options board" }, round.options.map(function (opt, i) {
-          return el("div", { class: "live-opt board", attrs: { style: "--c:" + COLORS[i] } }, [
-            el("span", { class: "opt-shape", text: SHAPES[i] }),
-            el("span", { class: "opt-text", text: opt })
-          ]);
-        }))
-      ]);
-    },
-    playerContent: function (el, round, api) {
-      return el("div", { class: "live-q-options phone" }, round.options.map(function (opt, i) {
-        return el("button", {
-          class: "live-opt phone", attrs: { style: "--c:" + COLORS[i] },
-          on: { click: function () { api.submit({ choice: opt }); } }
-        }, [el("span", { class: "opt-shape", text: SHAPES[i] }), el("span", { class: "opt-text", text: opt })]);
-      }));
-    },
-    score: function (round, payload, elapsedMs, timeLimit) {
-      if (!payload || payload.choice !== round.answer) return { correct: false, points: 0 };
-      var frac = Math.max(0, 1 - elapsedMs / timeLimit);
-      return { correct: true, points: Math.round(500 + 500 * frac) };
-    },
-    correctLabel: function (round) { return round.correct; },
-    speakOnReveal: function (round) { return round.correct; }
   };
 
   /* ---- Hör gut zu! (Listen Carefully!): pick OR type the word you heard ----
@@ -959,9 +718,6 @@
     memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" }),
     cases: blanksAdapter,
     wortmonster: compoundAdapter,
-    plural: pluralAdapter,
-    verben: verbAdapter,
-    uhrzeit: timeAdapter,
     listen: listenAdapter,
     hoerpaare: hoerpaareAdapter
   };

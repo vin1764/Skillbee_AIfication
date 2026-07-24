@@ -21,16 +21,10 @@
   }
 
   function defaultCases() {
-    return clone(window.CaseData || { accusative: [], dative: [], genitive: [] });
+    return clone(window.CaseData || { items: [] });
   }
   function defaultCompounds() {
     return clone(window.CompoundData || []);
-  }
-  function defaultPlurals() {
-    return clone(window.PluralData || []);
-  }
-  function defaultVerbs() {
-    return clone(window.VerbData || []);
   }
   function defaultListening() {
     return clone(window.ListeningData || []);
@@ -43,18 +37,18 @@
      Each game owns its content (nothing is shared between games). Shapes:
        words games  (quiz, memory, hangman)  -> { id, name, emoji, english, words: [...] }
        sentence game (scramble)              -> { id, name, emoji, english, sentences: [...] }
-       cases (Fall-Detektiv)                 -> { id, name, accusative, dative, genitive }
-       item games (compounds/plurals/verbs/listening) -> { id, name, items: [...] }
+       cases (Lücken-Text)                   -> { id, name, items: [...] }
+       item games (compounds/listening)      -> { id, name, items: [...] }
      --------------------------------------------------------------------- */
   var WORD_GAMES = ["quiz", "memory", "hangman"];
-  var ITEM_GAMES = ["compounds", "plurals", "verbs", "listening"];
+  var ITEM_GAMES = ["compounds", "listening"];
 
   function gameKind(gameKey) {
     if (gameKey === "scramble") return "sentences";
     if (gameKey === "cases") return "cases";
     if (gameKey === "hoerpaare") return "pairs";
     if (WORD_GAMES.indexOf(gameKey) >= 0) return "words";
-    return "items"; // compounds / plurals / verbs / listening
+    return "items"; // compounds / listening
   }
 
   function exId() {
@@ -66,16 +60,13 @@
   function sentencesExercise(name, sentences) {
     return { id: exId(), name: name || "Exercise 1", emoji: "🗣️", english: "", sentences: Array.isArray(sentences) ? clone(sentences) : [] };
   }
-  // A fresh exercise for the case game (three sub-lists). `seed` may be a legacy
-  // { accusative, dative, genitive } object whose content is migrated in.
+  // A fresh Lücken-Text exercise: one flat list of sentences. `seed` may be new
+  // ({ items }) or a legacy case-grouped ({ accusative, dative, genitive }) shape.
   function caseExercise(name, seed) {
     seed = seed || {};
-    return {
-      id: exId(), name: name || "Exercise 1",
-      accusative: Array.isArray(seed.accusative) ? clone(seed.accusative) : [],
-      dative: Array.isArray(seed.dative) ? clone(seed.dative) : [],
-      genitive: Array.isArray(seed.genitive) ? clone(seed.genitive) : []
-    };
+    var items = Array.isArray(seed.items) ? clone(seed.items) : [];
+    ["accusative", "dative", "genitive"].forEach(function (k) { if (Array.isArray(seed[k])) items = items.concat(clone(seed[k])); });
+    return { id: exId(), name: name || "Exercise 1", items: items };
   }
   // A fresh exercise for a flat-list game. `items` may be a legacy array migrated in.
   function listExercise(name, items) {
@@ -98,6 +89,18 @@
     if (typeof e.emoji !== "string") e.emoji = "📚";
     if (typeof e.english !== "string") e.english = "";
     if (!Array.isArray(e.words)) e.words = [];
+    // Optional typed MCQ questions (Vocabulary Quiz): { question:{type,value},
+    // options:[{type,value,correct}] } — keep 4 options with exactly one correct.
+    if (Array.isArray(e.mcq)) {
+      e.mcq = e.mcq.filter(function (m) { return m && typeof m === "object"; }).map(function (m) {
+        var q = (m.question && typeof m.question === "object") ? { type: m.question.type || "text", value: String(m.question.value == null ? "" : m.question.value) } : { type: "text", value: "" };
+        var opts = (Array.isArray(m.options) ? m.options : []).map(function (o) { return { type: (o && o.type) || "text", value: String((o && o.value) || ""), correct: !!(o && o.correct) }; });
+        while (opts.length < 4) opts.push({ type: (opts[0] || {}).type || "text", value: "", correct: false });
+        opts = opts.slice(0, 4);
+        if (!opts.some(function (o) { return o.correct; })) opts[0].correct = true;
+        return { question: q, options: opts };
+      });
+    }
   }
   function normalizeSentencesEx(e) {
     if (!e.id) e.id = exId();
@@ -135,10 +138,13 @@
   function normalizeCaseEx(e) {
     if (!e.id) e.id = exId();
     if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
+    if (!Array.isArray(e.items)) e.items = [];
+    // Fold the old accusative/dative/genitive sub-groups into one flat list.
     ["accusative", "dative", "genitive"].forEach(function (k) {
-      if (!Array.isArray(e[k])) e[k] = [];
-      e[k] = e[k].map(migrateCaseEntry);
+      if (Array.isArray(e[k]) && e[k].length) e.items = e.items.concat(e[k]);
+      delete e[k];
     });
+    e.items = e.items.map(migrateCaseEntry);
   }
   function normalizeListEx(e) {
     if (!e.id) e.id = exId();
@@ -221,8 +227,6 @@
       scramble: st.map(function (t) { return topicToExercise(t, "sentences"); }),
       cases: [caseExercise("Exercise 1", defaultCases())],
       compounds: [listExercise("Exercise 1", defaultCompounds())],
-      plurals: [listExercise("Exercise 1", defaultPlurals())],
-      verbs: [listExercise("Exercise 1", defaultVerbs())],
       listening: [listExercise("Exercise 1", defaultListening())],
       hoerpaare: [pairsExercise("Exercise 1", defaultPairsQuestions())]
     };
@@ -449,11 +453,9 @@
        when no specific exercise is chosen, e.g. by the audio helper). */
     casesData: function () {
       var e = this.exercise("cases");
-      return e ? { accusative: e.accusative, dative: e.dative, genitive: e.genitive } : { accusative: [], dative: [], genitive: [] };
+      return { items: (e && Array.isArray(e.items)) ? e.items : [] };
     },
     compoundsData: function () { var e = this.exercise("compounds"); return e ? e.items : []; },
-    pluralsData: function () { var e = this.exercise("plurals"); return e ? e.items : []; },
-    verbsData: function () { var e = this.exercise("verbs"); return e ? e.items : []; },
     listeningData: function () { var e = this.exercise("listening"); return e ? e.items : []; },
 
     newId: function (prefix) {

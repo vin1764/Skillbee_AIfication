@@ -649,6 +649,16 @@ kbd {
 .adm-icon-opt.sel { border-color: var(--skb); background: var(--skb-tint); }
 .adm-modal-cancel { align-self: flex-end; }
 
+/* MCQ authoring (Vocabulary Quiz — picture/audio/icon questions) */
+.adm-mcq-q { margin-bottom: 10px; }
+.adm-mcq-field { margin-top: 6px; }
+.adm-mcq-field .adm-input { width: 100%; }
+.adm-mcq-options { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.adm-mcq-opt { display: flex; align-items: center; gap: 8px; }
+.adm-mcq-opt .adm-mcq-field { flex: 1 1 0; min-width: 0; margin-top: 0; }
+.adm-mcq-radio { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line); background: #fff; cursor: pointer; font-weight: 900; color: var(--good); line-height: 1; }
+.adm-mcq-radio.sel { border-color: var(--good); background: #eafaf7; }
+
 /* Auto-translate (German → English) — button, AI-draft marker, bulk bar */
 .adm-en-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
 .adm-en-cell > input { flex: 1 1 60px; min-width: 0; }
@@ -1397,9 +1407,9 @@ function toBlanks(list) {
 }
 
 window.CaseData = {
-  accusative: toBlanks(CASE_DRILLS.accusative),
-  dative: toBlanks(CASE_DRILLS.dative),
-  genitive: toBlanks(CASE_DRILLS.genitive)
+  items: toBlanks(CASE_DRILLS.accusative)
+    .concat(toBlanks(CASE_DRILLS.dative))
+    .concat(toBlanks(CASE_DRILLS.genitive))
 };
 
 
@@ -1432,88 +1442,6 @@ const COMPOUNDS = [
 ];
 
 window.CompoundData = COMPOUNDS;
-
-
-/* ==== js/data-plurals.js ==== */
-/* =====================================================================
-   Plural-Palast (Plural Palace) — noun plural bank.
-   German plurals follow no single rule (-e, -er, -(e)n, -s, umlaut shift,
-   or no change), so each entry stores the correct plural plus three
-   plausible wrong forms — realistic mistakes (wrong ending, or the
-   missing/added umlaut trap), never random nonsense.
-     { singular, en, emoji, plural, wrong: [3 wrong plural forms] }
-   The plural article is always "die"; options show the bare form so the
-   ending is what's being tested. Mass nouns (Milch, Wasser, …) are left
-   out — they have no everyday plural.
-   ===================================================================== */
-const PLURALS = [
-  // Tiere
-  { singular: "der Hund", en: "dog", emoji: "🐶", plural: "Hunde", wrong: ["Hunden", "Hünde", "Hunds"] },
-  { singular: "die Katze", en: "cat", emoji: "🐱", plural: "Katzen", wrong: ["Katze", "Kätzen", "Katzes"] },
-  { singular: "das Pferd", en: "horse", emoji: "🐴", plural: "Pferde", wrong: ["Pferden", "Pferder", "Pferds"] },
-  { singular: "der Vogel", en: "bird", emoji: "🐦", plural: "Vögel", wrong: ["Vogel", "Vögeln", "Vogels"] },
-  { singular: "der Fisch", en: "fish", emoji: "🐟", plural: "Fische", wrong: ["Fischen", "Fischer", "Fischs"] },
-  { singular: "die Kuh", en: "cow", emoji: "🐮", plural: "Kühe", wrong: ["Kuhe", "Kühen", "Kuhs"] },
-  { singular: "das Schwein", en: "pig", emoji: "🐷", plural: "Schweine", wrong: ["Schweinen", "Schweiner", "Schweins"] },
-  { singular: "der Bär", en: "bear", emoji: "🐻", plural: "Bären", wrong: ["Bäre", "Bärer", "Bärs"] },
-  { singular: "der Löwe", en: "lion", emoji: "🦁", plural: "Löwen", wrong: ["Löwe", "Löwer", "Löwes"] },
-  { singular: "der Elefant", en: "elephant", emoji: "🐘", plural: "Elefanten", wrong: ["Elefante", "Elefanter", "Elefants"] },
-  // Essen (countable only)
-  { singular: "das Brot", en: "bread", emoji: "🍞", plural: "Brote", wrong: ["Broten", "Bröter", "Brots"] },
-  { singular: "der Apfel", en: "apple", emoji: "🍎", plural: "Äpfel", wrong: ["Apfel", "Äpfeln", "Apfels"] },
-  { singular: "das Ei", en: "egg", emoji: "🥚", plural: "Eier", wrong: ["Eie", "Eien", "Eis"] },
-  { singular: "die Banane", en: "banana", emoji: "🍌", plural: "Bananen", wrong: ["Banane", "Bananes", "Bananer"] },
-  { singular: "der Kuchen", en: "cake", emoji: "🍰", plural: "Kuchen", wrong: ["Kuchene", "Küchen", "Kuchens"] },
-  // Familie
-  { singular: "die Mutter", en: "mother", emoji: "👩", plural: "Mütter", wrong: ["Mutter", "Muttern", "Mütters"] },
-  { singular: "der Vater", en: "father", emoji: "👨", plural: "Väter", wrong: ["Vater", "Vatern", "Väters"] },
-  { singular: "die Schwester", en: "sister", emoji: "👧", plural: "Schwestern", wrong: ["Schwestere", "Schwesters", "Schwesteren"] },
-  { singular: "der Bruder", en: "brother", emoji: "👦", plural: "Brüder", wrong: ["Bruder", "Brudern", "Brüders"] },
-  { singular: "die Oma", en: "grandma", emoji: "👵", plural: "Omas", wrong: ["Omen", "Oma", "Omaen"] },
-  { singular: "der Opa", en: "grandpa", emoji: "👴", plural: "Opas", wrong: ["Open", "Opa", "Opaen"] },
-  { singular: "das Kind", en: "child", emoji: "🧒", plural: "Kinder", wrong: ["Kinde", "Kinden", "Kinds"] },
-  { singular: "das Baby", en: "baby", emoji: "👶", plural: "Babys", wrong: ["Babies", "Baben", "Babe"] }
-];
-
-window.PluralData = PLURALS;
-
-
-/* ==== js/data-verbs.js ==== */
-/* =====================================================================
-   Konjugations-Karussell (Conjugation Carousel) — present-tense verbs.
-   Each verb stores all six present-tense forms (most reliable for the
-   irregular stem-changers), plus an optional "naive" map: the du/er forms
-   a beginner would produce if they FORGOT the stem change (e.g. "fahrst"
-   instead of "fährst"). That naive form becomes the star distractor.
-     { inf, en, forms: {ich,du,er,wir,ihr,sie}, naive?: {du,er} }
-   Pronoun "er" covers er/sie/es; "sie" is the plural (they).
-   ===================================================================== */
-const VERBS = [
-  // --- regular ---
-  { inf: "spielen", en: "to play", forms: { ich: "spiele", du: "spielst", er: "spielt", wir: "spielen", ihr: "spielt", sie: "spielen" } },
-  { inf: "machen", en: "to do / make", forms: { ich: "mache", du: "machst", er: "macht", wir: "machen", ihr: "macht", sie: "machen" } },
-  { inf: "wohnen", en: "to live", forms: { ich: "wohne", du: "wohnst", er: "wohnt", wir: "wohnen", ihr: "wohnt", sie: "wohnen" } },
-  { inf: "lernen", en: "to learn", forms: { ich: "lerne", du: "lernst", er: "lernt", wir: "lernen", ihr: "lernt", sie: "lernen" } },
-  { inf: "kaufen", en: "to buy", forms: { ich: "kaufe", du: "kaufst", er: "kauft", wir: "kaufen", ihr: "kauft", sie: "kaufen" } },
-  { inf: "gehen", en: "to go", forms: { ich: "gehe", du: "gehst", er: "geht", wir: "gehen", ihr: "geht", sie: "gehen" } },
-  // --- stem-changing a -> ä ---
-  { inf: "fahren", en: "to drive", forms: { ich: "fahre", du: "fährst", er: "fährt", wir: "fahren", ihr: "fahrt", sie: "fahren" }, naive: { du: "fahrst", er: "fahrt" } },
-  { inf: "schlafen", en: "to sleep", forms: { ich: "schlafe", du: "schläfst", er: "schläft", wir: "schlafen", ihr: "schlaft", sie: "schlafen" }, naive: { du: "schlafst", er: "schlaft" } },
-  // --- stem-changing e -> i ---
-  { inf: "essen", en: "to eat", forms: { ich: "esse", du: "isst", er: "isst", wir: "essen", ihr: "esst", sie: "essen" } },
-  { inf: "geben", en: "to give", forms: { ich: "gebe", du: "gibst", er: "gibt", wir: "geben", ihr: "gebt", sie: "geben" }, naive: { du: "gebst", er: "gebt" } },
-  { inf: "nehmen", en: "to take", forms: { ich: "nehme", du: "nimmst", er: "nimmt", wir: "nehmen", ihr: "nehmt", sie: "nehmen" }, naive: { du: "nehmst", er: "nehmt" } },
-  { inf: "sprechen", en: "to speak", forms: { ich: "spreche", du: "sprichst", er: "spricht", wir: "sprechen", ihr: "sprecht", sie: "sprechen" }, naive: { du: "sprechst", er: "sprecht" } },
-  { inf: "helfen", en: "to help", forms: { ich: "helfe", du: "hilfst", er: "hilft", wir: "helfen", ihr: "helft", sie: "helfen" }, naive: { du: "helfst", er: "helft" } },
-  // --- stem-changing e -> ie ---
-  { inf: "sehen", en: "to see", forms: { ich: "sehe", du: "siehst", er: "sieht", wir: "sehen", ihr: "seht", sie: "sehen" }, naive: { du: "sehst", er: "seht" } },
-  { inf: "lesen", en: "to read", forms: { ich: "lese", du: "liest", er: "liest", wir: "lesen", ihr: "lest", sie: "lesen" } },
-  // --- highly irregular ---
-  { inf: "sein", en: "to be", forms: { ich: "bin", du: "bist", er: "ist", wir: "sind", ihr: "seid", sie: "sind" } },
-  { inf: "haben", en: "to have", forms: { ich: "habe", du: "hast", er: "hat", wir: "haben", ihr: "habt", sie: "haben" } }
-];
-
-window.VerbData = VERBS;
 
 
 /* ==== js/data-listening.js ==== */
@@ -1576,16 +1504,10 @@ window.SkillbeeBrand = {
   }
 
   function defaultCases() {
-    return clone(window.CaseData || { accusative: [], dative: [], genitive: [] });
+    return clone(window.CaseData || { items: [] });
   }
   function defaultCompounds() {
     return clone(window.CompoundData || []);
-  }
-  function defaultPlurals() {
-    return clone(window.PluralData || []);
-  }
-  function defaultVerbs() {
-    return clone(window.VerbData || []);
   }
   function defaultListening() {
     return clone(window.ListeningData || []);
@@ -1598,18 +1520,18 @@ window.SkillbeeBrand = {
      Each game owns its content (nothing is shared between games). Shapes:
        words games  (quiz, memory, hangman)  -> { id, name, emoji, english, words: [...] }
        sentence game (scramble)              -> { id, name, emoji, english, sentences: [...] }
-       cases (Fall-Detektiv)                 -> { id, name, accusative, dative, genitive }
-       item games (compounds/plurals/verbs/listening) -> { id, name, items: [...] }
+       cases (Lücken-Text)                   -> { id, name, items: [...] }
+       item games (compounds/listening)      -> { id, name, items: [...] }
      --------------------------------------------------------------------- */
   var WORD_GAMES = ["quiz", "memory", "hangman"];
-  var ITEM_GAMES = ["compounds", "plurals", "verbs", "listening"];
+  var ITEM_GAMES = ["compounds", "listening"];
 
   function gameKind(gameKey) {
     if (gameKey === "scramble") return "sentences";
     if (gameKey === "cases") return "cases";
     if (gameKey === "hoerpaare") return "pairs";
     if (WORD_GAMES.indexOf(gameKey) >= 0) return "words";
-    return "items"; // compounds / plurals / verbs / listening
+    return "items"; // compounds / listening
   }
 
   function exId() {
@@ -1621,16 +1543,13 @@ window.SkillbeeBrand = {
   function sentencesExercise(name, sentences) {
     return { id: exId(), name: name || "Exercise 1", emoji: "🗣️", english: "", sentences: Array.isArray(sentences) ? clone(sentences) : [] };
   }
-  // A fresh exercise for the case game (three sub-lists). `seed` may be a legacy
-  // { accusative, dative, genitive } object whose content is migrated in.
+  // A fresh Lücken-Text exercise: one flat list of sentences. `seed` may be new
+  // ({ items }) or a legacy case-grouped ({ accusative, dative, genitive }) shape.
   function caseExercise(name, seed) {
     seed = seed || {};
-    return {
-      id: exId(), name: name || "Exercise 1",
-      accusative: Array.isArray(seed.accusative) ? clone(seed.accusative) : [],
-      dative: Array.isArray(seed.dative) ? clone(seed.dative) : [],
-      genitive: Array.isArray(seed.genitive) ? clone(seed.genitive) : []
-    };
+    var items = Array.isArray(seed.items) ? clone(seed.items) : [];
+    ["accusative", "dative", "genitive"].forEach(function (k) { if (Array.isArray(seed[k])) items = items.concat(clone(seed[k])); });
+    return { id: exId(), name: name || "Exercise 1", items: items };
   }
   // A fresh exercise for a flat-list game. `items` may be a legacy array migrated in.
   function listExercise(name, items) {
@@ -1653,6 +1572,18 @@ window.SkillbeeBrand = {
     if (typeof e.emoji !== "string") e.emoji = "📚";
     if (typeof e.english !== "string") e.english = "";
     if (!Array.isArray(e.words)) e.words = [];
+    // Optional typed MCQ questions (Vocabulary Quiz): { question:{type,value},
+    // options:[{type,value,correct}] } — keep 4 options with exactly one correct.
+    if (Array.isArray(e.mcq)) {
+      e.mcq = e.mcq.filter(function (m) { return m && typeof m === "object"; }).map(function (m) {
+        var q = (m.question && typeof m.question === "object") ? { type: m.question.type || "text", value: String(m.question.value == null ? "" : m.question.value) } : { type: "text", value: "" };
+        var opts = (Array.isArray(m.options) ? m.options : []).map(function (o) { return { type: (o && o.type) || "text", value: String((o && o.value) || ""), correct: !!(o && o.correct) }; });
+        while (opts.length < 4) opts.push({ type: (opts[0] || {}).type || "text", value: "", correct: false });
+        opts = opts.slice(0, 4);
+        if (!opts.some(function (o) { return o.correct; })) opts[0].correct = true;
+        return { question: q, options: opts };
+      });
+    }
   }
   function normalizeSentencesEx(e) {
     if (!e.id) e.id = exId();
@@ -1690,10 +1621,13 @@ window.SkillbeeBrand = {
   function normalizeCaseEx(e) {
     if (!e.id) e.id = exId();
     if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
+    if (!Array.isArray(e.items)) e.items = [];
+    // Fold the old accusative/dative/genitive sub-groups into one flat list.
     ["accusative", "dative", "genitive"].forEach(function (k) {
-      if (!Array.isArray(e[k])) e[k] = [];
-      e[k] = e[k].map(migrateCaseEntry);
+      if (Array.isArray(e[k]) && e[k].length) e.items = e.items.concat(e[k]);
+      delete e[k];
     });
+    e.items = e.items.map(migrateCaseEntry);
   }
   function normalizeListEx(e) {
     if (!e.id) e.id = exId();
@@ -1776,8 +1710,6 @@ window.SkillbeeBrand = {
       scramble: st.map(function (t) { return topicToExercise(t, "sentences"); }),
       cases: [caseExercise("Exercise 1", defaultCases())],
       compounds: [listExercise("Exercise 1", defaultCompounds())],
-      plurals: [listExercise("Exercise 1", defaultPlurals())],
-      verbs: [listExercise("Exercise 1", defaultVerbs())],
       listening: [listExercise("Exercise 1", defaultListening())],
       hoerpaare: [pairsExercise("Exercise 1", defaultPairsQuestions())]
     };
@@ -2004,11 +1936,9 @@ window.SkillbeeBrand = {
        when no specific exercise is chosen, e.g. by the audio helper). */
     casesData: function () {
       var e = this.exercise("cases");
-      return e ? { accusative: e.accusative, dative: e.dative, genitive: e.genitive } : { accusative: [], dative: [], genitive: [] };
+      return { items: (e && Array.isArray(e.items)) ? e.items : [] };
     },
     compoundsData: function () { var e = this.exercise("compounds"); return e ? e.items : []; },
-    pluralsData: function () { var e = this.exercise("plurals"); return e ? e.items : []; },
-    verbsData: function () { var e = this.exercise("verbs"); return e ? e.items : []; },
     listeningData: function () { var e = this.exercise("listening"); return e ? e.items : []; },
 
     newId: function (prefix) {
@@ -4865,33 +4795,26 @@ document.addEventListener("DOMContentLoaded", App.init);
         renderGames(body);
       }
 
-      /* ---- Lücken-Text: fill-in sentences (one or many blanks), by case ---- */
+      /* ---- Lücken-Text: fill-in sentences (one or many blanks) ---- */
       function renderCases(body, ex) {
+        if (!Array.isArray(ex.items)) ex.items = [];
         body.appendChild(
           el("p", {
             class: "adm-hint",
             html:
               "These sentences power <b>✏️ Lücken-Text</b> (fill in the blank) in Live Class Mode. Type <code>___</code> wherever a word is missing — " +
               "<b>one or several blanks per sentence</b> — then give the correct word for each. The <b>word bank</b> (answers + wrong choices) is what students " +
-              "pick from in Tap mode; leave it blank and the game fills in plausible articles. Group by case; the class plays <b>all</b> the exercise's sentences. Changes save automatically."
+              "pick from in Tap mode; leave it blank and the game fills in plausible articles. The class plays <b>all</b> the exercise's sentences. Changes save automatically."
           })
         );
-        var C = ex;
-        [
-          ["accusative", "Accusative — Level 1", "🥇"],
-          ["dative", "Dative — Level 2", "🥈"],
-          ["genitive", "Genitive — Level 3", "🥉"]
-        ].forEach(function (sec) {
-          var key = sec[0];
-          var list = C[key] || (C[key] = []);
-          body.appendChild(el("h3", { class: "adm-case-h", text: sec[2] + " " + sec[1] + "  (" + list.length + ")" }));
-          list.forEach(function (entry, i) { body.appendChild(caseRow(entry, list, i)); });
-          body.appendChild(addRowBtn("+ Sentence", function () {
-            list.push({ sentence: "", blanks: [], wordBank: [], explanation: "" });
-            store.save();
-            render();
-          }));
-        });
+        var list = ex.items;
+        if (!list.length) body.appendChild(emptyState("No sentences yet — add the first one below."));
+        list.forEach(function (entry, i) { body.appendChild(caseRow(entry, list, i)); });
+        body.appendChild(addRowBtn("+ Sentence", function () {
+          list.push({ sentence: "", blanks: [], wordBank: [], explanation: "" });
+          store.save();
+          render();
+        }));
       }
 
       // Count the ___ gaps in a sentence and keep entry.blanks the same length,
@@ -4983,52 +4906,6 @@ document.addEventListener("DOMContentLoaded", App.init);
         }));
       }
 
-      /* ---- Plural-Palast: noun → correct plural (+ optional wrong forms) ---- */
-      function renderPlurals(body, ex) {
-        body.appendChild(
-          el("p", {
-            class: "adm-hint",
-            html:
-              "These nouns power <b>🏰 Plural-Palast</b> in Live Class Mode. Give each noun (with der/die/das) its correct plural. " +
-              "<b>Wrong options</b> are optional — leave blank and the game auto-picks plausible wrong plurals; type your own (comma-separated) to control them. Changes save automatically."
-          })
-        );
-        var list = ex.items;
-        body.appendChild(bulkTranslateBar(list.map(function (p) {
-          return { obj: p, enKey: "en", getGerman: function () { return p.singular; } };
-        })));
-        body.appendChild(el("div", { class: "adm-row adm-row-head adm-plural-row" }, [
-          el("span", { text: "Icon" }),
-          el("span", { text: "Singular (with article)" }),
-          el("span", { text: "English" }),
-          el("span", { text: "Plural (correct)" }),
-          el("span", { text: "Wrong options (optional)" }),
-          el("span", {})
-        ]));
-        if (!list.length) body.appendChild(emptyState("No nouns yet."));
-        list.forEach(function (p, i) {
-          var emojiInp = input(p, "emoji", "🙂", "adm-emoji", 6);
-          var singInp = input(p, "singular", "e.g. der Hund", "adm-input");
-          var enCell = enField(p, "en", function () { return p.singular; }, "dog");
-          var fill = wireAutoEmoji(emojiInp, p, function () { return [p.singular, p.en]; });
-          if (fill) { singInp.addEventListener("change", fill); var ei = enCell.querySelector("input"); if (ei) ei.addEventListener("change", fill); }
-          body.appendChild(el("div", { class: "adm-row adm-plural-row" }, [
-            emojiInp, singInp, enCell,
-            input(p, "plural", "e.g. Hunde", "adm-input"),
-            optionsInput(p, "wrong", "auto — or e.g. Hunden, Hünde"),
-            el("button", {
-              class: "adm-del", html: "✕", attrs: { title: "Remove" },
-              on: { click: function () { list.splice(i, 1); store.save(); render(); } }
-            })
-          ]));
-        });
-        body.appendChild(addRowBtn("+ Noun", function () {
-          list.push({ emoji: "", singular: "", en: "", plural: "", wrong: [] });
-          store.save();
-          render();
-        }));
-      }
-
       /* ---- Hör gut zu!: spoken word + look-alike options ---- */
       function renderListening(body, ex) {
         body.appendChild(
@@ -5071,49 +4948,6 @@ document.addEventListener("DOMContentLoaded", App.init);
           el("span", { class: "adm-listen-lbl", text: "Look-alikes" }),
           linesInput(w, "distractors", "one per line — leave blank to auto-pick from the other prompts", "adm-ta grow")
         ]));
-        return card;
-      }
-
-      /* ---- Konjugations-Karussell: a verb's six present-tense forms ---- */
-      function renderVerbs(body, ex) {
-        body.appendChild(
-          el("p", {
-            class: "adm-hint",
-            html:
-              "These verbs power <b>🎠 Konjugations-Karussell</b> in Live Class Mode. Fill in all six present-tense forms — " +
-              "the game shows the verb + a pronoun and asks students to pick the right one. Wrong options are built from the verb's " +
-              "other forms automatically. Changes save automatically."
-          })
-        );
-        var list = ex.items;
-        if (!list.length) body.appendChild(emptyState("No verbs yet."));
-        list.forEach(function (v, i) { body.appendChild(verbCard(v, list, i)); });
-        body.appendChild(addRowBtn("+ Verb", function () {
-          list.push({ inf: "", en: "", forms: { ich: "", du: "", er: "", wir: "", ihr: "", sie: "" } });
-          store.save();
-          render();
-        }));
-      }
-
-      function verbCard(v, list, index) {
-        if (!v.forms) v.forms = { ich: "", du: "", er: "", wir: "", ihr: "", sie: "" };
-        var card = el("div", { class: "adm-verb" });
-        card.appendChild(el("div", { class: "adm-case-line" }, [
-          input(v, "inf", "e.g. fahren", "adm-input"),
-          input(v, "en", "to drive", "adm-input"),
-          el("button", {
-            class: "adm-del", html: "🗑", attrs: { title: "Remove verb" },
-            on: { click: function () { list.splice(index, 1); store.save(); render(); } }
-          })
-        ]));
-        var forms = el("div", { class: "adm-verb-forms" });
-        [["ich", "ich"], ["du", "du"], ["er", "er/sie/es"], ["wir", "wir"], ["ihr", "ihr"], ["sie", "sie"]].forEach(function (pair) {
-          forms.appendChild(el("label", { class: "adm-verb-field" }, [
-            el("span", { class: "adm-verb-lbl", text: pair[1] }),
-            input(v.forms, pair[0], "", "adm-input")
-          ]));
-        });
-        card.appendChild(forms);
         return card;
       }
 
@@ -5173,8 +5007,6 @@ document.addEventListener("DOMContentLoaded", App.init);
       var LIVE_GAMES = [
         { id: "cases", name: "Lücken-Text", emoji: "✏️", color: "#8b5cf6" },
         { id: "compounds", name: "Wortmonster", emoji: "🧟", color: "#22c55e" },
-        { id: "plurals", name: "Plural-Palast", emoji: "🏰", color: "#e0731c" },
-        { id: "verbs", name: "Konjugations-Karussell", emoji: "🎠", color: "#e11d74" },
         { id: "listening", name: "Hör gut zu!", emoji: "👂", color: "#0ea5b7" },
         { id: "hoerpaare", name: "Match the Following", emoji: "🔗", color: "#06b6d4" }
       ];
@@ -5242,7 +5074,7 @@ document.addEventListener("DOMContentLoaded", App.init);
       // Count the content rows inside a single exercise, given the game's kind.
       function exerciseItemCount(kind, ex) {
         if (!ex) return 0;
-        if (kind === "cases") return (ex.accusative || []).length + (ex.dative || []).length + (ex.genitive || []).length;
+        if (kind === "cases") return (ex.items || []).length || ((ex.accusative || []).length + (ex.dative || []).length + (ex.genitive || []).length);
         if (kind === "words") return (ex.words || []).length;
         if (kind === "sentences") return (ex.sentences || []).length;
         if (kind === "pairs") return (ex.questions || []).length;
@@ -5252,8 +5084,6 @@ document.addEventListener("DOMContentLoaded", App.init);
         if (kind === "words") return " words";
         if (kind === "sentences") return " sentences";
         if (kind === "pairs") return " questions";
-        if (id === "plurals") return " nouns";
-        if (id === "verbs") return " verbs";
         if (id === "listening") return " prompts";
         return " words";
       }
@@ -5364,13 +5194,11 @@ document.addEventListener("DOMContentLoaded", App.init);
         body.appendChild(el("div", { class: "adm-subhead" }, [
           el("h3", { class: "adm-game-title", text: game.emoji + " " + game.name + "  ·  " + ex.name })
         ]));
-        if (game.kind === "words") renderWordsExercise(body, ex);
+        if (game.kind === "words") { renderWordsExercise(body, ex); if (currentGame === "quiz") renderMcqSection(body, ex); }
         else if (game.kind === "sentences") renderSentencesExercise(body, ex);
         else if (game.kind === "pairs") renderPairsExercise(body, ex);
         else if (currentGame === "cases") renderCases(body, ex);
         else if (currentGame === "compounds") renderCompounds(body, ex);
-        else if (currentGame === "plurals") renderPlurals(body, ex);
-        else if (currentGame === "verbs") renderVerbs(body, ex);
         else if (currentGame === "listening") renderListening(body, ex);
       }
 
@@ -5412,6 +5240,70 @@ document.addEventListener("DOMContentLoaded", App.init);
           );
         });
         body.appendChild(addRowBtn("+ Word", function () { list.push({ de: "", en: "", emoji: "" }); store.save(); render(); }));
+      }
+
+      /* ---- MCQ questions (Vocabulary Quiz): picture / audio / icon questions.
+             Question + options each pick a tile type; one type covers all four
+             options (they read cleanest the same). Reuses the Match-the-Following
+             type picker + per-type inputs. */
+      function renderMcqSection(body, ex) {
+        if (!Array.isArray(ex.mcq)) ex.mcq = [];
+        body.appendChild(el("div", { class: "adm-cpair-sep", text: "Picture / audio / icon questions (optional)" }));
+        body.appendChild(el("p", { class: "adm-hint", text: "Each is one multiple-choice question. Choose the question's type + value, then a single type for all four options, fill them in, and tap ○ to mark the correct one. The word list above still auto-makes text questions." }));
+        ex.mcq.forEach(function (m, mi) { body.appendChild(mcqQuestionCard(m, ex.mcq, mi)); });
+        body.appendChild(addRowBtn("+ Picture/audio question", function () {
+          ex.mcq.push({ question: { type: "text", value: "" }, options: [{ type: "text", value: "", correct: true }, { type: "text", value: "", correct: false }, { type: "text", value: "", correct: false }, { type: "text", value: "", correct: false }] });
+          store.save(); render();
+        }));
+      }
+
+      function mcqQuestionCard(m, arr, index) {
+        if (!m.question || typeof m.question !== "object") m.question = { type: "text", value: "" };
+        if (!Array.isArray(m.options) || m.options.length < 2) m.options = [{ type: "text", value: "", correct: true }, { type: "text", value: "", correct: false }, { type: "text", value: "", correct: false }, { type: "text", value: "", correct: false }];
+        var optType = m.options[0].type || "text";
+        var card = el("div", { class: "adm-cpair" });
+        card.appendChild(el("div", { class: "adm-cpair-topbar" }, [
+          el("span", { class: "adm-cpair-n", text: "Question " + (index + 1) }),
+          el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove question" }, on: { click: function () { arr.splice(index, 1); store.save(); render(); } } })
+        ]));
+        // Question: type picker + one value input of that type.
+        card.appendChild(el("div", { class: "adm-mcq-q" }, [
+          typePickerRow("Question", m.question, "type"),
+          el("div", { class: "adm-mcq-field" }, [entryInput(m.question, "value", m.question.type)])
+        ]));
+        // Options: one type for all four, then a correct-marker + value each.
+        card.appendChild(mcqOptionsTypePicker(m));
+        var optsWrap = el("div", { class: "adm-mcq-options" });
+        m.options.slice(0, 4).forEach(function (o) {
+          optsWrap.appendChild(el("div", { class: "adm-mcq-opt" }, [
+            mcqCorrectRadio(m, o),
+            el("div", { class: "adm-mcq-field" }, [entryInput(o, "value", optType)])
+          ]));
+        });
+        card.appendChild(optsWrap);
+        return card;
+      }
+
+      // One picker that sets ALL four options to the same type (values kept).
+      function mcqOptionsTypePicker(m) {
+        var TYPES = [["text", "Text", "🔤"], ["icon", "Icon", "😀"], ["image", "Image", "🖼"], ["audio", "Audio", "🔊"]];
+        var cur = (m.options[0] || {}).type || "text";
+        var chipRow = el("div", { class: "adm-typechips" });
+        TYPES.forEach(function (T) {
+          chipRow.appendChild(el("button", { class: "adm-typechip" + (cur === T[0] ? " sel" : ""), attrs: { type: "button", title: T[1] }, on: { click: function () {
+            if (cur === T[0]) return;
+            m.options.forEach(function (o) { o.type = T[0]; });
+            store.save(); render();
+          } } }, [el("span", { class: "adm-typechip-ic", text: T[2] }), el("span", { class: "adm-typechip-lbl", text: T[1] })]));
+        });
+        return el("div", { class: "adm-typepick" }, [el("span", { class: "adm-side-lbl", text: "Options are" }), chipRow]);
+      }
+
+      // Round radio marking the one correct option (clicking clears the others).
+      function mcqCorrectRadio(m, o) {
+        var btn = el("button", { class: "adm-mcq-radio" + (o.correct ? " sel" : ""), attrs: { type: "button", title: "Mark as the correct answer" }, text: o.correct ? "✓" : "" });
+        btn.addEventListener("click", function () { m.options.forEach(function (x) { x.correct = (x === o); }); store.save(); render(); });
+        return btn;
       }
 
       /* ---- Sentences exercise editor (Satzbau / Sentence Scramble) ---- */
@@ -6165,18 +6057,17 @@ document.addEventListener("DOMContentLoaded", App.init);
       var store = window.ContentStore;
       var list = (store && store.exercisesFor) ? store.exercisesFor("cases") : [];
       return list.map(function (e) {
-        var n = (e.accusative || []).length + (e.dative || []).length + (e.genitive || []).length;
+        var n = (e.items || []).length || ((e.accusative || []).length + (e.dative || []).length + (e.genitive || []).length);
         return { id: e.id, name: e.name, emoji: "✏️", english: n + (n === 1 ? " sentence" : " sentences") };
       });
     },
     buildRounds: function (topic) {
       var store = window.ContentStore;
       var e = (store && store.exercise) ? store.exercise("cases", topic && topic.id) : null;
-      var C = e || window.CaseData || { accusative: [], dative: [], genitive: [] };
-      // A case exercise mixes the three case groups it contains; a future flat
-      // content set may instead expose an "items" array — accept both.
-      var pool = (C.accusative || []).concat(C.dative || []).concat(C.genitive || []);
-      if (!pool.length && Array.isArray(C.items)) pool = C.items;
+      var C = e || window.CaseData || { items: [] };
+      // One flat list of sentences (older content may still be split into the
+      // accusative/dative/genitive groups — read those too, for safety).
+      var pool = Array.isArray(C.items) && C.items.length ? C.items.slice() : (C.accusative || []).concat(C.dative || []).concat(C.genitive || []);
       var norm = pool.map(normBlankEntry).filter(Boolean);
       return kit().sample(norm, Math.min(10, norm.length)).map(function (s) {
         return {
@@ -6390,246 +6281,6 @@ document.addEventListener("DOMContentLoaded", App.init);
     },
     correctLabel: function (round) { return round.gender + " " + round.compound; },
     speakOnReveal: function (round) { return round.gender + " " + round.compound; }
-  };
-
-  /* ---- Plural-Palast (Plural Palace): pick a noun's correct plural ---- */
-  var pluralAdapter = {
-    meta: { name: "Plural-Palast", emoji: "🏰", contentType: "plurals" },
-    timeLimit: 20000,
-    pickLabel: "Exercise",
-    getTopics: function () {
-      var store = window.ContentStore;
-      var list = (store && store.exercisesFor) ? store.exercisesFor("plurals") : [];
-      return list.map(function (e) {
-        var n = (e.items || []).length;
-        return { id: e.id, name: e.name, emoji: "🏰", english: n + (n === 1 ? " noun" : " nouns") };
-      });
-    },
-    buildRounds: function (topic) {
-      var store = window.ContentStore;
-      var e = (store && store.exercise) ? store.exercise("plurals", topic && topic.id) : null;
-      var all = ((e && e.items) || window.PluralData || [])
-        .filter(function (p) { return p && p.singular && p.plural; });
-      var autoPool = all.map(function (p) { return p.plural; });
-      return kit().sample(all, Math.min(10, all.length)).map(function (p) {
-        return {
-          type: "plural", de: p.singular, en: p.en || "", emoji: p.emoji || "",
-          options: kit().shuffle([p.plural].concat(wrongOptions(p.wrong, p.plural, autoPool, 3))),
-          answer: p.plural, correct: p.plural
-        };
-      });
-    },
-    hostContent: function (el, round) {
-      return el("div", { class: "live-q" }, [
-        el("div", { class: "live-q-tag", text: "🏰 What is the plural?" }),
-        el("div", { class: "live-q-word" }, [
-          document.createTextNode(round.de + " "),
-          kit().speakerButton(round.de)
-        ]),
-        el("div", { class: "live-q-options board" }, round.options.map(function (opt, i) {
-          return el("div", { class: "live-opt board", attrs: { style: "--c:" + COLORS[i] } }, [
-            el("span", { class: "opt-shape", text: SHAPES[i] }),
-            el("span", { class: "opt-text", text: opt })
-          ]);
-        }))
-      ]);
-    },
-    playerContent: function (el, round, api) {
-      return el("div", { class: "live-q-options phone" }, round.options.map(function (opt, i) {
-        return el("button", {
-          class: "live-opt phone", attrs: { style: "--c:" + COLORS[i] },
-          on: { click: function () { api.submit({ choice: opt }); } }
-        }, [el("span", { class: "opt-shape", text: SHAPES[i] }), el("span", { class: "opt-text", text: opt })]);
-      }));
-    },
-    score: function (round, payload, elapsedMs, timeLimit) {
-      if (!payload || payload.choice !== round.answer) return { correct: false, points: 0 };
-      var frac = Math.max(0, 1 - elapsedMs / timeLimit);
-      return { correct: true, points: Math.round(500 + 500 * frac) };
-    },
-    correctLabel: function (round) { return "die " + round.correct; },
-    speakOnReveal: function (round) { return "die " + round.correct; }
-  };
-
-  /* ---- Konjugations-Karussell (Conjugation Carousel): conjugate a verb ---- */
-  var PRON_LABEL = { ich: "ich", du: "du", er: "er/sie/es", wir: "wir", ihr: "ihr", sie: "sie (they)" };
-  // Ask about du / er more often — that's where the stem changes (and errors) are.
-  var PRON_WEIGHTED = ["du", "du", "er", "er", "ich", "wir", "ihr", "sie"];
-
-  var verbAdapter = {
-    meta: { name: "Konjugations-Karussell", emoji: "🎠", contentType: "verbs" },
-    timeLimit: 15000, // fast-paced warm-up
-    pickLabel: "Exercise",
-    getTopics: function () {
-      var store = window.ContentStore;
-      var list = (store && store.exercisesFor) ? store.exercisesFor("verbs") : [];
-      return list.map(function (e) {
-        var n = (e.items || []).length;
-        return { id: e.id, name: e.name, emoji: "🎠", english: n + (n === 1 ? " verb" : " verbs") };
-      });
-    },
-    buildRounds: function (topic) {
-      var store = window.ContentStore;
-      var e = (store && store.exercise) ? store.exercise("verbs", topic && topic.id) : null;
-      var all = ((e && e.items) || window.VerbData || [])
-        .filter(function (v) { return v && v.inf && v.forms && v.forms.du; });
-      return kit().sample(all, Math.min(10, all.length)).map(function (v) {
-        var pron = kit().shuffle(PRON_WEIGHTED.slice())[0];
-        var correct = v.forms[pron];
-        // Distractors: the star trap (naive "no stem change" form, for du/er) plus
-        // this verb's other pronoun-forms — all realistic mistakes.
-        var opts = [];
-        if (v.naive && v.naive[pron] && v.naive[pron] !== correct) opts.push(v.naive[pron]);
-        var others = Object.keys(v.forms).map(function (k) { return v.forms[k]; })
-          .filter(function (f) { return f !== correct; });
-        kit().shuffle(others).forEach(function (f) { if (opts.length < 3 && opts.indexOf(f) < 0) opts.push(f); });
-        return {
-          type: "verb", inf: v.inf, en: v.en || "", pron: pron, pronLabel: PRON_LABEL[pron] || pron,
-          options: kit().shuffle([correct].concat(opts.slice(0, 3))), answer: correct, correct: correct
-        };
-      });
-    },
-    hostContent: function (el, round) {
-      return el("div", { class: "live-q" }, [
-        el("div", { class: "live-q-tag", text: "🎠 Conjugate the verb" }),
-        el("div", { class: "live-q-word" }, [
-          document.createTextNode(round.inf + "  —  " + round.pronLabel + " "),
-          kit().speakerButton(round.inf)
-        ]),
-        round.en ? el("div", { class: "live-q-en", text: round.en }) : null,
-        el("div", { class: "live-q-options board" }, round.options.map(function (opt, i) {
-          return el("div", { class: "live-opt board", attrs: { style: "--c:" + COLORS[i] } }, [
-            el("span", { class: "opt-shape", text: SHAPES[i] }),
-            el("span", { class: "opt-text", text: opt })
-          ]);
-        }))
-      ]);
-    },
-    playerContent: function (el, round, api) {
-      return el("div", { class: "live-q-options phone" }, round.options.map(function (opt, i) {
-        return el("button", {
-          class: "live-opt phone", attrs: { style: "--c:" + COLORS[i] },
-          on: { click: function () { api.submit({ choice: opt }); } }
-        }, [el("span", { class: "opt-shape", text: SHAPES[i] }), el("span", { class: "opt-text", text: opt })]);
-      }));
-    },
-    score: function (round, payload, elapsedMs, timeLimit) {
-      if (!payload || payload.choice !== round.answer) return { correct: false, points: 0 };
-      var frac = Math.max(0, 1 - elapsedMs / timeLimit);
-      return { correct: true, points: Math.round(500 + 500 * frac) };
-    },
-    correctLabel: function (round) { return round.pron + " " + round.correct; },
-    speakOnReveal: function (round) { return round.pron + " " + round.correct; }
-  };
-
-  /* ---- Uhrzeit-Blitz (Clock Flash): read the analog clock in German ---- */
-  // Pure generator — no content bank. German colloquial time follows fixed
-  // rules from the hands, so we build the correct phrase + plausible wrong
-  // ones (the halb trap, off-by-a-quarter, nach/vor swap, wrong hour).
-  var NUMW = ["", "eins", "zwei", "drei", "vier", "fünf", "sechs", "sieben", "acht", "neun", "zehn", "elf", "zwölf"];
-  function hourWord(h, uhr) { if (h === 1) return uhr ? "ein" : "eins"; return NUMW[h]; }
-  function nextHour(h) { return (h % 12) + 1; }
-  function prevHour(h) { return ((h + 10) % 12) + 1; }
-  function pad2(n) { return n < 10 ? "0" + n : "" + n; }
-  var MIN_NACH = { 5: "fünf", 10: "zehn", 20: "zwanzig" };
-  var MIN_VOR = { 40: "zwanzig", 50: "zehn", 55: "fünf" };
-  function timePhrase(h, m) {
-    var nh = nextHour(h);
-    if (m === 0) return hourWord(h, true) + " Uhr";
-    if (m === 15) return "viertel nach " + hourWord(h, false);
-    if (m === 30) return "halb " + hourWord(nh, false);
-    if (m === 45) return "viertel vor " + hourWord(nh, false);
-    if (MIN_NACH[m]) return MIN_NACH[m] + " nach " + hourWord(h, false);
-    if (MIN_VOR[m]) return MIN_VOR[m] + " vor " + hourWord(nh, false);
-    return hourWord(h, true) + " Uhr";
-  }
-  function timeDistractors(h, m, correct) {
-    var nh = nextHour(h), ph = prevHour(h), cands = [];
-    if (m === 30) cands.push("halb " + hourWord(h, false)); // THE trap: "half past h"
-    if (m === 15) cands.push("viertel vor " + hourWord(nh, false));
-    else if (m === 45) cands.push("viertel nach " + hourWord(h, false));
-    else if (MIN_NACH[m]) cands.push(MIN_NACH[m] + " vor " + hourWord(nh, false));
-    else if (MIN_VOR[m]) cands.push(MIN_VOR[m] + " nach " + hourWord(h, false));
-    cands.push(timePhrase(nh, m), timePhrase(ph, m)); // wrong hour
-    if (m === 0) cands.push("viertel nach " + hourWord(h, false));
-    if (m === 15) cands.push("halb " + hourWord(nh, false));
-    if (m === 30) cands.push("viertel nach " + hourWord(h, false));
-    if (m === 45) cands.push("halb " + hourWord(nh, false));
-    var seen = {}, out = [];
-    cands.forEach(function (c) { if (c && c !== correct && !seen[c]) { seen[c] = 1; out.push(c); } });
-    return out.slice(0, 3);
-  }
-  function clockSVG(h, m) {
-    function hand(angle, len, w, color) {
-      var r = (angle - 90) * Math.PI / 180;
-      return '<line x1="100" y1="100" x2="' + (100 + len * Math.cos(r)).toFixed(1) + '" y2="' +
-        (100 + len * Math.sin(r)).toFixed(1) + '" stroke="' + color + '" stroke-width="' + w + '" stroke-linecap="round"/>';
-    }
-    var ticks = "";
-    for (var i = 0; i < 12; i++) {
-      var a = (i * 30 - 90) * Math.PI / 180, big = i % 3 === 0;
-      ticks += '<line x1="' + (100 + 78 * Math.cos(a)).toFixed(1) + '" y1="' + (100 + 78 * Math.sin(a)).toFixed(1) +
-        '" x2="' + (100 + 90 * Math.cos(a)).toFixed(1) + '" y2="' + (100 + 90 * Math.sin(a)).toFixed(1) +
-        '" stroke="' + (big ? "#3b4de8" : "#c9d2e3") + '" stroke-width="' + (big ? 4 : 2) + '"/>';
-    }
-    var hAng = ((h % 12) + m / 60) * 30, mAng = m * 6;
-    return '<svg viewBox="0 0 200 200" class="clock-svg" role="img" aria-label="clock">' +
-      '<circle cx="100" cy="100" r="94" fill="#fff" stroke="#3b4de8" stroke-width="4"/>' + ticks +
-      hand(hAng, 50, 7, "#1b2440") + hand(mAng, 74, 4, "#3b4de8") +
-      '<circle cx="100" cy="100" r="5" fill="#1b2440"/></svg>';
-  }
-
-  var timeAdapter = {
-    meta: { name: "Uhrzeit-Blitz", emoji: "🕐", contentType: "time" },
-    timeLimit: 20000,
-    getTopics: function () {
-      return [{ id: "all", name: "Uhrzeit-Blitz", english: "Random times", emoji: "🕐" }];
-    },
-    buildRounds: function () {
-      // weight toward the quarter times (and halb — the trap)
-      var MINS = [0, 15, 30, 30, 45, 5, 10, 20, 40, 50, 55];
-      var used = {}, rounds = [];
-      for (var n = 0; n < 10; n++) {
-        var h, m, key, guard = 0;
-        do { h = 1 + Math.floor(Math.random() * 12); m = kit().sample(MINS, 1)[0]; key = h + ":" + m; guard++; }
-        while (used[key] && guard < 30);
-        used[key] = 1;
-        var correct = timePhrase(h, m);
-        rounds.push({
-          type: "time", h: h, m: m, correct: correct, answer: correct,
-          explanation: "(" + h + ":" + pad2(m) + ")",
-          options: kit().shuffle([correct].concat(timeDistractors(h, m, correct)))
-        });
-      }
-      return rounds;
-    },
-    hostContent: function (el, round) {
-      return el("div", { class: "live-q" }, [
-        el("div", { class: "live-q-tag", text: "🕐 What time is it?" }),
-        el("div", { class: "clock-wrap", html: clockSVG(round.h, round.m) }),
-        el("div", { class: "live-q-options board" }, round.options.map(function (opt, i) {
-          return el("div", { class: "live-opt board", attrs: { style: "--c:" + COLORS[i] } }, [
-            el("span", { class: "opt-shape", text: SHAPES[i] }),
-            el("span", { class: "opt-text", text: opt })
-          ]);
-        }))
-      ]);
-    },
-    playerContent: function (el, round, api) {
-      return el("div", { class: "live-q-options phone" }, round.options.map(function (opt, i) {
-        return el("button", {
-          class: "live-opt phone", attrs: { style: "--c:" + COLORS[i] },
-          on: { click: function () { api.submit({ choice: opt }); } }
-        }, [el("span", { class: "opt-shape", text: SHAPES[i] }), el("span", { class: "opt-text", text: opt })]);
-      }));
-    },
-    score: function (round, payload, elapsedMs, timeLimit) {
-      if (!payload || payload.choice !== round.answer) return { correct: false, points: 0 };
-      var frac = Math.max(0, 1 - elapsedMs / timeLimit);
-      return { correct: true, points: Math.round(500 + 500 * frac) };
-    },
-    correctLabel: function (round) { return round.correct; },
-    speakOnReveal: function (round) { return round.correct; }
   };
 
   /* ---- Hör gut zu! (Listen Carefully!): pick OR type the word you heard ----
@@ -6863,9 +6514,6 @@ document.addEventListener("DOMContentLoaded", App.init);
     memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" }),
     cases: blanksAdapter,
     wortmonster: compoundAdapter,
-    plural: pluralAdapter,
-    verben: verbAdapter,
-    uhrzeit: timeAdapter,
     listen: listenAdapter,
     hoerpaare: hoerpaareAdapter
   };
@@ -8125,8 +7773,8 @@ window.LiveMode = (function () {
 /* =====================================================================
    Solo/Offline wrappers for the Live-Class games.
    ---------------------------------------------------------------------
-   Fall-Detektiv, Wortmonster, Plural-Palast, Konjugations-Karussell,
-   Uhrzeit-Blitz, Hör gut zu! and Hör-Paare were originally Live-only.
+   Lücken-Text, Wortmonster, Hör gut zu! and Match the Following were
+   originally Live-only.
    This registers a Solo version of each by reusing the very same content
    logic the Live adapters already provide (buildRounds / score /
    correctLabel / speakOnReveal). The result plays like the existing Solo
@@ -8148,12 +7796,6 @@ window.LiveMode = (function () {
     { key: "wortmonster", name: "Wortmonster", emoji: "🧟", color: "#22c55e", layout: "player",
       tag: "🧟 Build the German word",
       description: "Smash two parts together to build German compound nouns." },
-    { key: "plural", name: "Plural-Palast", emoji: "🏰", color: "#e0731c", layout: "prompt",
-      description: "Pick the correct plural form and master those tricky endings." },
-    { key: "verben", name: "Konjugations-Karussell", emoji: "🎠", color: "#e11d74", layout: "prompt",
-      description: "Conjugate the verb for each pronoun — fast-paced practice." },
-    { key: "uhrzeit", name: "Uhrzeit-Blitz", emoji: "🕐", color: "#2f80c4", layout: "prompt",
-      description: "Read the clock and pick the German time. No setup needed." },
     { key: "listen", name: "Hör gut zu!", emoji: "👂", color: "#0ea5b7", layout: "prompt",
       description: "Listen to the German word and pick what you heard." },
     { key: "hoerpaare", name: "Match the Following", emoji: "🔗", color: "#06b6d4", layout: "match",

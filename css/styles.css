@@ -641,6 +641,16 @@ kbd {
 .adm-icon-opt.sel { border-color: var(--skb); background: var(--skb-tint); }
 .adm-modal-cancel { align-self: flex-end; }
 
+/* MCQ authoring (Vocabulary Quiz — picture/audio/icon questions) */
+.adm-mcq-q { margin-bottom: 10px; }
+.adm-mcq-field { margin-top: 6px; }
+.adm-mcq-field .adm-input { width: 100%; }
+.adm-mcq-options { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.adm-mcq-opt { display: flex; align-items: center; gap: 8px; }
+.adm-mcq-opt .adm-mcq-field { flex: 1 1 0; min-width: 0; margin-top: 0; }
+.adm-mcq-radio { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line); background: #fff; cursor: pointer; font-weight: 900; color: var(--good); line-height: 1; }
+.adm-mcq-radio.sel { border-color: var(--good); background: #eafaf7; }
+
 /* Auto-translate (German → English) — button, AI-draft marker, bulk bar */
 .adm-en-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
 .adm-en-cell > input { flex: 1 1 60px; min-width: 0; }

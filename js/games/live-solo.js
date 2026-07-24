@@ -1,8 +1,8 @@
 /* =====================================================================
    Solo/Offline wrappers for the Live-Class games.
    ---------------------------------------------------------------------
-   Fall-Detektiv, Wortmonster, Plural-Palast, Konjugations-Karussell,
-   Uhrzeit-Blitz, Hör gut zu! and Hör-Paare were originally Live-only.
+   Lücken-Text, Wortmonster, Hör gut zu! and Match the Following were
+   originally Live-only.
    This registers a Solo version of each by reusing the very same content
    logic the Live adapters already provide (buildRounds / score /
    correctLabel / speakOnReveal). The result plays like the existing Solo
@@ -24,12 +24,6 @@
     { key: "wortmonster", name: "Wortmonster", emoji: "🧟", color: "#22c55e", layout: "player",
       tag: "🧟 Build the German word",
       description: "Smash two parts together to build German compound nouns." },
-    { key: "plural", name: "Plural-Palast", emoji: "🏰", color: "#e0731c", layout: "prompt",
-      description: "Pick the correct plural form and master those tricky endings." },
-    { key: "verben", name: "Konjugations-Karussell", emoji: "🎠", color: "#e11d74", layout: "prompt",
-      description: "Conjugate the verb for each pronoun — fast-paced practice." },
-    { key: "uhrzeit", name: "Uhrzeit-Blitz", emoji: "🕐", color: "#2f80c4", layout: "prompt",
-      description: "Read the clock and pick the German time. No setup needed." },
     { key: "listen", name: "Hör gut zu!", emoji: "👂", color: "#0ea5b7", layout: "prompt",
       description: "Listen to the German word and pick what you heard." },
     { key: "hoerpaare", name: "Match the Following", emoji: "🔗", color: "#06b6d4", layout: "match",
