@@ -551,6 +551,9 @@ kbd {
 .adm-blank-num { font-size: 0.72rem; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; }
 .adm-blank-field > .adm-article { flex: 0 0 90px; }
 .adm-blank-hint { color: var(--ink-soft); font-size: 0.85rem; font-style: italic; }
+/* Short label in front of a full-width field (word bank / explanation) */
+.adm-field-lbl { flex: 0 0 72px; font-size: 0.72rem; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; }
+.adm-case-line > .adm-input { min-width: 0; }
 
 /* Wortmonster (compounds) editor */
 .adm-compound-row {

@@ -374,9 +374,15 @@
           })
         ]));
         card.appendChild(blanksWrap);
+        // Word bank + explanation each get their own full-width row with a short
+        // label, so the guidance is never clipped inside a narrow input.
         card.appendChild(el("div", { class: "adm-case-line" }, [
-          optionsInput(entry, "wordBank", "word bank — answers + wrong choices (comma-separated; blank = auto)"),
-          input(entry, "explanation", "why it's correct (shown at reveal)", "adm-input grow")
+          el("span", { class: "adm-field-lbl", text: "Word bank" }),
+          optionsInput(entry, "wordBank", "e.g. den, der, dem, des  ·  answers + wrong choices, blank = auto")
+        ]));
+        card.appendChild(el("div", { class: "adm-case-line" }, [
+          el("span", { class: "adm-field-lbl", text: "Why" }),
+          input(entry, "explanation", "shown to students at reveal (optional)", "adm-input grow")
         ]));
         renderBlanks();
         return card;
