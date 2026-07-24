@@ -739,17 +739,16 @@ input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf
 .listen-play[disabled] { opacity: 0.6; }
 .listen-typing-note { margin: 6px 0; font-weight: 800; color: var(--skb-dark); font-size: clamp(1rem, 2.6vw, 1.5rem); }
 
-/* Hör gut zu! — type mode word-by-word diff (on the student's phone) */
+/* Hör gut zu! — type mode diff: a normal sentence with the words coloured in place */
 .diff-card { text-align: center; }
-.diff-label { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-soft); margin: 14px 0 6px; }
-.diff-line { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
-.diff-word { padding: 4px 9px; border-radius: 8px; font-weight: 800; font-size: 1.15rem; overflow-wrap: anywhere; }
-.diff-correct { background: #eafaf7; color: var(--good); }
-.diff-wrong { background: #ffeef0; color: var(--bad); }
-.diff-extra { background: #ffeef0; color: var(--bad); text-decoration: line-through; }
-.diff-line.ref .diff-word { background: transparent; color: var(--ink); font-weight: 700; }
-.diff-line.ref .diff-word.diff-missing { border: 2px dashed var(--bad); color: var(--bad); font-weight: 800; opacity: 0.85; }
-.diff-score { color: var(--ink-soft); font-weight: 700; margin-top: 4px; }
+.diff-label { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-soft); margin: 14px 0 4px; }
+.diff-line { line-height: 1.6; font-size: clamp(1.1rem, 2.8vw, 1.4rem); font-weight: 800; max-width: 92%; margin: 0 auto; overflow-wrap: anywhere; }
+.diff-correct { color: var(--good); }
+.diff-wrong { color: var(--bad); }
+.diff-extra { color: var(--bad); text-decoration: line-through; }
+.diff-line.ref { color: var(--ink); font-weight: 700; }
+.diff-line.ref .diff-missing { color: var(--bad); text-decoration: underline dotted; text-underline-offset: 3px; }
+.diff-score { color: var(--ink-soft); font-weight: 700; margin-top: 6px; }
 .diff-wait { margin-top: 12px; }
 .live-q-emoji { font-size: 3.5rem; margin-bottom: 10px; }
 .live-q-options.board { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }

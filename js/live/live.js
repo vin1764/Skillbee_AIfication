@@ -994,12 +994,21 @@ window.LiveMode = (function () {
     // the scored result (null while still waiting for the reveal).
     function typeDiffNode(r, text, adapter, me) {
       var d = adapter.diff(text, r.correct || "");
+      // Render each line as a normal, flowing sentence — words separated by real
+      // spaces, coloured in place (green/red), not boxed chips.
+      function inline(items, clsFor) {
+        var out = [];
+        items.forEach(function (x, i) {
+          if (i > 0) out.push(" ");
+          out.push(el("span", { class: clsFor(x), text: x.word }));
+        });
+        return out;
+      }
       var typedLine = el("div", { class: "diff-line" }, d.typedRow.length
-        ? d.typedRow.map(function (x) { return el("span", { class: "diff-word diff-" + x.status, text: x.word }); })
-        : [el("span", { class: "diff-word diff-wrong", text: "(nothing)" })]);
-      var correctLine = el("div", { class: "diff-line ref" }, d.correctRow.map(function (x) {
-        return el("span", { class: "diff-word" + (x.missing ? " diff-missing" : ""), text: x.word });
-      }));
+        ? inline(d.typedRow, function (x) { return "diff-word diff-" + x.status; })
+        : [el("span", { class: "diff-word diff-wrong", text: "(nothing typed)" })]);
+      var correctLine = el("div", { class: "diff-line ref" },
+        inline(d.correctRow, function (x) { return "diff-word" + (x.missing ? " diff-missing" : ""); }));
       var body = [
         el("div", { class: "player-name-tag", text: stu.name }),
         el("div", { class: "diff-label", text: "You typed" }),
