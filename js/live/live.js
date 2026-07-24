@@ -420,7 +420,14 @@ window.LiveMode = (function () {
       window.LiveDB.updateSession(code, {
         status: "question", questionIndex: i, reveal: null,
         round: {
-          index: i, type: r.type, de: r.de || null, emoji: r.emoji || null, options: r.options || null,
+          index: i, type: r.type, de: r.de || null, emoji: r.emoji || null,
+          // MCQ: send the typed question + options WITHOUT the `correct` flag so a
+          // phone can't peek which option wins. Other games keep options as-is
+          // (e.g. Hör gut zu!'s tap board sends plain option strings).
+          question: (adapter.mcq && r.question) ? r.question : null,
+          options: (adapter.mcq && r.options)
+            ? r.options.map(function (o) { return { type: o.type, value: o.value }; })
+            : (r.options || null),
           sentence: r.sentence || null, blank: r.blank || null, clueWord: r.clueWord || null,
           meaning: r.meaning || null, tiles: r.tiles || null,
           words: r.words || null, pairs: r.pairs || null, speed: r.speed || null,
@@ -576,6 +583,9 @@ window.LiveMode = (function () {
         // Lücken-Text: now that the round is over it's safe to ship the correct
         // answers so each phone can mark its own blanks right/wrong.
         if (adapter.blanks) { revealDoc.blanks = r.blanks; revealDoc.sentence = r.sentence; }
+        // MCQ: ship the correct option (type+value) so a picture/audio answer can
+        // be rendered at reveal, not just its text value.
+        if (adapter.mcq) { revealDoc.correctOption = (r.options || []).filter(function (o) { return o.correct; })[0] || null; }
         window.LiveDB.updateSession(code, { status: "reveal", scores: scores, reveal: revealDoc });
         var german = adapter.speakOnReveal(r);
         if (german) kit.speak(german);
@@ -648,6 +658,17 @@ window.LiveMode = (function () {
           el("div", { class: "reveal-label", text: "Correct answer" }),
           el("div", { class: "reveal-sentence lt" }, blanksFilled(r.sentence, function (id) { return { cls: "rs-fill", text: byId[id] != null ? byId[id] : "___" }; })),
           r.explanation ? el("div", { class: "reveal-why", text: r.explanation }) : null
+        ]);
+      } else if (adapter.mcq) {
+        // Render the winning option by its type (a picture answer shows the
+        // picture, an icon the icon, etc.) — not just its raw value.
+        var co = (r.options || []).filter(function (o) { return o.correct; })[0];
+        answerBlock = el("div", { class: "reveal-answer" }, [
+          el("div", { class: "reveal-label", text: "Correct answer" }),
+          (co && co.type && co.type !== "text")
+            ? el("div", { class: "reveal-value mcq-reveal" }, window.MatchTiles.content(el, co))
+            : el("div", { class: "reveal-value", text: adapter.correctLabel(r) }),
+          r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null
         ]);
       } else {
         answerBlock = el("div", { class: "reveal-answer" }, [
@@ -1169,7 +1190,10 @@ window.LiveMode = (function () {
         el("div", { class: "player-name-tag", text: stu.name }),
         el("div", { class: "live-big-emoji", text: correct ? "✅" : (me && me.answered ? "❌" : "⏰") }),
         el("h2", { text: correct ? "Correct!" : (me && me.answered ? "Not quite" : "Too slow") }),
-        el("p", { class: "live-sub", text: "Answer: " + (s.reveal ? s.reveal.correct : "") }),
+        // Show the winning answer by type (image/icon/audio), else its text value.
+        (s.reveal && s.reveal.correctOption && s.reveal.correctOption.type && s.reveal.correctOption.type !== "text")
+          ? el("div", { class: "mcq-result-answer" }, [el("span", { class: "live-sub", text: "Answer:" }), el("div", { class: "mcq-result-tile mt-" + s.reveal.correctOption.type }, window.MatchTiles.content(el, s.reveal.correctOption))])
+          : el("p", { class: "live-sub", text: "Answer: " + (s.reveal ? s.reveal.correct : "") }),
         s.reveal && s.reveal.explanation ? el("p", { class: "player-why", text: s.reveal.explanation }) : null,
         el("div", { class: "player-points", text: (pts > 0 ? "+" + pts : "0") + " points" })
       ])]));

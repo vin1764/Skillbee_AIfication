@@ -1,7 +1,9 @@
 /* =====================================================================
-   GAME: Vokabel-Quiz  (Kahoot-style multiple choice)
-   Show a German word (or English word) and 4 answer options with a
-   timer. Right answer = points + streak bonus. Great for the whole class.
+   GAME: Vokabel-Quiz  (Kahoot-style multiple choice — now a general MCQ)
+   A question with 4 answer options and a timer. Right answer = points +
+   streak bonus; faster = more. The question AND each option can be text,
+   audio, image or icon (via MatchTiles) — the quick default recreates the
+   classic German-word ↔ English-options vocab quiz.
    ===================================================================== */
 (function () {
   App.register({
@@ -14,35 +16,64 @@
 
     mount(stage, api) {
       const { kit, topic, addScore, el } = api;
-      if (!topic.words || topic.words.length === 0) {
-        kit.notice(stage, "No words yet", "Add words to this topic via ⚙️ Manage content.", api);
+      const MT = window.MatchTiles;
+
+      // Build the pool of canonical questions:
+      //   { q:{type,value}, options:[{type,value,correct}], promptSpeak, revealDe }
+      const pool = [];
+      // 1) Authored typed MCQ (image/audio/icon/text) if present.
+      (topic.mcq || []).forEach((m) => {
+        if (!m || !m.question) return;
+        const q = { type: m.question.type || "text", value: String(m.question.value || "") };
+        const options = (m.options || [])
+          .map((o) => ({ type: (o && o.type) || "text", value: String((o && o.value) || ""), correct: !!(o && o.correct) }))
+          .filter((o) => o.value !== "");
+        if (!q.value || options.length < 2 || !options.some((o) => o.correct)) return;
+        const audioCorrect = options.filter((o) => o.correct && o.type === "audio")[0];
+        pool.push({ q, options: kit.shuffle(options.slice(0, 4)), promptSpeak: false, revealDe: q.type === "audio" ? q.value : (audioCorrect ? audioCorrect.value : null) });
+      });
+      // 2) Quick auto-generate from vocab words (both directions, as before).
+      const words = (topic.words || []).filter((w) => w.de && w.en);
+      const room = Math.max(0, 8 - pool.length);
+      const sampled = kit.sample(words, Math.min(room, words.length));
+      sampled.forEach((w, i) => {
+        const g2e = i % 2 === 0; // ask German→English, then English→German, …
+        const prompt = g2e ? w.de : w.en;
+        const answer = g2e ? w.en : w.de;
+        const others = words.filter((x) => (g2e ? x.en : x.de) !== answer);
+        const distract = kit.sample(others, 3).map((x) => (g2e ? x.en : x.de));
+        const options = kit.shuffle(
+          [{ type: "text", value: answer, correct: true }].concat(distract.map((d) => ({ type: "text", value: d, correct: false })))
+        );
+        pool.push({ q: { type: "text", value: prompt }, options, promptSpeak: g2e, revealDe: w.de, emoji: w.emoji || "" });
+      });
+
+      if (!pool.length) {
+        kit.notice(stage, "No content yet", "Add words (or MCQ questions) to this topic via ⚙️ Manage content.", api);
         return;
       }
-      const words = topic.words;
-      const TOTAL = Math.min(8, words.length);
-      const pool = kit.sample(words, TOTAL);
-      let index = 0;
-      let correct = 0;
-      let streak = 0;
-      let timer = null;
-      let timeLeft = 0;
-      // Ask German -> English half the time, English -> German the other half.
-      let askGermanToEnglish = true;
+
+      const TOTAL = pool.length;
+      let index = 0, correct = 0, streak = 0, timer = null, timeLeft = 0, locked = false;
 
       const wrap = el("div", { class: "quiz" });
       stage.appendChild(wrap);
 
+      function questionNode(q, promptSpeak) {
+        if (q.type === "text") {
+          return el("div", { class: "quiz-word" }, [document.createTextNode(q.value + " "), promptSpeak ? kit.speakerButton(q.value) : null]);
+        }
+        if (q.type === "audio") {
+          return el("div", { class: "quiz-audio" }, [el("button", { class: "btn primary big", html: "🔊 Play the audio", on: { click: () => { try { MT.play(kit, q); } catch (e) {} } } })]);
+        }
+        if (q.type === "image") return el("div", { class: "quiz-media" }, [el("img", { class: "mcq-q-img", attrs: { src: q.value, alt: "" } })]);
+        return el("div", { class: "quiz-media" }, [el("span", { class: "mcq-q-icon", text: q.value })]); // icon
+      }
+
       function render() {
         clearInterval(timer);
-        const q = pool[index];
-        askGermanToEnglish = index % 2 === 0;
-        const prompt = askGermanToEnglish ? q.de : q.en;
-        const answer = askGermanToEnglish ? q.en : q.de;
-
-        // Build 3 wrong options from the same topic.
-        const others = words.filter((w) => (askGermanToEnglish ? w.en : w.de) !== answer);
-        const distractors = kit.sample(others, 3).map((w) => (askGermanToEnglish ? w.en : w.de));
-        const options = kit.shuffle([answer, ...distractors]);
+        locked = false;
+        const item = pool[index];
 
         wrap.innerHTML = "";
         wrap.appendChild(
@@ -52,84 +83,62 @@
             el("div", { class: "quiz-streak", text: streak > 1 ? `🔥 ${streak} streak` : "" })
           ])
         );
-
-        const bar = el("div", { class: "timer-bar" }, [el("div", { class: "timer-fill", attrs: { id: "tfill" } })]);
-        wrap.appendChild(bar);
-
+        wrap.appendChild(el("div", { class: "timer-bar" }, [el("div", { class: "timer-fill", attrs: { id: "tfill" } })]));
         wrap.appendChild(
           el("div", { class: "quiz-question" }, [
-            el("div", { class: "quiz-lang-tag", text: askGermanToEnglish ? "What does this mean?" : "What's the German word?" }),
-            el("div", { class: "quiz-word" }, [
-              document.createTextNode(prompt + " "),
-              askGermanToEnglish ? kit.speakerButton(q.de) : null
-            ]),
-            q.emoji ? el("div", { class: "quiz-emoji", text: q.emoji }) : null
+            el("div", { class: "quiz-lang-tag", text: item.q.type === "audio" ? "Listen — which one?" : "What is it?" }),
+            questionNode(item.q, item.promptSpeak)
           ])
         );
 
         const optWrap = el("div", { class: "quiz-options" });
         const shapes = ["🔺", "🔷", "⬤", "⬛"];
-        options.forEach((opt, i) => {
-          optWrap.appendChild(
-            el("button", {
-              class: "quiz-opt",
-              attrs: { style: `--i:${i}` },
-              on: { click: (e) => choose(e.currentTarget, opt, answer, q) }
-            }, [
-              el("span", { class: "opt-shape", text: shapes[i] }),
-              el("span", { class: "opt-text", text: opt })
-            ])
-          );
+        const buttons = [];
+        item.options.forEach((opt, i) => {
+          const btn = el("button", { class: "quiz-opt mt-" + (opt.type || "text"), attrs: { style: `--i:${i}` } },
+            [el("span", { class: "opt-shape", text: shapes[i] })].concat(MT.content(el, opt)));
+          let armed = false;
+          btn.addEventListener("click", () => {
+            if (locked) return;
+            if (MT.isAudio(opt)) {
+              try { MT.play(kit, opt); } catch (e) {}
+              if (!armed) { armed = true; btn.classList.add("armed"); const l = btn.querySelector(".match-slabel"); if (l) l.textContent = "Tap again to choose"; return; }
+            }
+            choose(opt, item);
+          });
+          buttons.push({ opt, btn });
+          optWrap.appendChild(btn);
         });
         wrap.appendChild(optWrap);
+        wrap.__buttons = buttons;
 
-        // start timer
         timeLeft = 100;
         const fill = document.getElementById("tfill");
         timer = setInterval(() => {
           timeLeft -= 1.5;
           if (fill) fill.style.width = Math.max(0, timeLeft) + "%";
-          if (timeLeft <= 0) {
-            clearInterval(timer);
-            reveal(null, answer, q);
-          }
+          if (timeLeft <= 0) { clearInterval(timer); choose(null, item); }
         }, 60);
       }
 
-      function choose(btn, opt, answer, q) {
+      function choose(chosen, item) {
+        if (locked) return;
+        locked = true;
         clearInterval(timer);
-        reveal(btn, answer, q, opt);
-      }
-
-      function reveal(btn, answer, q, chosen) {
-        const buttons = wrap.querySelectorAll(".quiz-opt");
-        buttons.forEach((b) => {
-          b.disabled = true;
-          const txt = b.querySelector(".opt-text").textContent;
-          if (txt === answer) b.classList.add("correct");
-          else if (b === btn) b.classList.add("wrong");
+        const wasRight = !!(chosen && chosen.correct);
+        (wrap.__buttons || []).forEach((b) => {
+          b.btn.disabled = true;
+          if (b.opt.correct) b.btn.classList.add("correct");
+          else if (b.opt === chosen) b.btn.classList.add("wrong");
         });
-
-        const wasRight = chosen === answer;
         if (wasRight) {
-          const bonus = Math.round(timeLeft / 10); // faster = more
-          const points = 10 + bonus;
-          correct++;
-          streak++;
-          addScore(points);
-          kit.beep("good");
+          addScore(10 + Math.round(timeLeft / 10)); // faster = more
+          correct++; streak++; kit.beep("good");
         } else {
-          streak = 0;
-          kit.beep("bad");
-          // Speak the correct German word so students hear it.
-          kit.speak(q.de);
+          streak = 0; kit.beep("bad");
+          if (item.revealDe) { try { kit.speak(item.revealDe); } catch (e) {} } // hear the German
         }
-
-        setTimeout(() => {
-          index++;
-          if (index < TOTAL) render();
-          else finish();
-        }, 1200);
+        setTimeout(() => { index++; if (index < TOTAL) render(); else finish(); }, 1200);
       }
 
       function finish() {

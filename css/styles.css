@@ -243,6 +243,16 @@ kbd {
 .opt-shape { font-size: 1.2rem; }
 .quiz-opt.correct { border-color: var(--good); background: #eafaf7; }
 .quiz-opt.wrong { border-color: var(--bad); background: #ffeef0; }
+.quiz-opt.armed { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(11, 63, 221, 0.18); }
+/* Solo quiz — typed question media + typed option tiles */
+.quiz-audio { margin: 14px 0; }
+.quiz-media { display: flex; justify-content: center; margin: 8px 0 14px; }
+.quiz-opt .match-mtext { flex: 1; text-align: left; }
+.quiz-opt .match-memoji { flex: 0 0 auto; }
+.quiz-opt .match-icon-big { flex: 1; text-align: center; font-size: 2rem; line-height: 1; }
+.quiz-opt .match-img { flex: 1; min-width: 0; max-height: 80px; object-fit: contain; border-radius: 8px; }
+.quiz-opt .match-ico { flex: 0 0 auto; font-size: 1.5rem; }
+.quiz-opt .match-slabel { flex: 1; text-align: left; color: var(--ink-soft); font-weight: 700; }
 
 /* =====================================================================
    SOLO wrappers for the Live games (reuse the Live adapter UI)
@@ -815,6 +825,28 @@ input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf
 .live-opt.board { font-size: clamp(1.1rem, 2.4vw, 1.6rem); }
 /* answers wrap for long text — options may be whole sentences (Hör gut zu!) */
 .opt-text { flex: 1; overflow-wrap: anywhere; line-height: 1.3; }
+
+/* General MCQ (was Vokabel-Quiz) — typed question media + typed option tiles */
+.live-q-media { margin: 12px 0 4px; }
+.mcq-q-img { max-width: min(60vh, 480px); max-height: 46vh; border-radius: 14px; box-shadow: 0 8px 24px rgba(11, 21, 51, 0.18); }
+.mcq-q-icon { font-size: clamp(4rem, 16vw, 9rem); line-height: 1; }
+.live-q-audio { margin: 14px 0; }
+/* MatchTiles content rendered inside the coloured option tile */
+.live-opt .match-mtext { flex: 1; text-align: left; font-size: inherit; overflow-wrap: anywhere; line-height: 1.3; color: #fff; }
+.live-opt .match-memoji { flex: 0 0 auto; }
+.live-opt .match-icon-big { flex: 1; text-align: center; font-size: 2.2rem; line-height: 1; }
+.live-opt .match-img { flex: 1; min-width: 0; max-height: 84px; object-fit: contain; border-radius: 8px; background: rgba(255, 255, 255, 0.92); padding: 3px; }
+.live-opt.board .match-img { max-height: 130px; }
+.live-opt .match-ico { flex: 0 0 auto; font-size: 1.6rem; }
+.live-opt .match-slabel { flex: 1; text-align: left; color: rgba(255, 255, 255, 0.92); font-weight: 700; font-size: 0.9rem; }
+.live-opt.armed { outline: 4px solid #fff; outline-offset: -4px; }
+/* MCQ reveal — the winning option rendered by its type */
+.reveal-value.mcq-reveal { display: flex; justify-content: center; align-items: center; gap: 8px; }
+.reveal-value.mcq-reveal .match-img { max-height: 40vh; border-radius: 12px; }
+.reveal-value.mcq-reveal .match-icon-big { font-size: 4rem; }
+.mcq-result-answer { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 6px 0; }
+.mcq-result-tile .match-img { max-height: 130px; border-radius: 10px; }
+.mcq-result-tile .match-icon-big { font-size: 3rem; }
 .reveal-value { overflow-wrap: anywhere; }
 
 /* audio-speed preview row in the Live host setup */

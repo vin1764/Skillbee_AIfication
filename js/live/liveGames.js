@@ -38,63 +38,106 @@
     return out.slice(0, n);
   }
 
-  /* A "choice" game: board shows a German word, phones show 4 tap buttons. */
+  /* ---- General MCQ (was Vokabel-Quiz): a question + up to 4 options, where the
+     question AND each option is independently text · audio · image · icon. The
+     fast, timed, speed-scored Kahoot flow is unchanged — only rendering adapts.
+     Quick content comes from vocab words (German text ↔ English text options);
+     typed content comes from an authored `mcq` list. */
+  function mcqCorrect(round) { return (round.options || []).filter(function (o) { return o.correct; })[0] || null; }
+  function mcqSide(s, fallback) {
+    if (s && typeof s === "object" && typeof s.type === "string") return { type: s.type, value: String(s.value == null ? "" : s.value) };
+    return { type: fallback || "text", value: String(s == null ? "" : s) };
+  }
+  // German-ish text to pronounce at reveal: an audio side if there is one, else
+  // the text question, else a text answer.
+  function mcqSpeak(round) {
+    var q = round.question || {};
+    if (q.type === "audio") return q.value;
+    var c = mcqCorrect(round);
+    if (c && c.type === "audio") return c.value;
+    if (q.type === "text") return q.value;
+    if (c && c.type === "text") return c.value;
+    return null;
+  }
+  // A phone option button rendered by type + a shape badge. Audio options play
+  // (preview) on the first tap and arm; a second tap on the armed tile submits —
+  // so a student can hear it before committing. Every other type submits on the
+  // first tap, so the fast Kahoot feel is unchanged.
+  function mcqOptionButton(el, opt, i, submit) {
+    var armed = false;
+    var btn = el("button", { class: "live-opt phone mt-" + (opt.type || "text"), attrs: { style: "--c:" + COLORS[i] } },
+      [el("span", { class: "opt-shape", text: SHAPES[i] })].concat(window.MatchTiles.content(el, opt)));
+    btn.addEventListener("click", function () {
+      if (window.MatchTiles.isAudio(opt)) {
+        try { window.MatchTiles.play(kit(), opt); } catch (e) {}
+        if (!armed) { armed = true; btn.classList.add("armed"); var l = btn.querySelector(".match-slabel"); if (l) l.textContent = "Tap again to choose"; return; }
+      }
+      submit();
+    });
+    return btn;
+  }
+
   function choiceAdapter(meta) {
     return {
       meta: meta,
       timeLimit: 20000,
       pickLabel: "Exercise",
+      mcq: true,
       buildRounds: function (topic) {
+        var rounds = [];
+        // 1) Authored typed MCQ (image/audio/icon/text questions + options).
+        (topic.mcq || []).forEach(function (m) {
+          if (!m || !m.question) return;
+          var q = mcqSide(m.question, "text");
+          var opts = (m.options || []).map(function (o) { return { type: (o && o.type) || "text", value: String((o && o.value) || ""), correct: !!(o && o.correct) }; })
+            .filter(function (o) { return o.value !== ""; });
+          if (!q.value || opts.length < 2 || !opts.some(function (o) { return o.correct; })) return;
+          rounds.push({ type: "mcq", question: q, options: kit().shuffle(opts.slice(0, 4)) });
+        });
+        // 2) Quick auto-generate from vocab → German-text question, English-text options.
         var words = (topic.words || []).filter(function (w) { return w.de && w.en; });
-        var picked = kit().sample(words, Math.min(10, words.length));
-        return picked.map(function (w) {
+        kit().sample(words, Math.min(10, words.length)).forEach(function (w) {
           var autoPool = words.filter(function (x) { return x.en !== w.en; }).map(function (x) { return x.en; });
           var distract = wrongOptions(w.distractors, w.en, autoPool, 3);
-          var options = kit().shuffle([w.en].concat(distract));
-          return { type: "choice", de: w.de, emoji: w.emoji || "", options: options, answer: w.en };
+          var opts = [{ type: "text", value: w.en, correct: true }].concat(distract.map(function (d) { return { type: "text", value: d, correct: false }; }));
+          rounds.push({ type: "mcq", question: { type: "text", value: w.de }, options: kit().shuffle(opts), emoji: w.emoji || "" });
         });
+        return rounds.slice(0, 10);
       },
       hostContent: function (el, round) {
+        var q = round.question || { type: "text", value: "" };
+        var qNode;
+        if (q.type === "text") {
+          qNode = el("div", { class: "live-q-word" }, [document.createTextNode(q.value + " "), kit().speakerButton(q.value)]);
+        } else if (q.type === "audio") {
+          qNode = el("div", { class: "live-q-audio" }, [el("button", { class: "btn primary big listen-play", html: "🔊 Play the audio", on: { click: function () { try { window.MatchTiles.play(kit(), q); } catch (e) {} } } })]);
+        } else if (q.type === "image") {
+          qNode = el("div", { class: "live-q-media" }, [el("img", { class: "mcq-q-img", attrs: { src: q.value, alt: "" } })]);
+        } else {
+          qNode = el("div", { class: "live-q-media" }, [el("span", { class: "mcq-q-icon", text: q.value })]);
+        }
         return el("div", { class: "live-q" }, [
-          el("div", { class: "live-q-tag", text: "What does this mean?" }),
-          el("div", { class: "live-q-word" }, [
-            document.createTextNode(round.de + " "),
-            kit().speakerButton(round.de)
-          ]),
-          // NOTE: the word's emoji is deliberately NOT shown here — for colours,
-          // numbers, etc. it would give away the answer. It appears at reveal.
+          el("div", { class: "live-q-tag", text: q.type === "audio" ? "Listen — which one?" : "What is it?" }),
+          qNode,
           el("div", { class: "live-q-options board" }, round.options.map(function (opt, i) {
-            return el("div", { class: "live-opt board", attrs: { style: "--c:" + COLORS[i] } }, [
-              el("span", { class: "opt-shape", text: SHAPES[i] }),
-              el("span", { class: "opt-text", text: opt })
-            ]);
+            return el("div", { class: "live-opt board mt-" + (opt.type || "text"), attrs: { style: "--c:" + COLORS[i] } },
+              [el("span", { class: "opt-shape", text: SHAPES[i] })].concat(window.MatchTiles.content(el, opt)));
           }))
         ]);
       },
       playerContent: function (el, round, api) {
         return el("div", { class: "live-q-options phone" }, round.options.map(function (opt, i) {
-          return el("button", {
-            class: "live-opt phone",
-            attrs: { style: "--c:" + COLORS[i] },
-            on: { click: function () { api.submit({ choice: opt }); } }
-          }, [
-            el("span", { class: "opt-shape", text: SHAPES[i] }),
-            el("span", { class: "opt-text", text: opt })
-          ]);
+          return mcqOptionButton(el, opt, i, function () { api.submit({ choice: i }); });
         }));
       },
       score: function (round, payload, elapsedMs, timeLimit) {
-        var correct = payload && payload.choice === round.answer;
-        if (!correct) return { correct: false, points: 0 };
-        var frac = Math.max(0, 1 - elapsedMs / timeLimit); // decays over the window
+        var opt = (round.options || [])[payload && payload.choice];
+        if (!opt || !opt.correct) return { correct: false, points: 0 };
+        var frac = Math.max(0, 1 - elapsedMs / timeLimit); // faster = more, decays over the window
         return { correct: true, points: Math.round(500 + 500 * frac) };
       },
-      correctLabel: function (round) {
-        return round.answer;
-      },
-      speakOnReveal: function (round) {
-        return round.de;
-      }
+      correctLabel: function (round) { var c = mcqCorrect(round); return c ? c.value : ""; },
+      speakOnReveal: function (round) { return mcqSpeak(round); }
     };
   }
 
@@ -841,24 +884,24 @@
     return out;
   }
 
-  // Shared tile renderer + audio playback, so the Live board and the Solo board
-  // render the four tile types identically. `side` = { type, value, emoji? }.
+  // Shared tile renderer + audio playback, so the Match board, the Solo board and
+  // the MCQ boards render the four tile types identically. `side` = { type,
+  // value, emoji? }. content() returns just the inner nodes (so callers like the
+  // quiz can wrap them in their own tile with a shape/colour badge).
   window.MatchTiles = {
-    render: function (el, side) {
+    content: function (el, side) {
       var type = (side && side.type) || "text";
       var value = side && side.value != null ? side.value : "";
-      var kids = [];
-      if (type === "audio") {
-        kids = [el("span", { class: "match-ico", text: "🔊" }), el("span", { class: "match-slabel", text: "Tap to hear" })];
-      } else if (type === "icon") {
-        kids = [el("span", { class: "match-icon-big", text: value })];
-      } else if (type === "image") {
-        kids = [el("img", { class: "match-img", attrs: { src: value, alt: "", loading: "lazy" } })];
-      } else { // text
-        if (side && side.emoji) kids.push(el("span", { class: "match-memoji", text: side.emoji }));
-        kids.push(el("span", { class: "match-mtext", text: value }));
-      }
-      return el("button", { class: "match-tile mt-" + type }, kids);
+      if (type === "audio") return [el("span", { class: "match-ico", text: "🔊" }), el("span", { class: "match-slabel", text: "Tap to hear" })];
+      if (type === "icon") return [el("span", { class: "match-icon-big", text: value })];
+      if (type === "image") return [el("img", { class: "match-img", attrs: { src: value, alt: "", loading: "lazy" } })];
+      var kids = []; // text
+      if (side && side.emoji) kids.push(el("span", { class: "match-memoji", text: side.emoji }));
+      kids.push(el("span", { class: "match-mtext", text: value }));
+      return kids;
+    },
+    render: function (el, side) {
+      return el("button", { class: "match-tile mt-" + ((side && side.type) || "text") }, this.content(el, side));
     },
     isAudio: function (side) { return !!(side && side.type === "audio"); },
     // Play an audio side: a hosted/uploaded file plays as-is; plain German text
