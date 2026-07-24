@@ -613,7 +613,7 @@
         { id: "plurals", name: "Plural-Palast", emoji: "🏰", color: "#e0731c" },
         { id: "verbs", name: "Konjugations-Karussell", emoji: "🎠", color: "#e11d74" },
         { id: "listening", name: "Hör gut zu!", emoji: "👂", color: "#0ea5b7" },
-        { id: "hoerpaare", name: "Hör-Paare", emoji: "🎧", color: "#06b6d4" }
+        { id: "hoerpaare", name: "Match the Following", emoji: "🔗", color: "#06b6d4" }
       ];
       function liveKind(id) {
         if (id === "cases") return "cases";
@@ -890,7 +890,7 @@
           el("p", {
             class: "adm-hint",
             html:
-              "These power <b>🎧 Hör-Paare</b> in Live Class Mode. Each <b>question</b> is one matching round: students hear the German words and tap the English meaning that matches. " +
+              "These power <b>🔗 Match the Following</b> in Live Class Mode. Each <b>question</b> is one matching round: students hear the German words and tap the English meaning that matches. " +
               "Give every question <b>at least 3 words</b>. The German is spoken with the app's voice (generated audio where available, otherwise the device voice). Changes save automatically."
           })
         );

@@ -794,24 +794,72 @@
     speakOnReveal: function (round) { return round.correct; }
   };
 
-  /* ---- Hör-Paare (Listen & Match Pairs): tap a speaker, then its meaning ----
+  /* ---- Match the Following (was Hör-Paare): tap one tile from each side ----
      UNLIKE every other Live game, this one is INDIVIDUAL: each phone works
-     through the same set of words at its own pace, with its own shuffled tiles.
+     through the same set of pairs at its own pace, with its own shuffled tiles.
      The host shows a live progress bar per student instead of a shared prompt.
      Scoring rewards completeness and speed, and deducts for wrong taps. The
-     Live controller (live.js) branches on `match: true` to drive this flow. */
+     Live controller (live.js) branches on `match: true` to drive this flow.
 
-  // A round's usable pairs — each needs both German (to speak) and English.
-  function validPairs(q) {
-    return (((q && q.words) || [])).filter(function (w) {
-      return w && w.de && w.en;
-    }).map(function (w) {
-      return { de: w.de, en: w.en, emoji: w.emoji || "" };
+     Generalised so EITHER side of a pair is independently one of four tile
+     types — text · icon (emoji) · image (url/data-uri) · audio (German text
+     spoken on tap). The classic audio↔English content still works unchanged:
+     legacy { de, en, emoji } rows normalise to a spoken German tile ↔ an
+     English text tile (with the emoji kept as decoration). */
+
+  // Normalise one content "question" into canonical pairs { q, a } where each
+  // side is { type, value } (+ optional emoji decoration on a text side).
+  function roundPairs(q) {
+    if (q && Array.isArray(q.pairs)) {
+      // New schema: [{ question:{type,value}, answer:{type,value} }, …]
+      return q.pairs.map(function (p) {
+        if (!p || !p.question || !p.answer) return null;
+        var qv = String(p.question.value == null ? "" : p.question.value).trim();
+        var av = String(p.answer.value == null ? "" : p.answer.value).trim();
+        if (!qv || !av) return null;
+        return { q: { type: p.question.type || "text", value: qv }, a: { type: p.answer.type || "text", value: av } };
+      }).filter(Boolean);
+    }
+    // Legacy schema: [{ de, en, emoji }] → spoken German ↔ English text.
+    return ((q && q.words) || []).filter(function (w) { return w && w.de && w.en; }).map(function (w) {
+      return { q: { type: "audio", value: w.de }, a: { type: "text", value: w.en, emoji: w.emoji || "" } };
     });
   }
 
+  // Shared tile renderer + audio playback, so the Live board and the Solo board
+  // render the four tile types identically. `side` = { type, value, emoji? }.
+  window.MatchTiles = {
+    render: function (el, side) {
+      var type = (side && side.type) || "text";
+      var value = side && side.value != null ? side.value : "";
+      var kids = [];
+      if (type === "audio") {
+        kids = [el("span", { class: "match-ico", text: "🔊" }), el("span", { class: "match-slabel", text: "Tap to hear" })];
+      } else if (type === "icon") {
+        kids = [el("span", { class: "match-icon-big", text: value })];
+      } else if (type === "image") {
+        kids = [el("img", { class: "match-img", attrs: { src: value, alt: "", loading: "lazy" } })];
+      } else { // text
+        if (side && side.emoji) kids.push(el("span", { class: "match-memoji", text: side.emoji }));
+        kids.push(el("span", { class: "match-mtext", text: value }));
+      }
+      return el("button", { class: "match-tile mt-" + type }, kids);
+    },
+    isAudio: function (side) { return !!(side && side.type === "audio"); },
+    // Play an audio side: a hosted/uploaded file plays as-is; plain German text
+    // is spoken via VoiceBox (pre-generated Azure voice, else the device voice).
+    play: function (kit, side, rate) {
+      var v = side && side.value != null ? String(side.value) : "";
+      if (!v) return;
+      if (/^(https?:|data:audio|blob:)/i.test(v) || /\.(mp3|ogg|wav|m4a)(\?|$)/i.test(v)) {
+        try { var a = new Audio(v); if (rate && rate !== 1) { try { a.playbackRate = rate; } catch (e) {} } a.play().catch(function () {}); return; } catch (e) {}
+      }
+      try { kit.speak(v, { rate: rate || 1 }); } catch (e) {}
+    }
+  };
+
   var hoerpaareAdapter = {
-    meta: { name: "Hör-Paare", emoji: "🎧", contentType: "pairs" },
+    meta: { name: "Match the Following", emoji: "🔗", contentType: "pairs" },
     timeLimit: 60000, // students self-pace through several pairs at once
     pickLabel: "Exercise",
     match: true,      // individual match flow (see live.js)
@@ -820,8 +868,8 @@
       var store = window.ContentStore;
       var list = (store && store.exercisesFor) ? store.exercisesFor("hoerpaare") : [];
       return list.map(function (e) {
-        var n = (e.questions || []).filter(function (q) { return validPairs(q).length >= 3; }).length;
-        return { id: e.id, name: e.name, emoji: e.emoji || "🎧", english: n + (n === 1 ? " round" : " rounds") };
+        var n = (e.questions || []).filter(function (q) { return roundPairs(q).length >= 3; }).length;
+        return { id: e.id, name: e.name, emoji: e.emoji || "🔗", english: n + (n === 1 ? " round" : " rounds") };
       });
     },
     buildRounds: function (topic) {
@@ -829,8 +877,8 @@
       var e = (store && store.exercise) ? store.exercise("hoerpaare", topic && topic.id) : null;
       var rounds = [];
       ((e && e.questions) || []).forEach(function (q) {
-        var pairs = validPairs(q).slice(0, 6); // up to 6 pairs on screen at once
-        if (pairs.length >= 3) rounds.push({ type: "pairs", words: pairs });
+        var pairs = roundPairs(q).slice(0, 6); // up to 6 pairs on screen at once
+        if (pairs.length >= 3) rounds.push({ type: "pairs", pairs: pairs });
       });
       return rounds.slice(0, 20);
     },
@@ -838,13 +886,13 @@
     // gentle fallbacks so nothing breaks if it ever does.
     hostContent: function (el, round) {
       return el("div", { class: "live-q" }, [
-        el("div", { class: "live-q-tag", text: "🎧 Match every word to its meaning" })
+        el("div", { class: "live-q-tag", text: "🔗 Match every pair" })
       ]);
     },
     playerContent: function (el, round) {
       return el("div", { class: "live-muted", text: "Loading…" });
     },
-    correctLabel: function (round) { return "All " + ((round.words || []).length) + " pairs"; },
+    correctLabel: function (round) { return "All " + ((round.pairs || []).length) + " pairs"; },
     speakOnReveal: function () { return null; }
   };
 

@@ -32,8 +32,8 @@
       description: "Read the clock and pick the German time. No setup needed." },
     { key: "listen", name: "Hör gut zu!", emoji: "👂", color: "#0ea5b7", layout: "prompt",
       description: "Listen to the German word and pick what you heard." },
-    { key: "hoerpaare", name: "Hör-Paare", emoji: "🎧", color: "#06b6d4", layout: "match",
-      description: "Hear each word and tap its matching meaning. Listening practice." }
+    { key: "hoerpaare", name: "Match the Following", emoji: "🔗", color: "#06b6d4", layout: "match",
+      description: "Match each tile to its pair — text, icons, pictures or audio." }
   ];
 
   function register() {
@@ -166,10 +166,11 @@
 
     function render() {
       var r = rounds[idx];
-      var words = (r.words || []).slice();
-      var n = words.length;
+      var pairs = (r.pairs || []).slice();
+      var n = pairs.length;
       var matched = 0, wrong = 0, done = false, busy = false;
       var startTs = Date.now();
+      var MT = window.MatchTiles;
       wrap.innerHTML = "";
       var counter = el("span", { class: "match-count-n", text: "0 / " + n });
       wrap.appendChild(el("div", { class: "quiz-head" }, [
@@ -177,66 +178,58 @@
         el("div", { class: "quiz-progress", text: "Round " + (idx + 1) + " / " + TOTAL }),
         el("div", { class: "match-count", text: "Matched " }, [counter])
       ]));
-      wrap.appendChild(el("div", { class: "player-prompt-hint", text: "Tap 🔊 to hear it, then its meaning 👇" }));
+      var anyAudio = pairs.some(function (p) { return MT.isAudio(p.q) || MT.isAudio(p.a); });
+      wrap.appendChild(el("div", { class: "player-prompt-hint", text: anyAudio ? "Tap 🔊 to hear it, then match each pair 👇" : "Tap one tile on each side to match them 👇" }));
 
-      var speakerCol = el("div", { class: "match-col speakers" });
-      var meaningCol = el("div", { class: "match-col meanings" });
-      var speakers = K.shuffle(words.map(function (w, i) { return { idx: i, de: w.de }; }));
-      var meanings = K.shuffle(words.map(function (w, i) { return { idx: i, en: w.en, emoji: w.emoji }; }));
-      var sel = { s: null, m: null };
-      function play(de) { try { K.speak(de, { rate: r.speed || 1 }); } catch (e) {} }
+      var leftCol = el("div", { class: "match-col questions" });
+      var rightCol = el("div", { class: "match-col answers" });
+      var lefts = K.shuffle(pairs.map(function (p, i) { return { idx: i, side: p.q }; }));
+      var rights = K.shuffle(pairs.map(function (p, i) { return { idx: i, side: p.a }; }));
+      var sel = { q: null, a: null };
 
+      function revealAudio(btn, side) {
+        if (side && side.type === "audio") { var lbl = btn.querySelector(".match-slabel"); if (lbl) lbl.textContent = side.value; }
+      }
       function tryMatch() {
-        if (!sel.s || !sel.m) return;
-        var s = sel.s, m = sel.m;
-        if (s.idx === m.idx) {
+        if (!sel.q || !sel.a) return;
+        var q = sel.q, a = sel.a;
+        if (q.idx === a.idx) {
           matched++; counter.textContent = matched + " / " + n;
-          s.btn.classList.remove("sel"); m.btn.classList.remove("sel");
-          s.btn.classList.add("done"); m.btn.classList.add("done");
-          s.btn.disabled = true; m.btn.disabled = true;
-          var lbl = s.btn.querySelector(".match-slabel");
-          if (lbl) lbl.textContent = words[s.idx].de;
-          sel.s = null; sel.m = null;
+          q.btn.classList.remove("sel"); a.btn.classList.remove("sel");
+          q.btn.classList.add("done"); a.btn.classList.add("done");
+          q.btn.disabled = true; a.btn.disabled = true;
+          revealAudio(q.btn, pairs[q.idx].q); revealAudio(a.btn, pairs[a.idx].a);
+          sel.q = null; sel.a = null;
           try { K.beep("good"); } catch (e) {}
           if (matched >= n) finishRound();
         } else {
           wrong++; busy = true;
-          s.btn.classList.remove("sel"); m.btn.classList.remove("sel");
-          s.btn.classList.add("wrong"); m.btn.classList.add("wrong");
+          q.btn.classList.remove("sel"); a.btn.classList.remove("sel");
+          q.btn.classList.add("wrong"); a.btn.classList.add("wrong");
           try { K.beep("bad"); } catch (e) {}
-          var a = s.btn, b = m.btn; sel.s = null; sel.m = null;
-          setTimeout(function () { a.classList.remove("wrong"); b.classList.remove("wrong"); busy = false; }, 500);
+          var x = q.btn, y = a.btn; sel.q = null; sel.a = null;
+          setTimeout(function () { x.classList.remove("wrong"); y.classList.remove("wrong"); busy = false; }, 500);
         }
       }
+      function onTile(col, it, btn) {
+        if (busy || btn.disabled) return;
+        if (MT.isAudio(it.side)) MT.play(K, it.side, r.speed || 1);
+        if (sel[col]) sel[col].btn.classList.remove("sel");
+        sel[col] = { idx: it.idx, btn: btn }; btn.classList.add("sel");
+        tryMatch();
+      }
 
-      speakers.forEach(function (it) {
-        var btn = el("button", { class: "match-tile speaker" }, [
-          el("span", { class: "match-ico", text: "🔊" }),
-          el("span", { class: "match-slabel", text: "Tap to hear" })
-        ]);
-        btn.addEventListener("click", function () {
-          if (busy || btn.disabled) return;
-          play(it.de);
-          if (sel.s) sel.s.btn.classList.remove("sel");
-          sel.s = { idx: it.idx, btn: btn }; btn.classList.add("sel");
-          tryMatch();
-        });
-        speakerCol.appendChild(btn);
+      lefts.forEach(function (it) {
+        var btn = MT.render(el, it.side);
+        btn.addEventListener("click", function () { onTile("q", it, btn); });
+        leftCol.appendChild(btn);
       });
-      meanings.forEach(function (it) {
-        var btn = el("button", { class: "match-tile meaning" }, [
-          it.emoji ? el("span", { class: "match-memoji", text: it.emoji }) : null,
-          el("span", { class: "match-mtext", text: it.en })
-        ]);
-        btn.addEventListener("click", function () {
-          if (busy || btn.disabled) return;
-          if (sel.m) sel.m.btn.classList.remove("sel");
-          sel.m = { idx: it.idx, btn: btn }; btn.classList.add("sel");
-          tryMatch();
-        });
-        meaningCol.appendChild(btn);
+      rights.forEach(function (it) {
+        var btn = MT.render(el, it.side);
+        btn.addEventListener("click", function () { onTile("a", it, btn); });
+        rightCol.appendChild(btn);
       });
-      wrap.appendChild(el("div", { class: "match-board" }, [speakerCol, meaningCol]));
+      wrap.appendChild(el("div", { class: "match-board" }, [leftCol, rightCol]));
 
       function finishRound() {
         if (done) return;
@@ -247,7 +240,7 @@
         var last = (idx + 1) >= TOTAL;
         setTimeout(function () {
           wrap.appendChild(el("div", { class: "solo-reveal good" }, [
-            el("div", { class: "solo-reveal-icon", text: "🎧" }),
+            el("div", { class: "solo-reveal-icon", text: "🔗" }),
             el("div", { class: "solo-reveal-body" }, [
               el("div", { class: "solo-reveal-title", text: "All " + n + " matched!" }),
               el("div", { class: "solo-reveal-ans", text: secs + "s" + (wrong ? " · " + wrong + " wrong tap" + (wrong === 1 ? "" : "s") : "") })
@@ -264,8 +257,8 @@
       K.beep(pct >= 60 ? "win" : "bad");
       wrap.innerHTML = "";
       wrap.appendChild(el("div", { class: "result-card" }, [
-        el("div", { class: "result-emoji", text: pct >= 80 ? "🏆" : "🎧" }),
-        el("h2", { text: "Nice listening!" }),
+        el("div", { class: "result-emoji", text: pct >= 80 ? "🏆" : "🔗" }),
+        el("h2", { text: "Nice matching!" }),
         el("p", { class: "result-score", html: "Matched <b>" + totalMatched + "</b> of <b>" + totalPairs + "</b> pairs across " + TOTAL + (TOTAL === 1 ? " round" : " rounds") }),
         el("div", { class: "result-actions" }, [
           el("button", { class: "btn primary", text: "Play again", on: { click: api.restart } }),

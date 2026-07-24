@@ -423,7 +423,7 @@ window.LiveMode = (function () {
           index: i, type: r.type, de: r.de || null, emoji: r.emoji || null, options: r.options || null,
           sentence: r.sentence || null, blank: r.blank || null, clueWord: r.clueWord || null,
           meaning: r.meaning || null, tiles: r.tiles || null,
-          words: r.words || null, speed: r.speed || null,
+          words: r.words || null, pairs: r.pairs || null, speed: r.speed || null,
           answerMode: sess.answerMode || "options",
           // Lücken-Text: phones need the blank ids (to lay out the gaps) and, in
           // tap mode, the shuffled word bank — but NEVER the correct answers, so
@@ -486,7 +486,7 @@ window.LiveMode = (function () {
     // Build the per-student progress rows + the "N finished" count from the
     // progress docs the live listener has delivered so far.
     function matchProgress(r) {
-      var total = (r.words || []).length || 1;
+      var total = (r.pairs || []).length || 1;
       var joined = sess.joined || {};
       var joinedIds = Object.keys(joined);
       // Best progress per student, from the docs the live listener delivered.
@@ -538,7 +538,7 @@ window.LiveMode = (function () {
           el("div", { class: "host-q-num", text: "Round " + (i + 1) + " / " + rounds.length }),
           el("div", { class: "host-answered", text: d.doneCount + " of " + d.denom + " finished" })
         ]),
-        el("div", { class: "match-host-tag", text: "🎧 Each student matches every word to its meaning" }),
+        el("div", { class: "match-host-tag", text: "🔗 Each student matches every pair" }),
         d.rows.length
           ? el("div", { class: "match-progress" }, d.rows)
           : el("p", { class: "live-muted", text: "Waiting for students to join…" }),
@@ -588,7 +588,7 @@ window.LiveMode = (function () {
       clearTimeout(timer);
       if (answersUnsub) { answersUnsub(); answersUnsub = null; }
       var arr = latestAnswers;
-      var total = (r.words || []).length || 1;
+      var total = (r.pairs || []).length || 1;
       var startedAt = sess.round && sess.round.startedAt && sess.round.startedAt.toMillis ? sess.round.startedAt.toMillis() : null;
       // Keep the most complete record per student (a "done" doc, else highest matched).
       var best = {};
@@ -632,14 +632,14 @@ window.LiveMode = (function () {
       var isMatch = !!adapter.match;
       var isBlanks = !!adapter.blanks;
       var correctCount = results.filter(function (x) { return x.correct; }).length;
-      var mtotal = (r.words || []).length;
+      var mtotal = (r.pairs || []).length;
       // Leaderboard for THIS question only (ranked by points earned this round).
       var ranked = results.filter(function (x) { return x.answered; }).sort(function (a, b) { return b.points - a.points; });
       var answerBlock;
       if (isMatch) {
         answerBlock = el("div", { class: "reveal-answer" }, [
           el("div", { class: "reveal-label", text: "Round complete" }),
-          el("div", { class: "reveal-value", text: "🎧 " + mtotal + (mtotal === 1 ? " pair" : " pairs") })
+          el("div", { class: "reveal-value", text: "🔗 " + mtotal + (mtotal === 1 ? " pair" : " pairs") })
         ]);
       } else if (isBlanks) {
         // The full sentence with every gap filled + highlighted, plus the note.
@@ -921,23 +921,22 @@ window.LiveMode = (function () {
        pair is matched. */
     function matchPlayerScreen(s) {
       var r = s.round;
-      var words = (r.words || []).slice();
-      var total = words.length;
+      var pairs = (r.pairs || []).slice();
+      var total = pairs.length;
       var rate = r.speed || 1;
       var matched = 0, wrong = 0, finished = false;
       var startTs = Date.now();
+      var MT = window.MatchTiles;
 
-      // Independent shuffles → every phone's layout is different.
-      var speakers = kit.shuffle(words.map(function (w, idx) { return { idx: idx, de: w.de }; }));
-      var meanings = kit.shuffle(words.map(function (w, idx) { return { idx: idx, en: w.en, emoji: w.emoji }; }));
-      var sel = { speaker: null, meaning: null }; // { idx, btn }
+      // Independent shuffles per side → every phone's layout is different.
+      var lefts = kit.shuffle(pairs.map(function (p, idx) { return { idx: idx, side: p.q }; }));
+      var rights = kit.shuffle(pairs.map(function (p, idx) { return { idx: idx, side: p.a }; }));
+      var sel = { q: null, a: null }; // { idx, btn } per column
       var busy = false; // brief lock during the wrong-answer flash
 
       var counter = el("span", { class: "match-count-n", text: "0 / " + total });
-      var speakerCol = el("div", { class: "match-col speakers" });
-      var meaningCol = el("div", { class: "match-col meanings" });
-
-      function play(de) { try { kit.speak(de, { rate: rate }); } catch (e) {} }
+      var leftCol = el("div", { class: "match-col questions" });
+      var rightCol = el("div", { class: "match-col answers" });
 
       function reportMatch() {
         // One write-once doc per matched pair drives the host's live bar; the
@@ -950,52 +949,42 @@ window.LiveMode = (function () {
         } catch (e) {}
       }
 
-      function clearSel() {
-        if (sel.speaker) sel.speaker.btn.classList.remove("sel");
-        if (sel.meaning) sel.meaning.btn.classList.remove("sel");
-        sel.speaker = null; sel.meaning = null;
+      // A solved audio tile reveals the German text it was speaking (a reward).
+      function revealAudio(btn, side) {
+        if (side && side.type === "audio") { var lbl = btn.querySelector(".match-slabel"); if (lbl) lbl.textContent = side.value; }
       }
 
       function tryMatch() {
-        if (!sel.speaker || !sel.meaning) return;
-        var sp = sel.speaker, me = sel.meaning;
-        if (sp.idx === me.idx) {
+        if (!sel.q || !sel.a) return;
+        var q = sel.q, a = sel.a;
+        if (q.idx === a.idx) {
           matched++;
           counter.textContent = matched + " / " + total;
-          sp.btn.classList.remove("sel"); me.btn.classList.remove("sel");
-          sp.btn.classList.add("done"); me.btn.classList.add("done");
-          sp.btn.disabled = true; me.btn.disabled = true;
-          // Reveal the German word on the now-solved speaker tile (a small reward).
-          var lbl = sp.btn.querySelector(".match-slabel");
-          if (lbl) lbl.textContent = words[sp.idx].de;
-          sel.speaker = null; sel.meaning = null;
+          q.btn.classList.remove("sel"); a.btn.classList.remove("sel");
+          q.btn.classList.add("done"); a.btn.classList.add("done");
+          q.btn.disabled = true; a.btn.disabled = true;
+          revealAudio(q.btn, pairs[q.idx].q); revealAudio(a.btn, pairs[a.idx].a);
+          sel.q = null; sel.a = null;
           try { kit.beep("good"); } catch (e) {}
           reportMatch();
           if (matched >= total) return finish();
         } else {
           wrong++;
           busy = true;
-          sp.btn.classList.remove("sel"); me.btn.classList.remove("sel");
-          sp.btn.classList.add("wrong"); me.btn.classList.add("wrong");
+          q.btn.classList.remove("sel"); a.btn.classList.remove("sel");
+          q.btn.classList.add("wrong"); a.btn.classList.add("wrong");
           try { kit.beep("bad"); } catch (e) {}
-          var a = sp.btn, b = me.btn;
-          sel.speaker = null; sel.meaning = null;
-          setTimeout(function () { a.classList.remove("wrong"); b.classList.remove("wrong"); busy = false; }, 500);
+          var x = q.btn, y = a.btn;
+          sel.q = null; sel.a = null;
+          setTimeout(function () { x.classList.remove("wrong"); y.classList.remove("wrong"); busy = false; }, 500);
         }
       }
 
-      function onSpeaker(item, btn) {
+      function onTile(col, item, btn) {
         if (busy || btn.disabled) return;
-        play(item.de);                       // always free to replay
-        if (sel.speaker) sel.speaker.btn.classList.remove("sel");
-        sel.speaker = { idx: item.idx, btn: btn };
-        btn.classList.add("sel");
-        tryMatch();
-      }
-      function onMeaning(item, btn) {
-        if (busy || btn.disabled) return;
-        if (sel.meaning) sel.meaning.btn.classList.remove("sel");
-        sel.meaning = { idx: item.idx, btn: btn };
+        if (MT.isAudio(item.side)) MT.play(kit, item.side, rate); // always free to replay
+        if (sel[col]) sel[col].btn.classList.remove("sel");
+        sel[col] = { idx: item.idx, btn: btn };
         btn.classList.add("sel");
         tryMatch();
       }
@@ -1007,7 +996,7 @@ window.LiveMode = (function () {
         var secs = Math.max(1, Math.round((Date.now() - startTs) / 1000));
         show(screen("player live-center res-good", [el("div", { class: "live-card" }, [
           el("div", { class: "player-name-tag", text: stu.name }),
-          el("div", { class: "live-big-emoji", text: "🎧" }),
+          el("div", { class: "live-big-emoji", text: "🔗" }),
           el("h2", { text: "All matched! 🎉" }),
           el("p", { class: "live-sub", text: "You matched all " + total + " pairs in " + secs + "s" }),
           wrong ? el("p", { class: "player-why", text: wrong + (wrong === 1 ? " wrong tap" : " wrong taps") }) : null,
@@ -1015,30 +1004,25 @@ window.LiveMode = (function () {
         ])]));
       }
 
-      speakers.forEach(function (item) {
-        var btn = el("button", { class: "match-tile speaker" }, [
-          el("span", { class: "match-ico", text: "🔊" }),
-          el("span", { class: "match-slabel", text: "Tap to hear" })
-        ]);
-        btn.addEventListener("click", function () { onSpeaker(item, btn); });
-        speakerCol.appendChild(btn);
+      lefts.forEach(function (item) {
+        var btn = MT.render(el, item.side);
+        btn.addEventListener("click", function () { onTile("q", item, btn); });
+        leftCol.appendChild(btn);
       });
-      meanings.forEach(function (item) {
-        var btn = el("button", { class: "match-tile meaning" }, [
-          item.emoji ? el("span", { class: "match-memoji", text: item.emoji }) : null,
-          el("span", { class: "match-mtext", text: item.en })
-        ]);
-        btn.addEventListener("click", function () { onMeaning(item, btn); });
-        meaningCol.appendChild(btn);
+      rights.forEach(function (item) {
+        var btn = MT.render(el, item.side);
+        btn.addEventListener("click", function () { onTile("a", item, btn); });
+        rightCol.appendChild(btn);
       });
 
+      var anyAudio = pairs.some(function (p) { return MT.isAudio(p.q) || MT.isAudio(p.a); });
       show(screen("player", [
         el("div", { class: "player-topbar" }, [
           el("div", { class: "player-name-tag", text: stu.name }),
           el("div", { class: "match-count", text: "Matched " }, [counter])
         ]),
-        el("div", { class: "player-prompt-hint", text: "Tap 🔊 to hear it, then its meaning 👇" }),
-        el("div", { class: "match-board" }, [speakerCol, meaningCol])
+        el("div", { class: "player-prompt-hint", text: anyAudio ? "Tap 🔊 to hear it, then match each pair 👇" : "Tap one tile on each side to match them 👇" }),
+        el("div", { class: "match-board" }, [leftCol, rightCol])
       ]));
     }
 
@@ -1198,7 +1182,7 @@ window.LiveMode = (function () {
       kit.beep(allDone ? "good" : "bad");
       show(screen("player live-center " + (allDone ? "res-good" : "res-bad"), [el("div", { class: "live-card" }, [
         el("div", { class: "player-name-tag", text: stu.name }),
-        el("div", { class: "live-big-emoji", text: allDone ? "🎧" : (matched > 0 ? "🧩" : "⏰") }),
+        el("div", { class: "live-big-emoji", text: allDone ? "🔗" : (matched > 0 ? "🧩" : "⏰") }),
         el("h2", { text: allDone ? "All matched!" : (matched > 0 ? "Time's up" : "Too slow") }),
         el("p", { class: "live-sub", text: "You matched " + matched + " of " + total + (total === 1 ? " pair" : " pairs") }),
         el("div", { class: "player-points", text: (pts > 0 ? "+" + pts : "0") + " points" })
