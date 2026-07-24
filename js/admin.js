@@ -539,9 +539,10 @@
         for (var i = 0; i < all.length; i++) if (all[i].id === id) return all[i];
         return null;
       }
-      // Games you can copy an exercise FROM into `gameId`. Only the word games
-      // (Quiz / Memory / Hangman) share a compatible content shape.
-      var WORD_COPY_GROUP = ["quiz", "memory", "hangman"];
+      // Games you can copy an exercise FROM into `gameId`. Only the vocab-word
+      // games (Memory / Hangman) share a compatible content shape. Quiz-Blitz is
+      // authored as multiple-choice questions, so it isn't part of this group.
+      var WORD_COPY_GROUP = ["memory", "hangman"];
       function copySourcesFor(gameId) {
         if (WORD_COPY_GROUP.indexOf(gameId) < 0) return [];
         return WORD_COPY_GROUP.filter(function (g) { return g !== gameId && store.exercisesFor(g).length > 0; });
@@ -701,7 +702,8 @@
         body.appendChild(el("div", { class: "adm-subhead" }, [
           el("h3", { class: "adm-game-title", text: game.emoji + " " + game.name + "  ·  " + ex.name })
         ]));
-        if (game.kind === "words") { renderWordsExercise(body, ex); if (currentGame === "quiz") renderMcqSection(body, ex); }
+        if (currentGame === "quiz") renderQuizExercise(body, ex);
+        else if (game.kind === "words") renderWordsExercise(body, ex);
         else if (game.kind === "sentences") renderSentencesExercise(body, ex);
         else if (game.kind === "pairs") renderPairsExercise(body, ex);
         else if (currentGame === "cases") renderCases(body, ex);
@@ -709,7 +711,7 @@
         else if (currentGame === "listening") renderListening(body, ex);
       }
 
-      /* ---- Words exercise editor (Vocabulary Quiz / Memory / Hangman) ---- */
+      /* ---- Words exercise editor (Memory / Hangman) ---- */
       function renderWordsExercise(body, ex) {
         body.appendChild(
           el("p", { class: "adm-hint", html: "The words in this exercise. <b>Wrong options</b> are optional — leave blank and the game auto-picks wrong answers from the other words here; type your own (comma-separated) to control them. Changes save automatically." })
@@ -749,16 +751,26 @@
         body.appendChild(addRowBtn("+ Word", function () { list.push({ de: "", en: "", emoji: "" }); store.save(); render(); }));
       }
 
-      /* ---- MCQ questions (Vocabulary Quiz): picture / audio / icon questions.
+      /* ---- Quiz-Blitz: an MCQ-only editor (header + multiple-choice questions).
              Question + options each pick a tile type; one type covers all four
              options (they read cleanest the same). Reuses the Match-the-Following
              type picker + per-type inputs. */
+      function renderQuizExercise(body, ex) {
+        if (!Array.isArray(ex.mcq)) ex.mcq = [];
+        body.appendChild(
+          el("p", { class: "adm-hint", html: "Multiple-choice questions for <b>🎯 Quiz-Blitz</b>. The question <b>and</b> each of the four options can be text, spoken German (audio), a picture (paste an image link) or an icon. Tap ○ to mark the correct option. A countdown rewards faster answers. Changes save automatically." })
+        );
+        body.appendChild(el("div", { class: "adm-ex-head" }, [
+          input(ex, "emoji", "🎯", "adm-emoji", 6),
+          input(ex, "english", "Short description (optional, e.g. Unit 3 review)", "adm-input")
+        ]));
+        renderMcqSection(body, ex);
+      }
       function renderMcqSection(body, ex) {
         if (!Array.isArray(ex.mcq)) ex.mcq = [];
-        body.appendChild(el("div", { class: "adm-cpair-sep", text: "Picture / audio / icon questions (optional)" }));
-        body.appendChild(el("p", { class: "adm-hint", text: "Each is one multiple-choice question. Choose the question's type + value, then a single type for all four options, fill them in, and tap ○ to mark the correct one. The word list above still auto-makes text questions." }));
+        if (!ex.mcq.length) body.appendChild(emptyState("No questions yet — add the first one below."));
         ex.mcq.forEach(function (m, mi) { body.appendChild(mcqQuestionCard(m, ex.mcq, mi)); });
-        body.appendChild(addRowBtn("+ Picture/audio question", function () {
+        body.appendChild(addRowBtn("+ Question", function () {
           ex.mcq.push({ question: { type: "text", value: "" }, options: [{ type: "text", value: "", correct: true }, { type: "text", value: "", correct: false }, { type: "text", value: "", correct: false }, { type: "text", value: "", correct: false }] });
           store.save(); render();
         }));

@@ -1,14 +1,13 @@
 /* =====================================================================
-   GAME: Vokabel-Quiz  (Kahoot-style multiple choice — now a general MCQ)
+   GAME: Quiz-Blitz  (Kahoot-style multiple choice — a general MCQ)
    A question with 4 answer options and a timer. Right answer = points +
    streak bonus; faster = more. The question AND each option can be text,
-   audio, image or icon (via MatchTiles) — the quick default recreates the
-   classic German-word ↔ English-options vocab quiz.
+   audio, image or icon (via MatchTiles) — teachers author the questions.
    ===================================================================== */
 (function () {
   App.register({
     id: "quiz",
-    name: "Vocabulary Quiz",
+    name: "Quiz-Blitz",
     emoji: "🎯",
     color: "#ff595e",
     description: "Multiple-choice quiz with a timer. Answer fast for bonus points!",

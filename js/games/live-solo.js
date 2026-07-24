@@ -6,7 +6,7 @@
    This registers a Solo version of each by reusing the very same content
    logic the Live adapters already provide (buildRounds / score /
    correctLabel / speakOnReveal). The result plays like the existing Solo
-   Vocabulary Quiz: one round at a time, ✓/✗ feedback, then a score card.
+   Quiz-Blitz: one round at a time, ✓/✗ feedback, then a score card.
    (Quiz and Memory already have their own richer Solo games, so they're
    not wrapped here.)
    ===================================================================== */

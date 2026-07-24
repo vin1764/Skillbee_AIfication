@@ -89,7 +89,7 @@
     if (typeof e.emoji !== "string") e.emoji = "📚";
     if (typeof e.english !== "string") e.english = "";
     if (!Array.isArray(e.words)) e.words = [];
-    // Optional typed MCQ questions (Vocabulary Quiz): { question:{type,value},
+    // Optional typed MCQ questions (Quiz-Blitz): { question:{type,value},
     // options:[{type,value,correct}] } — keep 4 options with exactly one correct.
     if (Array.isArray(e.mcq)) {
       e.mcq = e.mcq.filter(function (m) { return m && typeof m === "object"; }).map(function (m) {
@@ -221,7 +221,7 @@
       return chosen.map(function (t) { return topicToExercise(t, "words"); });
     };
     return {
-      quiz: pickWords(null), // the full set
+      quiz: [wordsExercise("Exercise 1", [])], // Quiz-Blitz: authored MCQ, starts empty
       memory: pickWords(["tiere", "essen", "farben", "familie"]),
       hangman: pickWords(["tiere", "essen", "familie", "verben"]),
       scramble: st.map(function (t) { return topicToExercise(t, "sentences"); }),
