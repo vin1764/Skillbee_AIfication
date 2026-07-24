@@ -443,14 +443,18 @@ const App = (function () {
         ]);
     } else {
       const usesSentences = game.contentType === "sentences";
+      const isQuiz = game.id === "quiz"; // Quiz-Blitz counts multiple-choice questions
       topics = window.ContentStore.exercisesFor(game.id);
       makeCard = (ex) => {
-        const count = usesSentences ? (ex.sentences || []).length : (ex.words || []).length;
+        let count, unit;
+        if (usesSentences) { count = (ex.sentences || []).length; unit = "sentence"; }
+        else if (isQuiz) { count = (ex.mcq || []).length + (ex.words || []).length; unit = "question"; }
+        else { count = (ex.words || []).length; unit = "word"; }
         return el("button", { class: "topic-card", on: { click: () => launch(game, ex) } }, [
           el("div", { class: "topic-emoji", text: ex.emoji || (usesSentences ? "🗣️" : "📚") }),
           el("div", { class: "topic-name", text: ex.name }),
           el("div", { class: "topic-en", text: ex.english || "" }),
-          el("div", { class: "topic-count", text: `${count} ${usesSentences ? "sentences" : "words"}` })
+          el("div", { class: "topic-count", text: `${count} ${unit}${count === 1 ? "" : "s"}` })
         ]);
       };
     }

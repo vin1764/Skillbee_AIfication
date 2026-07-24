@@ -573,6 +573,27 @@ window.LiveMode = (function () {
       ]));
     }
 
+    // renderReveal is well-tested, but a reveal must NEVER leave the teacher stuck
+    // on the question screen. If the rich reveal ever throws (some unforeseen
+    // content), fall back to a minimal reveal card (answer + Next) so the room can
+    // always move on.
+    function safeReveal(i, r, results, scores) {
+      try { renderReveal(i, r, results, scores); return; } catch (e) {}
+      var last = (i + 1) >= rounds.length;
+      var correctText = "";
+      try { correctText = String(adapter.correctLabel(r) || ""); } catch (e2) {}
+      try {
+        show(screen("host", [
+          el("div", { class: "host-topbar" }, [el("div", { class: "host-q-num", text: "Question " + (i + 1) + " / " + rounds.length })]),
+          el("div", { class: "reveal-answer" }, [
+            el("div", { class: "reveal-label", text: "Correct answer" }),
+            el("div", { class: "reveal-value", text: correctText })
+          ]),
+          el("button", { class: "btn primary big", text: last ? "Finish ▶" : "Next question ▶", on: { click: nextQuestion } })
+        ]));
+      } catch (e3) {}
+    }
+
     function reveal(i, r) {
       // Revealing is the teacher's call at ANY moment. Mark the phase first so a
       // late answer snapshot can't rebuild the question screen over this reveal.
@@ -610,9 +631,9 @@ window.LiveMode = (function () {
         // be rendered at reveal, not just its text value.
         if (adapter.mcq) { revealDoc.correctOption = (r.options || []).filter(function (o) { return o.correct; })[0] || null; }
         window.LiveDB.updateSession(code, { status: "reveal", scores: scores, reveal: revealDoc });
-        var german = adapter.speakOnReveal(r);
+        var german; try { german = adapter.speakOnReveal(r); } catch (e) { german = null; }
         if (german) kit.speak(german);
-        renderReveal(i, r, results, scores);
+        safeReveal(i, r, results, scores);
       }
     }
 
@@ -654,11 +675,12 @@ window.LiveMode = (function () {
       });
       results.sort(function (x, y) { return y.points - x.points; });
       results.forEach(function (rr, idx) { rr.rank = idx + 1; });
+      var mCorrect; try { mCorrect = adapter.correctLabel(r); } catch (e) { mCorrect = ""; }
       window.LiveDB.updateSession(code, {
         status: "reveal", scores: scores,
-        reveal: { index: i, correct: adapter.correctLabel(r), explanation: null, results: results, match: true }
+        reveal: { index: i, correct: mCorrect, explanation: null, results: results, match: true }
       });
-      renderReveal(i, r, results, scores);
+      safeReveal(i, r, results, scores);
     }
 
     function renderReveal(i, r, results) {
