@@ -5630,15 +5630,22 @@ document.addEventListener("DOMContentLoaded", App.init);
       }
       firebase.initializeApp(firebaseConfig);
       db = firebase.firestore();
+      // ignoreUndefinedProperties: without it, ONE `undefined` field anywhere in
+      // a payload makes the SDK throw the entire write away — synchronously,
+      // inside whichever click handler asked for it (this froze the host's
+      // Reveal button in every game whose scorer omitted a field). Dropping the
+      // stray field is always better than losing the write.
+      var settings = { ignoreUndefinedProperties: true };
+      if (!window.__FIRESTORE_EMULATOR__) {
+        // Long-polling is more reliable behind corporate/school proxies than
+        // the default streaming transport.
+        settings.experimentalForceLongPolling = true;
+        settings.useFetchStreams = false;
+      }
+      try { db.settings(settings); } catch (e) {}
       if (window.__FIRESTORE_EMULATOR__) {
         // Test-only: point at a local Firestore emulator. Never set in production.
         try { db.useEmulator(window.__FIRESTORE_EMULATOR__.host, window.__FIRESTORE_EMULATOR__.port); } catch (e) {}
-      } else {
-        // Long-polling is more reliable behind corporate/school proxies than
-        // the default streaming transport.
-        try {
-          db.settings({ experimentalForceLongPolling: true, useFetchStreams: false });
-        } catch (e) {}
       }
     } catch (e) {
       initError = e;
@@ -6931,6 +6938,19 @@ window.LiveMode = (function () {
                              // the reveal — renderQuestion/renderMatchHost bail
                              // unless we're actually in the question phase.
 
+    // Every write that moves the room forward runs inside a click handler. The
+    // Firestore SDK throws SYNCHRONOUSLY on invalid data (e.g. an `undefined`
+    // field slipping into a payload) — unguarded, that throw aborts the click
+    // handler mid-flight and freezes the host screen (this is exactly how the
+    // Reveal button died). Guard the sync throw AND the async rejection: the
+    // host screen must always advance; a lost write is re-synced by the next.
+    function safeUpdate(data) {
+      try {
+        var p = window.LiveDB.updateSession(code, data);
+        if (p && p.catch) p.catch(function () {});
+      } catch (e) {}
+    }
+
     track(window.LiveDB.listenSession(code, function (s) {
       sess = s;
       if (!s) return;
@@ -6961,7 +6981,7 @@ window.LiveMode = (function () {
       // Carry the session's answer mode onto the in-memory round so the host
       // view (hostContent) and scoring (score) both know Tap vs Type.
       r.answerMode = sess.answerMode || "options";
-      window.LiveDB.updateSession(code, {
+      safeUpdate({
         status: "question", questionIndex: i, reveal: null,
         round: {
           index: i, type: r.type, de: r.de || null, emoji: r.emoji || null,
@@ -7156,7 +7176,16 @@ window.LiveMode = (function () {
           // A bad answer payload must never brick the reveal — score defensively.
           var sc; try { sc = adapter.score(r, a, elapsed, TL) || {}; } catch (e) { sc = { correct: false, points: 0 }; }
           scores[stu.id] = (scores[stu.id] || 0) + (sc.points || 0);
-          results.push({ studentId: stu.id, name: stu.name, correct: !!sc.correct, points: sc.points || 0, answered: true, matched: sc.matched, total: sc.total });
+          var row = { studentId: stu.id, name: stu.name, correct: !!sc.correct, points: sc.points || 0, answered: true };
+          // Only the partial-credit scorers (Lücken-Text, type mode) return
+          // matched/total. Writing them as `undefined` for every other game
+          // made Firestore reject the WHOLE reveal write — thrown synchronously
+          // from inside the click handler — so the Reveal button looked dead in
+          // each MCQ-style game once one student had answered. Omit, never
+          // write `undefined`.
+          if (sc.matched != null) row.matched = sc.matched;
+          if (sc.total != null) row.total = sc.total;
+          results.push(row);
         });
         results.sort(function (x, y) { return y.points - x.points; });
         results.forEach(function (rr, idx) { rr.rank = idx + 1; });
@@ -7168,9 +7197,10 @@ window.LiveMode = (function () {
         // MCQ: ship the correct option (type+value) so a picture/audio answer can
         // be rendered at reveal, not just its text value.
         if (adapter.mcq) { revealDoc.correctOption = (r.options || []).filter(function (o) { return o.correct; })[0] || null; }
-        window.LiveDB.updateSession(code, { status: "reveal", scores: scores, reveal: revealDoc });
+        safeUpdate({ status: "reveal", scores: scores, reveal: revealDoc });
         var german; try { german = adapter.speakOnReveal(r); } catch (e) { german = null; }
-        if (german) kit.speak(german);
+        // Pronunciation is a nice-to-have — it must never stop the reveal screen.
+        if (german) { try { kit.speak(german); } catch (e) {} }
         safeReveal(i, r, results, scores);
       }
     }
@@ -7214,7 +7244,7 @@ window.LiveMode = (function () {
       results.sort(function (x, y) { return y.points - x.points; });
       results.forEach(function (rr, idx) { rr.rank = idx + 1; });
       var mCorrect; try { mCorrect = adapter.correctLabel(r); } catch (e) { mCorrect = ""; }
-      window.LiveDB.updateSession(code, {
+      safeUpdate({
         status: "reveal", scores: scores,
         reveal: { index: i, correct: mCorrect, explanation: null, results: results, match: true }
       });
@@ -7290,9 +7320,9 @@ window.LiveMode = (function () {
     function podium() {
       hostPhase = "podium";
       // Transition into the final screen (once), then render it.
-      window.LiveDB.updateSession(code, { status: "podium" });
-      if (sess.persistMode === "continue") window.LiveDB.saveLeaderboard(sess.rosterId, sess.scores || {});
-      kit.confetti(); kit.beep("win");
+      safeUpdate({ status: "podium" });
+      try { if (sess.persistMode === "continue") window.LiveDB.saveLeaderboard(sess.rosterId, sess.scores || {}).catch(function () {}); } catch (e) {}
+      try { kit.confetti(); kit.beep("win"); } catch (e) {}
       renderPodium();
     }
 
@@ -7356,7 +7386,7 @@ window.LiveMode = (function () {
     }
 
     function closeRoom() {
-      window.LiveDB.updateSession(code, { status: "ended" });
+      safeUpdate({ status: "ended" });
       stop();
       landing();
     }
