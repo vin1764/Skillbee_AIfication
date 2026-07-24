@@ -148,15 +148,29 @@
   // Hör-Paare (Listen & Match): an exercise is a list of "questions", and each
   // question is a set of words (min 3) students match audio-to-meaning.
   function pairsExercise(name, questions) {
-    return { id: exId(), name: name || "Exercise 1", emoji: "🎧", questions: Array.isArray(questions) ? clone(questions) : [] };
+    return { id: exId(), name: name || "Exercise 1", emoji: "🔗", questions: Array.isArray(questions) ? clone(questions) : [] };
   }
   function normalizePairsEx(e) {
     if (!e.id) e.id = exId();
     if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
-    if (typeof e.emoji !== "string") e.emoji = "🎧";
+    if (typeof e.emoji !== "string") e.emoji = "🔗";
     if (!Array.isArray(e.questions)) e.questions = [];
     e.questions = e.questions.filter(function (q) { return q && typeof q === "object"; });
-    e.questions.forEach(function (q) { if (!Array.isArray(q.words)) q.words = []; });
+    e.questions.forEach(function (q) {
+      if (!Array.isArray(q.words)) q.words = [];
+      // Manual "custom pairs": each side is { type: text|icon|image|audio, value }.
+      if (!Array.isArray(q.pairs)) q.pairs = [];
+      q.pairs = q.pairs.filter(function (p) { return p && typeof p === "object"; });
+      q.pairs.forEach(function (p, i) {
+        if (p.id == null) p.id = i + 1;
+        if (!p.question || typeof p.question !== "object") p.question = { type: "text", value: "" };
+        if (!p.answer || typeof p.answer !== "object") p.answer = { type: "text", value: "" };
+        ["question", "answer"].forEach(function (k) {
+          if (typeof p[k].type !== "string") p[k].type = "text";
+          if (p[k].value == null) p[k].value = "";
+        });
+      });
+    });
   }
   // Seed Hör-Paare with a few ready-made questions (4 words each) from the vocab.
   function defaultPairsQuestions() {

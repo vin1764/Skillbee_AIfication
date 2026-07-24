@@ -808,22 +808,26 @@
      English text tile (with the emoji kept as decoration). */
 
   // Normalise one content "question" into canonical pairs { q, a } where each
-  // side is { type, value } (+ optional emoji decoration on a text side).
+  // side is { type, value } (+ optional emoji decoration on a text side). A
+  // question may carry BOTH custom-type pairs and simple word rows — they merge,
+  // so the manual authoring and the quick word-pair flow coexist in one round.
   function roundPairs(q) {
+    var out = [];
     if (q && Array.isArray(q.pairs)) {
-      // New schema: [{ question:{type,value}, answer:{type,value} }, …]
-      return q.pairs.map(function (p) {
-        if (!p || !p.question || !p.answer) return null;
+      // Manual authoring: [{ question:{type,value}, answer:{type,value} }, …]
+      q.pairs.forEach(function (p) {
+        if (!p || !p.question || !p.answer) return;
         var qv = String(p.question.value == null ? "" : p.question.value).trim();
         var av = String(p.answer.value == null ? "" : p.answer.value).trim();
-        if (!qv || !av) return null;
-        return { q: { type: p.question.type || "text", value: qv }, a: { type: p.answer.type || "text", value: av } };
-      }).filter(Boolean);
+        if (!qv || !av) return;
+        out.push({ q: { type: p.question.type || "text", value: qv }, a: { type: p.answer.type || "text", value: av } });
+      });
     }
-    // Legacy schema: [{ de, en, emoji }] → spoken German ↔ English text.
-    return ((q && q.words) || []).filter(function (w) { return w && w.de && w.en; }).map(function (w) {
-      return { q: { type: "audio", value: w.de }, a: { type: "text", value: w.en, emoji: w.emoji || "" } };
+    // Quick word pairs: [{ de, en, emoji }] → spoken German ↔ English text.
+    ((q && q.words) || []).forEach(function (w) {
+      if (w && w.de && w.en) out.push({ q: { type: "audio", value: w.de }, a: { type: "text", value: w.en, emoji: w.emoji || "" } });
     });
+    return out;
   }
 
   // Shared tile renderer + audio playback, so the Live board and the Solo board

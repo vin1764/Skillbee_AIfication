@@ -816,5 +816,23 @@
     return "";
   }
 
-  window.EmojiPick = { forText: forText, forTexts: forTexts };
+  // The curated emoji set (GROUPS order, de-duplicated) — for the icon picker in
+  // Manage Content, so it reuses the SAME set the auto-emoji dictionary draws on.
+  function emojiList() {
+    var seen = {}, out = [];
+    GROUPS.forEach(function (g) { var e = g[0]; if (e && !seen[e]) { seen[e] = 1; out.push(e); } });
+    return out;
+  }
+  // Emojis whose German/English keywords contain `q` (blank q → the full list).
+  function search(q) {
+    q = norm(q);
+    if (!q) return emojiList();
+    var seen = {}, out = [];
+    Object.keys(DICT).forEach(function (k) {
+      if (k.indexOf(q) >= 0) { var e = DICT[k]; if (e && !seen[e]) { seen[e] = 1; out.push(e); } }
+    });
+    return out;
+  }
+
+  window.EmojiPick = { forText: forText, forTexts: forTexts, list: emojiList, search: search };
 })();

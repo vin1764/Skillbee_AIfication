@@ -602,6 +602,39 @@ kbd {
 .adm-pairs-count.warn { color: var(--bad); }
 .adm-pairs-head .adm-del { margin-left: auto; }
 
+/* Match the Following — custom-pair authoring (mix tile types) */
+.adm-cpair-sep { margin: 14px 0 8px; font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-soft); border-top: 1px dashed var(--line); padding-top: 10px; }
+.adm-cpair { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; background: #f7f9ff; }
+.adm-cpair-topbar { display: flex; align-items: center; margin-bottom: 6px; }
+.adm-cpair-n { font-size: 0.78rem; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; }
+.adm-cpair-topbar .adm-del { margin-left: auto; }
+.adm-cpair-sides { display: flex; align-items: flex-start; gap: 8px; }
+.adm-cpair-side { flex: 1 1 0; min-width: 0; }
+.adm-cpair-mid { flex: 0 0 auto; align-self: center; font-size: 1.2rem; color: var(--ink-soft); padding-top: 18px; }
+.adm-side-lbl { font-size: 0.7rem; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
+/* 4-chip type picker */
+.adm-typechips { display: flex; gap: 4px; margin-bottom: 6px; }
+.adm-typechip { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 2px; border: 1.5px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; }
+.adm-typechip .adm-typechip-ic { font-size: 1rem; line-height: 1; }
+.adm-typechip .adm-typechip-lbl { font-size: 0.62rem; font-weight: 700; color: var(--ink-soft); }
+.adm-typechip.sel { border-color: var(--skb); background: var(--skb-tint); }
+.adm-typechip.sel .adm-typechip-lbl { color: var(--skb-dark); }
+.adm-side-input .adm-input { width: 100%; }
+.adm-side-row { display: flex; gap: 6px; align-items: center; }
+.adm-side-row .adm-input { flex: 1 1 auto; }
+.adm-audio-prev { flex: 0 0 auto; }
+.adm-img-prev { display: block; max-width: 100%; max-height: 90px; margin-top: 6px; border-radius: 8px; border: 1px solid var(--line); object-fit: contain; }
+/* Icon picker */
+.adm-iconpick { border: 1px solid var(--line); border-radius: 8px; padding: 6px; background: #fff; }
+.adm-icon-head { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.adm-icon-lbl { font-size: 0.72rem; font-weight: 700; color: var(--ink-soft); }
+.adm-icon-preview { font-size: 1.4rem; line-height: 1; }
+.adm-icon-search { width: 100%; margin-bottom: 6px; }
+.adm-icon-grid { display: flex; flex-wrap: wrap; gap: 2px; max-height: 132px; overflow-y: auto; }
+.adm-icon-opt { font-size: 1.25rem; line-height: 1; padding: 3px; border: 1.5px solid transparent; border-radius: 7px; background: none; cursor: pointer; }
+.adm-icon-opt:hover { background: var(--skb-tint); }
+.adm-icon-opt.sel { border-color: var(--skb); background: var(--skb-tint); }
+
 /* Auto-translate (German → English) — button, AI-draft marker, bulk bar */
 .adm-en-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
 .adm-en-cell > input { flex: 1 1 60px; min-width: 0; }
@@ -1634,15 +1667,29 @@ window.SkillbeeBrand = {
   // Hör-Paare (Listen & Match): an exercise is a list of "questions", and each
   // question is a set of words (min 3) students match audio-to-meaning.
   function pairsExercise(name, questions) {
-    return { id: exId(), name: name || "Exercise 1", emoji: "🎧", questions: Array.isArray(questions) ? clone(questions) : [] };
+    return { id: exId(), name: name || "Exercise 1", emoji: "🔗", questions: Array.isArray(questions) ? clone(questions) : [] };
   }
   function normalizePairsEx(e) {
     if (!e.id) e.id = exId();
     if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
-    if (typeof e.emoji !== "string") e.emoji = "🎧";
+    if (typeof e.emoji !== "string") e.emoji = "🔗";
     if (!Array.isArray(e.questions)) e.questions = [];
     e.questions = e.questions.filter(function (q) { return q && typeof q === "object"; });
-    e.questions.forEach(function (q) { if (!Array.isArray(q.words)) q.words = []; });
+    e.questions.forEach(function (q) {
+      if (!Array.isArray(q.words)) q.words = [];
+      // Manual "custom pairs": each side is { type: text|icon|image|audio, value }.
+      if (!Array.isArray(q.pairs)) q.pairs = [];
+      q.pairs = q.pairs.filter(function (p) { return p && typeof p === "object"; });
+      q.pairs.forEach(function (p, i) {
+        if (p.id == null) p.id = i + 1;
+        if (!p.question || typeof p.question !== "object") p.question = { type: "text", value: "" };
+        if (!p.answer || typeof p.answer !== "object") p.answer = { type: "text", value: "" };
+        ["question", "answer"].forEach(function (k) {
+          if (typeof p[k].type !== "string") p[k].type = "text";
+          if (p[k].value == null) p[k].value = "";
+        });
+      });
+    });
   }
   // Seed Hör-Paare with a few ready-made questions (4 words each) from the vocab.
   function defaultPairsQuestions() {
@@ -4431,7 +4478,25 @@ document.addEventListener("DOMContentLoaded", App.init);
     return "";
   }
 
-  window.EmojiPick = { forText: forText, forTexts: forTexts };
+  // The curated emoji set (GROUPS order, de-duplicated) — for the icon picker in
+  // Manage Content, so it reuses the SAME set the auto-emoji dictionary draws on.
+  function emojiList() {
+    var seen = {}, out = [];
+    GROUPS.forEach(function (g) { var e = g[0]; if (e && !seen[e]) { seen[e] = 1; out.push(e); } });
+    return out;
+  }
+  // Emojis whose German/English keywords contain `q` (blank q → the full list).
+  function search(q) {
+    q = norm(q);
+    if (!q) return emojiList();
+    var seen = {}, out = [];
+    Object.keys(DICT).forEach(function (k) {
+      if (k.indexOf(q) >= 0) { var e = DICT[k]; if (e && !seen[e]) { seen[e] = 1; out.push(e); } }
+    });
+    return out;
+  }
+
+  window.EmojiPick = { forText: forText, forTexts: forTexts, list: emojiList, search: search };
 })();
 
 
@@ -5328,8 +5393,9 @@ document.addEventListener("DOMContentLoaded", App.init);
           el("p", {
             class: "adm-hint",
             html:
-              "These power <b>🔗 Match the Following</b> in Live Class Mode. Each <b>question</b> is one matching round: students hear the German words and tap the English meaning that matches. " +
-              "Give every question <b>at least 3 words</b>. The German is spoken with the app's voice (generated audio where available, otherwise the device voice). Changes save automatically."
+              "These power <b>🔗 Match the Following</b> in Live Class Mode. Each <b>question</b> is one matching round; give it <b>at least 3 pairs</b>. " +
+              "Build pairs two ways (mix freely): add quick <b>word pairs</b> (spoken German ↔ English), or add <b>custom pairs</b> where each side is text, an icon, a picture or audio. " +
+              "German audio is spoken with the app's voice (generated audio where available, otherwise the device voice). Changes save automatically."
           })
         );
         body.appendChild(el("div", { class: "adm-ex-head" }, [ input(ex, "emoji", "🎧", "adm-emoji", 6) ]));
@@ -5344,13 +5410,16 @@ document.addEventListener("DOMContentLoaded", App.init);
         if (!list.length) body.appendChild(emptyState("No questions yet — add the first one below."));
         list.forEach(function (q, qi) {
           if (!Array.isArray(q.words)) q.words = [];
-          var complete = q.words.filter(function (w) { return w.de && w.en; }).length;
+          if (!Array.isArray(q.pairs)) q.pairs = [];
+          var validCustom = q.pairs.filter(function (p) { return p && p.question && p.answer && String(p.question.value || "").trim() && String(p.answer.value || "").trim(); }).length;
+          var complete = q.words.filter(function (w) { return w.de && w.en; }).length + validCustom;
           var card = el("div", { class: "adm-pairs-q" });
           card.appendChild(el("div", { class: "adm-pairs-head" }, [
             el("h4", { class: "adm-pairs-title", text: "Question " + (qi + 1) }),
-            el("span", { class: "adm-pairs-count" + (complete < 3 ? " warn" : ""), text: complete + (complete === 1 ? " word" : " words") + (complete < 3 ? " · needs at least 3" : "") }),
+            el("span", { class: "adm-pairs-count" + (complete < 3 ? " warn" : ""), text: complete + (complete === 1 ? " pair" : " pairs") + (complete < 3 ? " · needs at least 3" : "") }),
             el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove this question" }, on: { click: function () { list.splice(qi, 1); store.save(); render(); } } })
           ]));
+          // Quick word pairs (spoken German ↔ English) — the simple default.
           card.appendChild(el("div", { class: "adm-row adm-row-head adm-pairs-row" }, [
             el("span", { class: "adm-emoji-h", text: "Icon" }),
             el("span", { text: "German (spoken)" }),
@@ -5369,12 +5438,100 @@ document.addEventListener("DOMContentLoaded", App.init);
             ]));
           });
           card.appendChild(addRowBtn("+ Word", function () { q.words.push({ de: "", en: "", emoji: "" }); store.save(); render(); }));
+          // Custom pairs (mix tile types) — optional, added to the same round.
+          card.appendChild(el("div", { class: "adm-cpair-sep", text: "Custom pairs — mix text, icons, pictures & audio" }));
+          q.pairs.forEach(function (pp, pi) { card.appendChild(customPairRow(pp, q.pairs, pi)); });
+          card.appendChild(addRowBtn("+ Custom pair", function () { q.pairs.push({ id: q.pairs.length + 1, question: { type: "text", value: "" }, answer: { type: "text", value: "" } }); store.save(); render(); }));
           body.appendChild(card);
         });
         body.appendChild(addRowBtn("+ Question", function () {
           list.push({ words: [{ de: "", en: "", emoji: "" }, { de: "", en: "", emoji: "" }, { de: "", en: "", emoji: "" }] });
           store.save(); render();
         }));
+      }
+
+      /* One custom pair: a left (question) side ⟷ a right (answer) side, each of
+         which independently picks a tile type and swaps in just that input. */
+      function customPairRow(pair, arr, index) {
+        var card = el("div", { class: "adm-cpair" });
+        card.appendChild(el("div", { class: "adm-cpair-topbar" }, [
+          el("span", { class: "adm-cpair-n", text: "Pair " + (index + 1) }),
+          el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove pair" }, on: { click: function () { arr.splice(index, 1); store.save(); render(); } } })
+        ]));
+        card.appendChild(el("div", { class: "adm-cpair-sides" }, [
+          el("div", { class: "adm-cpair-side" }, [el("div", { class: "adm-side-lbl", text: "Left" }), pairSideEditor(pair.question)]),
+          el("div", { class: "adm-cpair-mid", text: "⟷" }),
+          el("div", { class: "adm-cpair-side" }, [el("div", { class: "adm-side-lbl", text: "Right" }), pairSideEditor(pair.answer)])
+        ]));
+        return card;
+      }
+
+      // A four-chip type picker (Text / Icon / Image / Audio) that swaps in just
+      // the one input that type needs. `side` = { type, value } (mutated in place).
+      function pairSideEditor(side) {
+        if (typeof side.type !== "string") side.type = "text";
+        if (side.value == null) side.value = "";
+        var TYPES = [["text", "Text", "🔤"], ["icon", "Icon", "😀"], ["image", "Image", "🖼"], ["audio", "Audio", "🔊"]];
+        var chipRow = el("div", { class: "adm-typechips" });
+        var inputWrap = el("div", { class: "adm-side-input" });
+        var chips = [];
+        function renderInput() {
+          inputWrap.innerHTML = "";
+          var t = side.type;
+          if (t === "text") {
+            inputWrap.appendChild(input(side, "value", "type the text", "adm-input"));
+          } else if (t === "audio") {
+            var inp = input(side, "value", "type the German word", "adm-input");
+            var play = el("button", { class: "btn small adm-audio-prev", attrs: { type: "button", title: "Hear it" }, html: "▶", on: { click: function () { try { if (window.VoiceBox) window.VoiceBox.speak(side.value || ""); } catch (e) {} } } });
+            inputWrap.appendChild(el("div", { class: "adm-side-row" }, [inp, play]));
+          } else if (t === "image") {
+            var urlInp = input(side, "value", "paste image link (right-click a Google image → Copy image address)", "adm-input");
+            var prev = el("img", { class: "adm-img-prev", attrs: { alt: "" } });
+            function upd() { if (side.value) { prev.src = side.value; prev.style.display = ""; } else { prev.removeAttribute("src"); prev.style.display = "none"; } }
+            urlInp.addEventListener("input", upd);
+            inputWrap.appendChild(urlInp); inputWrap.appendChild(prev); upd();
+          } else if (t === "icon") {
+            inputWrap.appendChild(iconPicker(side));
+          }
+        }
+        function selectType(t) {
+          if (side.type !== t) { side.type = t; side.value = ""; store.save(); }
+          chips.forEach(function (c) { c.btn.classList.toggle("sel", c.t === t); });
+          renderInput();
+        }
+        TYPES.forEach(function (T) {
+          var btn = el("button", { class: "adm-typechip" + (side.type === T[0] ? " sel" : ""), attrs: { type: "button", title: T[1] }, on: { click: function () { selectType(T[0]); } } }, [el("span", { class: "adm-typechip-ic", text: T[2] }), el("span", { class: "adm-typechip-lbl", text: T[1] })]);
+          chips.push({ t: T[0], btn: btn });
+          chipRow.appendChild(btn);
+        });
+        renderInput();
+        return el("div", { class: "adm-side" }, [chipRow, inputWrap]);
+      }
+
+      // Icon picker over the EXISTING emoji set (js/emoji.js) — search + a grid.
+      function iconPicker(side) {
+        var preview = el("span", { class: "adm-icon-preview", text: side.value || "—" });
+        var searchInp = el("input", { class: "adm-input adm-icon-search", attrs: { type: "text", placeholder: "search icons (dog, apple, red…)" } });
+        var grid = el("div", { class: "adm-icon-grid" });
+        function fillGrid(q) {
+          grid.innerHTML = "";
+          var listE = (window.EmojiPick && window.EmojiPick.search) ? window.EmojiPick.search(q || "") : [];
+          if (!listE.length) { grid.appendChild(el("span", { class: "adm-blank-hint", text: "No icon — try another word." })); return; }
+          listE.slice(0, 120).forEach(function (e) {
+            var b = el("button", { class: "adm-icon-opt" + (side.value === e ? " sel" : ""), attrs: { type: "button" }, text: e, on: { click: function () {
+              side.value = e; preview.textContent = e; store.save();
+              Array.prototype.forEach.call(grid.children, function (c) { c.classList.remove("sel"); });
+              b.classList.add("sel");
+            } } });
+            grid.appendChild(b);
+          });
+        }
+        searchInp.addEventListener("input", function () { fillGrid(searchInp.value); });
+        fillGrid("");
+        return el("div", { class: "adm-iconpick" }, [
+          el("div", { class: "adm-icon-head" }, [el("span", { class: "adm-icon-lbl", text: "Chosen:" }), preview]),
+          searchInp, grid
+        ]);
       }
 
       function delRowBtn(title, onClick) {
@@ -6501,22 +6658,26 @@ document.addEventListener("DOMContentLoaded", App.init);
      English text tile (with the emoji kept as decoration). */
 
   // Normalise one content "question" into canonical pairs { q, a } where each
-  // side is { type, value } (+ optional emoji decoration on a text side).
+  // side is { type, value } (+ optional emoji decoration on a text side). A
+  // question may carry BOTH custom-type pairs and simple word rows — they merge,
+  // so the manual authoring and the quick word-pair flow coexist in one round.
   function roundPairs(q) {
+    var out = [];
     if (q && Array.isArray(q.pairs)) {
-      // New schema: [{ question:{type,value}, answer:{type,value} }, …]
-      return q.pairs.map(function (p) {
-        if (!p || !p.question || !p.answer) return null;
+      // Manual authoring: [{ question:{type,value}, answer:{type,value} }, …]
+      q.pairs.forEach(function (p) {
+        if (!p || !p.question || !p.answer) return;
         var qv = String(p.question.value == null ? "" : p.question.value).trim();
         var av = String(p.answer.value == null ? "" : p.answer.value).trim();
-        if (!qv || !av) return null;
-        return { q: { type: p.question.type || "text", value: qv }, a: { type: p.answer.type || "text", value: av } };
-      }).filter(Boolean);
+        if (!qv || !av) return;
+        out.push({ q: { type: p.question.type || "text", value: qv }, a: { type: p.answer.type || "text", value: av } });
+      });
     }
-    // Legacy schema: [{ de, en, emoji }] → spoken German ↔ English text.
-    return ((q && q.words) || []).filter(function (w) { return w && w.de && w.en; }).map(function (w) {
-      return { q: { type: "audio", value: w.de }, a: { type: "text", value: w.en, emoji: w.emoji || "" } };
+    // Quick word pairs: [{ de, en, emoji }] → spoken German ↔ English text.
+    ((q && q.words) || []).forEach(function (w) {
+      if (w && w.de && w.en) out.push({ q: { type: "audio", value: w.de }, a: { type: "text", value: w.en, emoji: w.emoji || "" } });
     });
+    return out;
   }
 
   // Shared tile renderer + audio playback, so the Live board and the Solo board
