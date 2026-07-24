@@ -157,10 +157,10 @@
     if (!Array.isArray(e.questions)) e.questions = [];
     e.questions = e.questions.filter(function (q) { return q && typeof q === "object"; });
     e.questions.forEach(function (q) {
-      if (!Array.isArray(q.words)) q.words = [];
-      // Manual "custom pairs": the question picks a left + right tile type once,
-      // then holds entries { left, right } sharing those types.
-      if (typeof q.leftType !== "string") q.leftType = "text";
+      // A question picks a left + right tile type once, then holds entries
+      // { left, right } sharing those types. Default is Audio ↔ Text (spoken
+      // German ↔ English) — the classic matching round.
+      if (typeof q.leftType !== "string") q.leftType = "audio";
       if (typeof q.rightType !== "string") q.rightType = "text";
       if (!Array.isArray(q.entries)) q.entries = [];
       // Migrate the brief earlier per-pair form into the per-question model.
@@ -173,6 +173,14 @@
         });
       }
       delete q.pairs;
+      // Migrate the old German↔English "words" rows into Audio↔Text entries.
+      if (Array.isArray(q.words) && q.words.length) {
+        var we = q.words.filter(function (w) { return w && w.de && w.en; }).map(function (w) { return { left: w.de, right: w.en }; });
+        if (!q.entries.length) { q.leftType = "audio"; q.rightType = "text"; q.entries = we; }
+        else if (q.leftType === "audio" && q.rightType === "text") { q.entries = q.entries.concat(we); }
+        // else: incompatible types (rare) — the words are dropped.
+      }
+      delete q.words;
       q.entries = q.entries.filter(function (en) { return en && typeof en === "object"; });
       q.entries.forEach(function (en) { if (en.left == null) en.left = ""; if (en.right == null) en.right = ""; });
     });
@@ -289,7 +297,9 @@
       } catch (e) {
         /* localStorage may be unavailable (e.g. sandboxed) — fall back to defaults */
       }
-      this.data = defaults();
+      // Run the built-in defaults through the same normalisers as saved content
+      // (so e.g. Match-the-Following seed words migrate into the entries model).
+      this.data = ensureSections(defaults());
       this._ts = 0;
     },
 

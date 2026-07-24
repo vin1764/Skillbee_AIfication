@@ -1680,10 +1680,10 @@ window.SkillbeeBrand = {
     if (!Array.isArray(e.questions)) e.questions = [];
     e.questions = e.questions.filter(function (q) { return q && typeof q === "object"; });
     e.questions.forEach(function (q) {
-      if (!Array.isArray(q.words)) q.words = [];
-      // Manual "custom pairs": the question picks a left + right tile type once,
-      // then holds entries { left, right } sharing those types.
-      if (typeof q.leftType !== "string") q.leftType = "text";
+      // A question picks a left + right tile type once, then holds entries
+      // { left, right } sharing those types. Default is Audio ↔ Text (spoken
+      // German ↔ English) — the classic matching round.
+      if (typeof q.leftType !== "string") q.leftType = "audio";
       if (typeof q.rightType !== "string") q.rightType = "text";
       if (!Array.isArray(q.entries)) q.entries = [];
       // Migrate the brief earlier per-pair form into the per-question model.
@@ -1696,6 +1696,14 @@ window.SkillbeeBrand = {
         });
       }
       delete q.pairs;
+      // Migrate the old German↔English "words" rows into Audio↔Text entries.
+      if (Array.isArray(q.words) && q.words.length) {
+        var we = q.words.filter(function (w) { return w && w.de && w.en; }).map(function (w) { return { left: w.de, right: w.en }; });
+        if (!q.entries.length) { q.leftType = "audio"; q.rightType = "text"; q.entries = we; }
+        else if (q.leftType === "audio" && q.rightType === "text") { q.entries = q.entries.concat(we); }
+        // else: incompatible types (rare) — the words are dropped.
+      }
+      delete q.words;
       q.entries = q.entries.filter(function (en) { return en && typeof en === "object"; });
       q.entries.forEach(function (en) { if (en.left == null) en.left = ""; if (en.right == null) en.right = ""; });
     });
@@ -1812,7 +1820,9 @@ window.SkillbeeBrand = {
       } catch (e) {
         /* localStorage may be unavailable (e.g. sandboxed) — fall back to defaults */
       }
-      this.data = defaults();
+      // Run the built-in defaults through the same normalisers as saved content
+      // (so e.g. Match-the-Following seed words migrate into the entries model).
+      this.data = ensureSections(defaults());
       this._ts = 0;
     },
 
@@ -5396,122 +5406,93 @@ document.addEventListener("DOMContentLoaded", App.init);
         body.appendChild(addRowBtn("+ Sentence", function () { list.push({ de: "", en: "" }); store.save(); render(); }));
       }
 
-      /* ---- Hör-Paare editor (Listen & Match): each exercise = N questions, each ≥3 words ---- */
+      /* ---- Match the Following editor: each exercise = N questions; a question
+             picks a Left + Right tile type, then holds ≥3 entries of that shape. */
       function renderPairsExercise(body, ex) {
         body.appendChild(
           el("p", {
             class: "adm-hint",
             html:
-              "These power <b>🔗 Match the Following</b> in Live Class Mode. Each <b>question</b> is one matching round; give it <b>at least 3 pairs</b>. " +
-              "Build pairs two ways (mix freely): add quick <b>word pairs</b> (spoken German ↔ English), or add <b>custom pairs</b> where each side is text, an icon, a picture or audio. " +
-              "German audio is spoken with the app's voice (generated audio where available, otherwise the device voice). Changes save automatically."
+              "These power <b>🔗 Match the Following</b> in Live Class Mode. Each <b>question</b> is one matching round: " +
+              "pick a <b>type for the Left and Right side</b> (text, icon, picture or audio), then add <b>at least 3 entries</b>. " +
+              "The default is <b>Audio ↔ Text</b> — spoken German matched to its English. German audio uses the app's voice " +
+              "(generated where available, otherwise the device voice). Changes save automatically."
           })
         );
-        body.appendChild(el("div", { class: "adm-ex-head" }, [ input(ex, "emoji", "🎧", "adm-emoji", 6) ]));
+        body.appendChild(el("div", { class: "adm-ex-head" }, [ input(ex, "emoji", "🔗", "adm-emoji", 6) ]));
         if (!Array.isArray(ex.questions)) ex.questions = [];
         var list = ex.questions;
-        // Bulk translate spans every word in every question of this exercise.
+        // Bulk translate covers the English side of every Audio↔Text entry.
         var trRows = [];
         list.forEach(function (q) {
-          (q.words || []).forEach(function (w) { trRows.push({ obj: w, enKey: "en", getGerman: function () { return w.de; } }); });
+          if (q.leftType === "audio" && q.rightType === "text") {
+            (q.entries || []).forEach(function (en) { trRows.push({ obj: en, enKey: "right", getGerman: function () { return en.left; } }); });
+          }
         });
         body.appendChild(bulkTranslateBar(trRows));
         if (!list.length) body.appendChild(emptyState("No questions yet — add the first one below."));
         list.forEach(function (q, qi) {
-          if (!Array.isArray(q.words)) q.words = [];
           if (!Array.isArray(q.entries)) q.entries = [];
-          var validCustom = q.entries.filter(function (en) { return en && String(en.left || "").trim() && String(en.right || "").trim(); }).length;
-          var complete = q.words.filter(function (w) { return w.de && w.en; }).length + validCustom;
+          var complete = q.entries.filter(function (en) { return en && String(en.left || "").trim() && String(en.right || "").trim(); }).length;
           var card = el("div", { class: "adm-pairs-q" });
           card.appendChild(el("div", { class: "adm-pairs-head" }, [
             el("h4", { class: "adm-pairs-title", text: "Question " + (qi + 1) }),
             el("span", { class: "adm-pairs-count" + (complete < 3 ? " warn" : ""), text: complete + (complete === 1 ? " pair" : " pairs") + (complete < 3 ? " · needs at least 3" : "") }),
             el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove this question" }, on: { click: function () { list.splice(qi, 1); store.save(); render(); } } })
           ]));
-          // Quick word pairs (spoken German ↔ English) — the simple default.
-          card.appendChild(el("div", { class: "adm-row adm-row-head adm-pairs-row" }, [
-            el("span", { class: "adm-emoji-h", text: "Icon" }),
-            el("span", { text: "German (spoken)" }),
-            el("span", { text: "English (meaning)" }),
-            el("span", {})
-          ]));
-          q.words.forEach(function (w, wi) {
-            var emojiInp = input(w, "emoji", "🙂", "adm-emoji", 6);
-            var deInp = input(w, "de", "e.g. der Hund", "adm-input");
-            var enCell = enField(w, "en", function () { return w.de; }, "e.g. the dog");
-            var fill = wireAutoEmoji(emojiInp, w, function () { return [w.de, w.en]; });
-            if (fill) { deInp.addEventListener("change", fill); var ei = enCell.querySelector("input"); if (ei) ei.addEventListener("change", fill); }
-            card.appendChild(el("div", { class: "adm-row adm-pairs-row" }, [
-              emojiInp, deInp, enCell,
-              delRowBtn("Remove word", function () { q.words.splice(wi, 1); store.save(); render(); })
-            ]));
-          });
-          card.appendChild(addRowBtn("+ Word", function () { q.words.push({ de: "", en: "", emoji: "" }); store.save(); render(); }));
-          // Custom pairs: pick a type for each side once, then add entries.
-          card.appendChild(el("div", { class: "adm-cpair-sep", text: "Custom pairs — pick a type for each side, then add entries" }));
           card.appendChild(customSection(q));
           body.appendChild(card);
         });
         body.appendChild(addRowBtn("+ Question", function () {
-          list.push({ words: [{ de: "", en: "", emoji: "" }, { de: "", en: "", emoji: "" }, { de: "", en: "", emoji: "" }] });
+          list.push({ leftType: "audio", rightType: "text", entries: [{ left: "", right: "" }, { left: "", right: "" }, { left: "", right: "" }] });
           store.save(); render();
         }));
       }
 
       /* Custom pairs for one question: pick a Left type + a Right type once, then
-         add entries { left, right } that all share those two types. Changing a
-         type only re-renders the entry inputs (the type pickers keep their state). */
+         add entries { left, right } that all share those types. Type changes and
+         add/remove do a full re-render so the count + bulk-translate bar stay in
+         sync (typing into a field never re-renders, so focus is never lost). */
       function customSection(q) {
-        if (typeof q.leftType !== "string") q.leftType = "text";
+        if (typeof q.leftType !== "string") q.leftType = "audio";
         if (typeof q.rightType !== "string") q.rightType = "text";
         if (!Array.isArray(q.entries)) q.entries = [];
         var entriesWrap = el("div", { class: "adm-entries" });
-
-        function renderEntries() {
-          entriesWrap.innerHTML = "";
-          if (!q.entries.length) { entriesWrap.appendChild(el("p", { class: "adm-blank-hint", text: "No entries yet — add at least 3 with “+ Entry”." })); return; }
+        if (!q.entries.length) {
+          entriesWrap.appendChild(el("p", { class: "adm-blank-hint", text: "No entries yet — add at least 3 with “+ Entry”." }));
+        } else {
           q.entries.forEach(function (en, ei) {
             entriesWrap.appendChild(el("div", { class: "adm-entry" }, [
               el("span", { class: "adm-entry-n", text: (ei + 1) }),
-              el("div", { class: "adm-entry-side" }, [entryInput(en, "left", q.leftType)]),
+              el("div", { class: "adm-entry-side" }, [entryInput(en, "left", q.leftType, q)]),
               el("span", { class: "adm-entry-mid", text: "⟷" }),
-              el("div", { class: "adm-entry-side" }, [entryInput(en, "right", q.rightType)]),
-              el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove entry" }, on: { click: function () { q.entries.splice(ei, 1); store.save(); renderEntries(); } } })
+              el("div", { class: "adm-entry-side" }, [entryInput(en, "right", q.rightType, q)]),
+              el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove entry" }, on: { click: function () { q.entries.splice(ei, 1); store.save(); render(); } } })
             ]));
           });
         }
-
-        var types = el("div", { class: "adm-custom-types" }, [
-          typePickerRow("Left", q, "leftType", renderEntries),
-          typePickerRow("Right", q, "rightType", renderEntries)
-        ]);
-        renderEntries();
         return el("div", { class: "adm-custom" }, [
-          types,
+          el("div", { class: "adm-custom-types" }, [typePickerRow("Left", q, "leftType"), typePickerRow("Right", q, "rightType")]),
           entriesWrap,
-          addRowBtn("+ Entry", function () { q.entries.push({ left: "", right: "" }); store.save(); renderEntries(); })
+          addRowBtn("+ Entry", function () { q.entries.push({ left: "", right: "" }); store.save(); render(); })
         ]);
       }
 
-      // A labelled 4-chip type picker bound to obj[field]; onChange after a change.
-      function typePickerRow(label, obj, field, onChange) {
+      // A labelled 4-chip type picker bound to obj[field]; a change re-renders.
+      function typePickerRow(label, obj, field) {
         var TYPES = [["text", "Text", "🔤"], ["icon", "Icon", "😀"], ["image", "Image", "🖼"], ["audio", "Audio", "🔊"]];
-        var chips = [];
         var chipRow = el("div", { class: "adm-typechips" });
         TYPES.forEach(function (T) {
-          var btn = el("button", { class: "adm-typechip" + (obj[field] === T[0] ? " sel" : ""), attrs: { type: "button", title: T[1] }, on: { click: function () {
-            if (obj[field] !== T[0]) { obj[field] = T[0]; store.save(); }
-            chips.forEach(function (c) { c.btn.classList.toggle("sel", c.t === T[0]); });
-            if (onChange) onChange();
-          } } }, [el("span", { class: "adm-typechip-ic", text: T[2] }), el("span", { class: "adm-typechip-lbl", text: T[1] })]);
-          chips.push({ t: T[0], btn: btn });
-          chipRow.appendChild(btn);
+          chipRow.appendChild(el("button", { class: "adm-typechip" + (obj[field] === T[0] ? " sel" : ""), attrs: { type: "button", title: T[1] }, on: { click: function () {
+            if (obj[field] === T[0]) return;
+            obj[field] = T[0]; store.save(); render();
+          } } }, [el("span", { class: "adm-typechip-ic", text: T[2] }), el("span", { class: "adm-typechip-lbl", text: T[1] })]));
         });
         return el("div", { class: "adm-typepick" }, [el("span", { class: "adm-side-lbl", text: label }), chipRow]);
       }
 
       // The input for one entry side, matched to the question's chosen type.
-      function entryInput(en, field, type) {
+      function entryInput(en, field, type, q) {
         if (en[field] == null) en[field] = "";
         if (type === "audio") {
           var inp = input(en, field, "German word", "adm-input");
@@ -5526,7 +5507,11 @@ document.addEventListener("DOMContentLoaded", App.init);
           return el("div", { class: "adm-side-row" }, [urlInp, prev]);
         }
         if (type === "icon") return iconButton(en, field);
-        return input(en, field, "type the text", "adm-input"); // text
+        // Text — on the English side of an Audio↔Text question, offer ✨ translate.
+        if (field === "right" && q && q.leftType === "audio" && q.rightType === "text") {
+          return enField(en, "right", function () { return en.left; }, "the dog");
+        }
+        return input(en, field, "type the text", "adm-input");
       }
 
       // A compact icon button that opens the emoji picker modal (reuses js/emoji.js).
