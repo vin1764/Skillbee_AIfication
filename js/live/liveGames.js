@@ -98,97 +98,245 @@
     };
   }
 
-  /* ---- Fall-Detektiv (Case Detective): pick the correctly-declined article ---- */
-  // Render a sentence, styling the blank and (on the host) the clue word, which
-  // glows after a short delay via CSS so struggling students get a hint.
-  function renderSentence(el, sentence, clueWord, isHost) {
-    return String(sentence).split(/(\s+)/).map(function (tok) {
-      if (/^\s+$/.test(tok)) return document.createTextNode(tok);
-      if (tok.indexOf("___") >= 0) return el("span", { class: "cases-blank", text: "____" });
-      var core = tok.replace(/[.,!?;:]/g, "");
-      if (isHost && clueWord && core.toLowerCase() === clueWord.toLowerCase()) {
-        return el("span", { class: "cases-clue", text: tok });
-      }
-      return el("span", { text: tok });
-    });
-  }
-
-  // Three wrong article options. Use the ones stored with the sentence if
-  // present; otherwise pick three other real German articles (so teacher-added
-  // rows work without having to type distractors by hand).
+  /* ==================================================================
+     Lücken-Text (Fill in the Blank) — a general fill-in-the-blank format.
+     A sentence has one OR MANY blanks (___1___, ___2___, …). The teacher
+     picks Tap (a shared word bank of answers + distractors) or Type (an
+     inline text box per blank). Any content set that provides sentences +
+     blanks can plug in — case articles are just the first data set. See the
+     schema in js/data-cases.js. This game replaces the old case-only
+     "Fall-Detektiv"; its single-blank case sentences migrate in unchanged
+     (one blank each), and it keeps reading the same "cases" content bank.
+     ================================================================== */
   var ARTICLE_POOL = ["der", "die", "das", "den", "dem", "des"];
   function caseDistractors(s) {
     return wrongOptions(s.distractors, s.correct, ARTICLE_POOL, 3);
   }
 
-  var casesAdapter = {
-    meta: { name: "Fall-Detektiv", emoji: "🕵️", contentType: "cases" },
-    timeLimit: 20000,
-    supportsTyping: true, // teacher can choose tap-options or type-the-answer
+  // Answer matching: case-insensitive, punctuation stripped, ä/ö/ü/ß folded to
+  // ae/oe/ue/ss — the same lenient rules used by Hör gut zu!'s type mode.
+  function ltNorm(s) {
+    return String(s == null ? "" : s).toLowerCase()
+      .replace(/[.,!?;:"'“”„«»()¡¿…\-–—]/g, "")
+      .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
+      .trim();
+  }
+
+  // If a sentence uses plain "___" gaps (legacy), number them ___1___, ___2___…
+  // in reading order so every blank has a stable id. Already-numbered sentences
+  // are returned untouched.
+  function ensureNumbered(sentence, blanks) {
+    if (/___\d+___/.test(sentence)) return sentence;
+    var i = 0;
+    return sentence.replace(/_{2,}/g, function () {
+      var b = blanks[i]; i++;
+      return "___" + (b ? b.id : i) + "___";
+    });
+  }
+
+  // Accept BOTH the new multi-blank schema and the legacy single-blank case
+  // rows (sentence + correct + distractors) a teacher may have in the editor,
+  // and normalise to { sentence, blanks:[{id,correct}], wordBank, explanation }.
+  function normBlankEntry(s) {
+    if (!s) return null;
+    if (Array.isArray(s.blanks) && s.blanks.length) {
+      var blanks = s.blanks.map(function (b, i) {
+        return { id: (b.id != null ? b.id : i + 1), correct: String(b.correct == null ? "" : b.correct).trim() };
+      }).filter(function (b) { return b.correct !== ""; });
+      if (!blanks.length) return null;
+      var wordBank = (Array.isArray(s.wordBank) && s.wordBank.length)
+        ? s.wordBank.map(function (w) { return String(w).trim(); }).filter(Boolean)
+        : blanks.map(function (b) { return b.correct; });
+      return { sentence: ensureNumbered(String(s.sentence || ""), blanks), blanks: blanks, wordBank: wordBank, explanation: s.explanation || "" };
+    }
+    // Legacy: one blank marked by "___", with a single correct article.
+    if (s.sentence && String(s.sentence).indexOf("___") >= 0 && s.correct) {
+      var sent = String(s.sentence).replace(/_{2,}/, "___1___");
+      return {
+        sentence: sent,
+        blanks: [{ id: 1, correct: String(s.correct).trim() }],
+        wordBank: [String(s.correct).trim()].concat(caseDistractors(s)),
+        explanation: s.explanation || ""
+      };
+    }
+    return null;
+  }
+
+  // The full correct sentence, blanks filled in — for reveal + pronunciation.
+  function fillBlanksText(round) {
+    var byId = {};
+    (round.blanks || []).forEach(function (b) { byId[b.id] = b.correct; });
+    return String(round.sentence).replace(/___(\d+)___/g, function (_, n) {
+      return byId[n] != null ? byId[n] : "___";
+    });
+  }
+
+  // Host board: the sentence with visible numbered gaps, no answers shown.
+  function blanksHostNodes(el, sentence) {
+    return String(sentence).split(/(___\d+___)/).map(function (part) {
+      var m = /^___(\d+)___$/.exec(part);
+      if (m) return el("span", { class: "lt-gap", text: "＿＿" });
+      return part ? el("span", { text: part }) : document.createTextNode("");
+    });
+  }
+
+  var blanksAdapter = {
+    meta: { name: "Lücken-Text", emoji: "✏️", contentType: "cases" },
+    timeLimit: 20000,           // used only as a fallback elapsed cap; no countdown
+    supportsTyping: true,       // teacher chooses Tap (word bank) or Type (inline)
+    blanks: true,               // routes to the fill-in player + per-blank reveal
+    statefulPlayer: true,       // the phone widget builds once per round (no rebuild)
     pickLabel: "Exercise",
-    // The "topics" for this game are the teacher's exercises.
+    typeLabels: {
+      options: ["Tap the words", "Word bank — pick & place"],
+      type: ["Type the answers", "Free recall — harder"]
+    },
     getTopics: function () {
       var store = window.ContentStore;
       var list = (store && store.exercisesFor) ? store.exercisesFor("cases") : [];
       return list.map(function (e) {
         var n = (e.accusative || []).length + (e.dative || []).length + (e.genitive || []).length;
-        return { id: e.id, name: e.name, emoji: "🕵️", english: n + (n === 1 ? " sentence" : " sentences") };
+        return { id: e.id, name: e.name, emoji: "✏️", english: n + (n === 1 ? " sentence" : " sentences") };
       });
     },
     buildRounds: function (topic) {
       var store = window.ContentStore;
       var e = (store && store.exercise) ? store.exercise("cases", topic && topic.id) : null;
       var C = e || window.CaseData || { accusative: [], dative: [], genitive: [] };
-      // An exercise mixes all three cases it contains (its own difficulty scope).
+      // A case exercise mixes the three case groups it contains; a future flat
+      // content set may instead expose an "items" array — accept both.
       var pool = (C.accusative || []).concat(C.dative || []).concat(C.genitive || []);
-      // Skip half-finished rows a teacher may have added in the editor.
-      pool = pool.filter(function (s) {
-        return s && s.sentence && String(s.sentence).indexOf("___") >= 0 && s.correct;
-      });
-      return kit().sample(pool, Math.min(10, pool.length)).map(function (s) {
+      if (!pool.length && Array.isArray(C.items)) pool = C.items;
+      var norm = pool.map(normBlankEntry).filter(Boolean);
+      return kit().sample(norm, Math.min(10, norm.length)).map(function (s) {
         return {
-          type: "cases", sentence: s.sentence, blank: s.blank || "", clueWord: s.clueWord || "",
-          options: kit().shuffle([s.correct].concat(caseDistractors(s))),
-          answer: s.correct, correct: s.correct, explanation: s.explanation || ""
+          type: "blanks",
+          sentence: s.sentence,
+          blanks: s.blanks,
+          wordBank: kit().shuffle(s.wordBank.slice()),
+          explanation: s.explanation || ""
         };
       });
     },
     hostContent: function (el, round) {
-      return el("div", { class: "cases-q" }, [
-        el("div", { class: "cases-tag", text: "🕵️ Which article fits the blank?" }),
-        el("div", { class: "cases-sentence" }, renderSentence(el, round.sentence, round.clueWord, true))
+      var many = (round.blanks || []).length > 1;
+      var typing = round.answerMode === "type";
+      return el("div", { class: "lt-q" }, [
+        el("div", { class: "lt-tag", text: "✏️ Fill in the blank" + (many ? "s" : "") }),
+        el("div", { class: "lt-sentence host" }, blanksHostNodes(el, round.sentence)),
+        el("div", { class: "lt-hostnote", text: typing
+          ? "⌨️ Students type the missing word" + (many ? "s" : "") + " on their phones"
+          : "🔤 Students build the sentence from a word bank on their phones" })
       ]);
     },
+    // The interactive fill-in widget — self-contained so both Live and the Solo
+    // wrapper reuse it. api.submit({ blanks: { id: text } }) once every gap is set.
     playerContent: function (el, round, api) {
-      var sentence = el("div", { class: "cases-sentence phone" }, renderSentence(el, round.sentence, round.clueWord, false));
-      if (round.answerMode === "type") {
-        var input = el("input", { class: "type-input", attrs: { type: "text", placeholder: "type the article…", autocapitalize: "off", autocomplete: "off", spellcheck: "false" } });
-        var submit = function () { var v = (input.value || "").trim(); if (v) api.submit({ text: v }); };
-        input.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
-        setTimeout(function () { try { input.focus(); } catch (e) {} }, 50);
-        return el("div", { class: "cases-player" }, [
-          sentence,
-          el("div", { class: "type-row" }, [input, el("button", { class: "btn primary type-go", text: "Submit", on: { click: submit } })])
-        ]);
+      var typing = round.answerMode === "type";
+      var order = [];            // blank ids in reading order
+      var state = {};            // id -> { value, fromBank, el }
+      var bankBtns = [];         // { btn, word, usedBy }
+      var submitBtn;
+
+      function refresh() {
+        var allFilled = order.length && order.every(function (id) { return state[id].value !== ""; });
+        if (submitBtn) submitBtn.disabled = !allFilled;
       }
-      return el("div", { class: "cases-player" }, [
-        sentence,
-        el("div", { class: "live-q-options phone" }, round.options.map(function (opt, i) {
-          return el("button", {
-            class: "live-opt phone", attrs: { style: "--c:" + COLORS[i] },
-            on: { click: function () { api.submit({ choice: opt }); } }
-          }, [el("span", { class: "opt-shape", text: SHAPES[i] }), el("span", { class: "opt-text", text: opt })]);
-        }))
-      ]);
+      function nextEmptyId() {
+        for (var k = 0; k < order.length; k++) { if (state[order[k]].value === "") return order[k]; }
+        return null;
+      }
+      function doSubmit() {
+        if (submitBtn && submitBtn.disabled) return;
+        var answers = {};
+        order.forEach(function (id) { answers[id] = state[id].value; });
+        api.submit({ blanks: answers });
+      }
+      function fillSlot(id, word, bankIdx) {
+        var st = state[id];
+        st.value = word; st.fromBank = (bankIdx == null ? null : bankIdx);
+        st.el.textContent = word; st.el.classList.remove("empty"); st.el.classList.add("filled");
+        refresh();
+      }
+      function clearSlot(id) {              // tap mode: return the word to the bank
+        var st = state[id];
+        if (st.value === "") return;
+        var bi = st.fromBank;
+        st.value = ""; st.fromBank = null;
+        st.el.textContent = "＿＿"; st.el.classList.add("empty"); st.el.classList.remove("filled");
+        if (bi != null && bankBtns[bi]) { bankBtns[bi].usedBy = null; bankBtns[bi].btn.classList.remove("used"); bankBtns[bi].btn.disabled = false; }
+        refresh();
+      }
+      function placeWord(bankIdx) {
+        var entry = bankBtns[bankIdx];
+        if (!entry || entry.usedBy != null) return;
+        var id = nextEmptyId();
+        if (id == null) return;
+        entry.usedBy = id; entry.btn.classList.add("used"); entry.btn.disabled = true;
+        fillSlot(id, entry.word, bankIdx);
+        try { kit().beep && kit().beep("good"); } catch (e) {}
+      }
+
+      var sentEl = el("div", { class: "lt-sentence phone" });
+      String(round.sentence).split(/(___\d+___)/).forEach(function (part) {
+        var m = /^___(\d+)___$/.exec(part);
+        if (m) {
+          var id = parseInt(m[1], 10);
+          order.push(id);
+          state[id] = { value: "", fromBank: null, el: null };
+          var slot;
+          if (typing) {
+            slot = el("input", { class: "lt-input", attrs: { type: "text", size: "6", "aria-label": "blank " + id, autocapitalize: "off", autocomplete: "off", spellcheck: "false", placeholder: "?" } });
+            slot.addEventListener("input", function () { state[id].value = slot.value.trim(); refresh(); });
+            slot.addEventListener("keydown", function (ev) {
+              if (ev.key !== "Enter") return;
+              ev.preventDefault();
+              var pos = order.indexOf(id);
+              if (pos >= 0 && pos < order.length - 1) { try { state[order[pos + 1]].el.focus(); } catch (e) {} }
+              else doSubmit();
+            });
+          } else {
+            slot = el("button", { class: "lt-slot empty", attrs: { type: "button" }, text: "＿＿", on: { click: function () { clearSlot(id); } } });
+          }
+          state[id].el = slot;
+          sentEl.appendChild(slot);
+        } else if (part) {
+          sentEl.appendChild(el("span", { class: "lt-txt", text: part }));
+        }
+      });
+
+      var children = [sentEl];
+      if (typing) {
+        children.push(el("div", { class: "lt-typehint", text: "Tap a blank and type the missing word." + (order.length > 1 ? " Enter jumps to the next." : "") }));
+        setTimeout(function () { try { state[order[0]].el.focus(); } catch (e) {} }, 60);
+      } else {
+        var bank = el("div", { class: "lt-bank" });
+        kit().shuffle((round.wordBank || []).slice()).forEach(function (w, i) {
+          var btn = el("button", { class: "lt-word", attrs: { type: "button" }, text: w, on: { click: function () { placeWord(i); } } });
+          bankBtns.push({ btn: btn, word: w, usedBy: null });
+          bank.appendChild(btn);
+        });
+        children.push(bank);
+      }
+      submitBtn = el("button", { class: "btn primary lt-submit", text: "Submit", attrs: { disabled: "true" }, on: { click: doSubmit } });
+      children.push(submitBtn);
+      refresh();
+      return el("div", { class: "lt-player" }, children);
     },
+    // Per-blank partial credit: 0…1000 points scaled by the share of blanks right.
     score: function (round, payload, elapsedMs, timeLimit) {
-      var given = payload ? (payload.choice != null ? payload.choice : (payload.text || "").trim().toLowerCase()) : "";
-      if (given !== round.answer) return { correct: false, points: 0 };
-      var frac = Math.max(0, 1 - elapsedMs / timeLimit);
-      return { correct: true, points: Math.round(500 + 500 * frac) };
+      var ans = (payload && payload.blanks) || {};
+      var blanks = round.blanks || [];
+      var total = blanks.length || 1;
+      var matched = 0;
+      blanks.forEach(function (b) {
+        var g = ltNorm(ans[b.id]);
+        if (g !== "" && g === ltNorm(b.correct)) matched++;
+      });
+      return { correct: matched === total, points: Math.round((matched / total) * 1000), matched: matched, total: total };
     },
-    correctLabel: function (round) { return round.correct; },
-    speakOnReveal: function (round) { return String(round.sentence).replace("___", round.correct); }
+    correctLabel: function (round) { return fillBlanksText(round); },
+    speakOnReveal: function (round) { return fillBlanksText(round); }
   };
 
   /* ---- Wortmonster (Word Monster): build compound nouns from two tiles ---- */
@@ -680,7 +828,7 @@
   window.LiveGames = {
     quiz: choiceAdapter({ name: "Vocabulary Quiz", emoji: "🎯", contentType: "vocab" }),
     memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" }),
-    cases: casesAdapter,
+    cases: blanksAdapter,
     wortmonster: compoundAdapter,
     plural: pluralAdapter,
     verben: verbAdapter,

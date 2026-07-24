@@ -18,9 +18,9 @@
   //              its own prompt), so we render only that (plus a tag).
   //   "match"  — Hör-Paare's tap-the-pairs board (its own little runner).
   var SOLO_GAMES = [
-    { key: "cases", name: "Fall-Detektiv", emoji: "🕵️", color: "#8b5cf6", layout: "player",
-      tag: "🕵️ Which article fits the blank?",
-      description: "Spot the right article (der/die/das…) to crack each case. Grammar detective work." },
+    { key: "cases", name: "Lücken-Text", emoji: "✏️", color: "#8b5cf6", layout: "player",
+      tag: "✏️ Fill in the blank",
+      description: "Fill the blanks in each sentence — pick the missing words from the bank." },
     { key: "wortmonster", name: "Wortmonster", emoji: "🧟", color: "#22c55e", layout: "player",
       tag: "🧟 Build the German word",
       description: "Smash two parts together to build German compound nouns." },

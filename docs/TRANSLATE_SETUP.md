@@ -12,9 +12,10 @@ It's on for the games where content is a plain German → English pair:
 - **Wortmonster** compound words (translates the joined word, e.g. *Handschuh*)
 - **Hör gut zu!** listening prompts (a word *or* a whole sentence)
 
-It is deliberately **off for Fall-Detektiv**. Those case sentences teach which
-noun takes which grammatical case, and a generic translation can quietly shift
-the emphasis and teach the wrong thing — so that content stays fully manual.
+It is deliberately **off for Lücken-Text** (the fill-in-the-blank game, which
+Fall-Detektiv's case sentences now feed into). Those sentences teach which word
+takes which grammatical form, and a generic translation can quietly shift the
+emphasis and teach the wrong thing — so that content stays fully manual.
 
 ---
 

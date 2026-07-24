@@ -30,6 +30,19 @@ window.LiveMode = (function () {
     });
   }
 
+  // Lücken-Text reveal: the sentence with every numbered blank replaced by its
+  // correct word, each highlighted. `filled` maps blank id -> shown text/class.
+  function blanksFilled(sentence, filled) {
+    return String(sentence).split(/(___\d+___)/).map(function (part) {
+      var m = /^___(\d+)___$/.exec(part);
+      if (m) {
+        var f = filled(parseInt(m[1], 10));
+        return el("span", { class: f.cls, text: f.text });
+      }
+      return part ? el("span", { text: part }) : document.createTextNode("");
+    });
+  }
+
   /* ---------- entry ---------- */
   function start(container, api) {
     C = container; el = api.el; kit = api.kit; store = api.store; goBack = api.back;
@@ -412,6 +425,11 @@ window.LiveMode = (function () {
           meaning: r.meaning || null, tiles: r.tiles || null,
           words: r.words || null, speed: r.speed || null,
           answerMode: sess.answerMode || "options",
+          // Lücken-Text: phones need the blank ids (to lay out the gaps) and, in
+          // tap mode, the shuffled word bank — but NEVER the correct answers, so
+          // type mode can't be peeked. The bank naturally contains the answers.
+          blanks: (adapter.blanks && r.blanks) ? r.blanks.map(function (b) { return { id: b.id }; }) : null,
+          wordBank: (adapter.blanks && sess.answerMode !== "type") ? (r.wordBank || null) : null,
           // Type mode needs the answer on the phone (to diff on submit). Only sent
           // for the type-diff game in type mode — tap mode still hides it.
           correct: (adapter.typeResult && sess.answerMode === "type") ? (r.correct || r.word || null) : null,
@@ -554,10 +572,11 @@ window.LiveMode = (function () {
         });
         results.sort(function (x, y) { return y.points - x.points; });
         results.forEach(function (rr, idx) { rr.rank = idx + 1; });
-        window.LiveDB.updateSession(code, {
-          status: "reveal", scores: scores,
-          reveal: { index: i, correct: adapter.correctLabel(r), explanation: r.explanation || null, results: results }
-        });
+        var revealDoc = { index: i, correct: adapter.correctLabel(r), explanation: r.explanation || null, results: results };
+        // Lücken-Text: now that the round is over it's safe to ship the correct
+        // answers so each phone can mark its own blanks right/wrong.
+        if (adapter.blanks) { revealDoc.blanks = r.blanks; revealDoc.sentence = r.sentence; }
+        window.LiveDB.updateSession(code, { status: "reveal", scores: scores, reveal: revealDoc });
         var german = adapter.speakOnReveal(r);
         if (german) kit.speak(german);
         renderReveal(i, r, results, scores);
@@ -611,25 +630,40 @@ window.LiveMode = (function () {
     function renderReveal(i, r, results) {
       var last = (i + 1) >= rounds.length;
       var isMatch = !!adapter.match;
+      var isBlanks = !!adapter.blanks;
       var correctCount = results.filter(function (x) { return x.correct; }).length;
       var mtotal = (r.words || []).length;
       // Leaderboard for THIS question only (ranked by points earned this round).
       var ranked = results.filter(function (x) { return x.answered; }).sort(function (a, b) { return b.points - a.points; });
-      var answerBlock = isMatch
-        ? el("div", { class: "reveal-answer" }, [
-            el("div", { class: "reveal-label", text: "Round complete" }),
-            el("div", { class: "reveal-value", text: "🎧 " + mtotal + (mtotal === 1 ? " pair" : " pairs") })
-          ])
-        : el("div", { class: "reveal-answer" }, [
-            el("div", { class: "reveal-label", text: "Correct answer" }),
-            el("div", { class: "reveal-value", text: adapter.correctLabel(r) }),
-            r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null,
-            r.sentence ? el("div", { class: "reveal-sentence" }, filledSentence(r.sentence, r.correct)) : null,
-            r.explanation ? el("div", { class: "reveal-why", text: r.explanation }) : null
-          ]);
+      var answerBlock;
+      if (isMatch) {
+        answerBlock = el("div", { class: "reveal-answer" }, [
+          el("div", { class: "reveal-label", text: "Round complete" }),
+          el("div", { class: "reveal-value", text: "🎧 " + mtotal + (mtotal === 1 ? " pair" : " pairs") })
+        ]);
+      } else if (isBlanks) {
+        // The full sentence with every gap filled + highlighted, plus the note.
+        var byId = {}; (r.blanks || []).forEach(function (b) { byId[b.id] = b.correct; });
+        answerBlock = el("div", { class: "reveal-answer" }, [
+          el("div", { class: "reveal-label", text: "Correct answer" }),
+          el("div", { class: "reveal-sentence lt" }, blanksFilled(r.sentence, function (id) { return { cls: "rs-fill", text: byId[id] != null ? byId[id] : "___" }; })),
+          r.explanation ? el("div", { class: "reveal-why", text: r.explanation }) : null
+        ]);
+      } else {
+        answerBlock = el("div", { class: "reveal-answer" }, [
+          el("div", { class: "reveal-label", text: "Correct answer" }),
+          el("div", { class: "reveal-value", text: adapter.correctLabel(r) }),
+          r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null,
+          r.sentence ? el("div", { class: "reveal-sentence" }, filledSentence(r.sentence, r.correct)) : null,
+          r.explanation ? el("div", { class: "reveal-why", text: r.explanation }) : null
+        ]);
+      }
+      var showCount = isMatch || isBlanks;   // board shows an "x/y" suffix per student
       var statText = isMatch
         ? correctCount + " of " + results.length + " finished every pair"
-        : correctCount + " of " + results.length + " correct";
+        : (isBlanks
+            ? correctCount + " of " + results.length + " filled every blank"
+            : correctCount + " of " + results.length + " correct");
       show(screen("host", [
         el("div", { class: "host-topbar" }, [el("div", { class: "host-q-num", text: (isMatch ? "Round " : "Question ") + (i + 1) + " / " + rounds.length })]),
         answerBlock,
@@ -639,8 +673,8 @@ window.LiveMode = (function () {
           ? el("div", { class: "board-list" }, ranked.slice(0, 8).map(function (x, idx) {
               return el("div", { class: "board-row" + (idx === 0 && x.points > 0 ? " top" : "") }, [
                 el("span", { class: "board-rank", text: (idx + 1) }),
-                el("span", { class: "board-name", text: x.name + (isMatch ? "  (" + x.matched + "/" + x.total + ")" : "") }),
-                el("span", { class: "board-pts", text: x.points > 0 ? "+" + x.points : (isMatch ? "0" : "✗") })
+                el("span", { class: "board-name", text: x.name + (showCount ? "  (" + x.matched + "/" + x.total + ")" : "") }),
+                el("span", { class: "board-pts", text: x.points > 0 ? "+" + x.points : (showCount ? "0" : "✗") })
               ]);
             }))
           : el("p", { class: "live-muted", text: "No answers this round." }),
@@ -787,13 +821,15 @@ window.LiveMode = (function () {
     var lastStatus = null, lastQ = -1, lastSeq = null;
     var matchRenderedQ = -1; // match board is stateful — render it once per round
     var typeRenderedQ = -1;  // type input is stateful too — render once per round
+    var statefulRenderedQ = -1; // Lücken-Text widget: build once, don't rebuild
     var typeState = { qi: -1, text: "" }; // this phone's last typed answer
+    var blanksState = { qi: -1, answers: null }; // this phone's submitted blanks
 
     track(window.LiveDB.listenSession(code, function (s) {
       if (!s) { show(screen("player live-center", [el("div", { class: "live-card" }, [el("h2", { text: "Room closed" })])])); return; }
       // A new game in the same room resets question numbering — allow answering again.
       var seq = s.gameSeq || 0;
-      if (seq !== lastSeq) { answeredIndex = -1; matchRenderedQ = -1; typeRenderedQ = -1; lastSeq = seq; }
+      if (seq !== lastSeq) { answeredIndex = -1; matchRenderedQ = -1; typeRenderedQ = -1; statefulRenderedQ = -1; lastSeq = seq; }
       var qi = s.round ? s.round.index : -1;
       if (s.status === lastStatus && qi === lastQ && s.status !== "question") return;
       lastStatus = s.status; lastQ = qi;
@@ -818,12 +854,21 @@ window.LiveMode = (function () {
           typeRenderedQ = qi;
           return typePlayerScreen(s, qAdapter);
         }
+        if (qAdapter && qAdapter.statefulPlayer) {
+          // Lücken-Text: the fill-in widget holds in-progress taps/typing, so it
+          // must be built once and never rebuilt while the student is working.
+          if (answeredIndex === qi) return waitScreen("Answer locked ✔", "Waiting for the class…");
+          if (statefulRenderedQ === qi) return;
+          statefulRenderedQ = qi;
+          return answerScreen(s);
+        }
         if (answeredIndex === qi) return waitScreen("Answer locked ✔", "Waiting for the class…");
         return answerScreen(s);
       }
       if (s.status === "reveal") {
         var rAdapter = window.LiveGames[s.gameId];
         if (rAdapter && rAdapter.typeResult && s.answerMode === "type") return typeRevealScreen(s, rAdapter);
+        if (rAdapter && rAdapter.blanks) return blanksRevealScreen(s, rAdapter);
         return resultScreen(s);
       }
       if (s.status === "leaderboard") return standingScreen(s);
@@ -848,16 +893,21 @@ window.LiveMode = (function () {
         submit: function (payload) {
           if (locked || answeredIndex === r.index) return;
           locked = true; answeredIndex = r.index;
+          // Remember this phone's blanks so it can mark them right/wrong at reveal.
+          if (payload && payload.blanks) blanksState = { qi: r.index, answers: payload.blanks };
           window.LiveDB.submitAnswer(code, r.index, stu.id, payload);
           waitScreen("Answer locked ✔", "Waiting for the class…");
         }
       };
+      var hint = adapter.blanks
+        ? (s.answerMode === "type" ? "Fill in the blanks ✍️" : "Tap the words to fill the blanks 👇")
+        : "Tap your answer 👇";
       var body = screen("player", [
         el("div", { class: "player-topbar" }, [
           el("div", { class: "player-name-tag", text: stu.name }),
           el("div", { class: "player-qnum", text: "Q" + (r.index + 1) })
         ]),
-        el("div", { class: "player-prompt-hint", text: "Tap your answer 👇" }),
+        el("div", { class: "player-prompt-hint", text: hint }),
         adapter.playerContent(el, r, api)
       ]);
       show(body);
@@ -1074,6 +1124,55 @@ window.LiveMode = (function () {
       var me = (s.reveal && s.reveal.results || []).filter(function (x) { return x.studentId === stu.id; })[0];
       kit.beep(me && me.correct ? "good" : "bad");
       show(typeDiffNode(r, typeState.text, adapter, me || { points: 0, matched: 0, total: 0 }));
+    }
+
+    // Lücken-Text reveal: the sentence with THIS phone's answers dropped into the
+    // gaps, each coloured green/red, plus the correct word under any wrong gap.
+    function blanksRevealScreen(s, adapter) {
+      var r = s.round;
+      // Didn't submit before the teacher revealed → locked out with the answer.
+      if (answeredIndex !== r.index || blanksState.qi !== r.index) {
+        kit.beep("bad");
+        return show(screen("player live-center res-bad", [el("div", { class: "live-card" }, [
+          el("div", { class: "player-name-tag", text: stu.name }),
+          el("div", { class: "live-big-emoji", text: "⏰" }),
+          el("h2", { text: "Too slow!" }),
+          el("p", { class: "live-sub", text: "Answer: " + (s.reveal ? s.reveal.correct : "") }),
+          el("div", { class: "player-points", text: "0 points" })
+        ])]));
+      }
+      var me = (s.reveal && s.reveal.results || []).filter(function (x) { return x.studentId === stu.id; })[0] || { points: 0, matched: 0, total: 0, correct: false };
+      var mine = blanksState.answers || {};
+      var correctById = {}; (s.reveal && s.reveal.blanks || []).forEach(function (b) { correctById[b.id] = b.correct; });
+      var normEq = function (a, b) {
+        var n = function (x) {
+          return String(x == null ? "" : x).toLowerCase()
+            .replace(/[.,!?;:"'“”„«»()¡¿…\-–—]/g, "")
+            .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").trim();
+        };
+        return n(a) !== "" && n(a) === n(b);
+      };
+      var sentence = s.reveal && s.reveal.sentence ? s.reveal.sentence : r.sentence;
+      var line = el("div", { class: "diff-line lt-reveal" }, blanksFilled(sentence, function (id) {
+        var typed = mine[id], right = normEq(typed, correctById[id]);
+        return { cls: "diff-word diff-" + (right ? "correct" : "wrong"), text: (typed && String(typed).trim()) ? typed : "＿＿" };
+      }));
+      // Corrections list for any blank the student got wrong.
+      var wrongs = (s.reveal && s.reveal.blanks || []).filter(function (b) { return !normEq(mine[b.id], b.correct); });
+      var body = [
+        el("div", { class: "player-name-tag", text: stu.name }),
+        el("div", { class: "diff-label", text: "Your answer" }),
+        line
+      ];
+      if (wrongs.length) {
+        body.push(el("div", { class: "lt-corrections" }, wrongs.map(function (b) {
+          return el("div", { class: "lt-correction", text: "✓ " + b.correct });
+        })));
+      }
+      if (s.reveal && s.reveal.explanation) body.push(el("p", { class: "player-why", text: s.reveal.explanation }));
+      body.push(el("div", { class: "player-points", text: (me.points > 0 ? "+" + me.points : "0") + " points" }));
+      body.push(el("div", { class: "diff-score", text: (me.matched || 0) + " of " + (me.total || (s.reveal && s.reveal.blanks || []).length) + " blanks correct" }));
+      show(screen("player live-center " + (me.correct ? "res-good" : "res-bad"), [el("div", { class: "live-card diff-card" }, body)]));
     }
 
     function resultScreen(s) {

@@ -122,8 +122,8 @@
       /* ---------------- Auto-translate (German → English) ----------------
          Scoped to straightforward German→English pairs: base vocab (words),
          Wortmonster compounds, and Hör gut zu! prompts. Deliberately NOT wired
-         into Fall-Detektiv — its case sentences must stay fully manual, since a
-         generic translation can obscure which noun carries the grammatical case.
+         into Lücken-Text — its fill-in sentences must stay fully manual, since a
+         generic translation can obscure which word carries the grammatical point.
          AI-filled values are DRAFTS: dashed + badged "AI · review" until the
          teacher edits the field or clicks ✓ to confirm. We never silently
          overwrite an existing translation — only empty fields (a per-field
@@ -308,7 +308,7 @@
           el("p", {
             class: "adm-hint",
             html:
-              "These sentences power <b>🕵️ Fall-Detektiv</b> in Live Class Mode. Put <code>___</code> where the article belongs, then give the correct article. " +
+              "These sentences power <b>✏️ Lücken-Text</b> (fill in the blank) in Live Class Mode. Put <code>___</code> where the missing word belongs, then give the correct word. " +
               "Group them by case below; when the class plays this exercise, <b>all</b> its sentences are used. Changes save automatically."
           })
         );
@@ -568,7 +568,7 @@
       // Live-Class-only games get a badge; the rest come from the registered
       // Solo games passed in `games`. Every game owns its own exercises.
       var LIVE_GAMES = [
-        { id: "cases", name: "Fall-Detektiv", emoji: "🕵️", color: "#8b5cf6" },
+        { id: "cases", name: "Lücken-Text", emoji: "✏️", color: "#8b5cf6" },
         { id: "compounds", name: "Wortmonster", emoji: "🧟", color: "#22c55e" },
         { id: "plurals", name: "Plural-Palast", emoji: "🏰", color: "#e0731c" },
         { id: "verbs", name: "Konjugations-Karussell", emoji: "🎠", color: "#e11d74" },

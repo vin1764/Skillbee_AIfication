@@ -39,7 +39,7 @@ it usually means the rules need re-publishing — tell me and I'll help.
 
 ## 1b. Content syncs automatically (no more files)
 
-Your words, sentences, Fall-Detektiv sentences and Wortmonster words are stored in your Firebase,
+Your words, sentences, Lücken-Text (fill-in-the-blank) sentences and Wortmonster words are stored in your Firebase,
 just like the live games. That means:
 
 - Edit content on your laptop and it instantly appears on the classroom smartboard and on every

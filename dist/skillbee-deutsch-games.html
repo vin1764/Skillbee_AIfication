@@ -797,6 +797,36 @@ input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf
 .cases-blank { display: inline-block; min-width: 2.4em; border-bottom: 4px solid var(--skb); vertical-align: bottom; color: transparent; }
 .cases-clue { padding: 0 4px; border-radius: 5px; animation: clueGlow 0.4s ease 2.5s forwards; }
 @keyframes clueGlow { to { background: #fff3a0; box-shadow: 0 0 0 3px #fff3a0; color: var(--ink); } }
+
+/* ---- Lücken-Text (fill in the blank) ---- */
+.lt-q { text-align: center; }
+.lt-tag { color: var(--ink-soft); text-transform: uppercase; letter-spacing: 1px; font-weight: 800; font-size: 0.9rem; margin-bottom: 12px; }
+.lt-sentence { line-height: 2; font-weight: 800; }
+.lt-sentence.host { font-size: clamp(1.5rem, 4vw, 2.7rem); }
+.lt-sentence.phone { font-size: 1.3rem; text-align: center; margin-bottom: 16px; }
+.lt-sentence .lt-txt { white-space: pre-wrap; }
+.lt-gap { display: inline-block; min-width: 2.2em; border-bottom: 4px solid var(--skb); color: transparent; vertical-align: bottom; margin: 0 2px; }
+.lt-hostnote { margin-top: 18px; color: var(--ink-soft); font-weight: 700; font-size: 1.05rem; }
+.lt-player { text-align: center; }
+/* Tap-mode gap: a pill you can tap to empty. Filled shows the chosen word. */
+.lt-slot { display: inline-block; min-width: 2.6em; margin: 0 3px; padding: 2px 10px; border-radius: 8px; border: 2px dashed var(--skb); background: #fff; font: inherit; font-weight: 900; color: var(--skb-dark); cursor: pointer; vertical-align: baseline; }
+.lt-slot.empty { color: var(--skb); letter-spacing: -2px; }
+.lt-slot.filled { border-style: solid; background: #eef6fc; }
+.lt-slot.filled:hover { border-color: var(--bad); }
+/* Type-mode gap: an inline input sized to fit the sentence flow. */
+.lt-input { display: inline-block; width: 4.5em; margin: 0 3px; padding: 2px 6px; border: 2px solid var(--line); border-bottom: 3px solid var(--skb); border-radius: 8px; font: inherit; font-weight: 800; text-align: center; color: var(--ink); background: #fff; }
+.lt-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,77,232,0.15); }
+.lt-typehint { color: var(--ink-soft); font-weight: 600; font-size: 0.9rem; margin: 4px 0 14px; }
+.lt-bank { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 4px 0 18px; }
+.lt-word { padding: 10px 16px; border-radius: 12px; border: 2px solid var(--line); background: #fff; font: inherit; font-weight: 800; font-size: 1.05rem; color: var(--ink); cursor: pointer; transition: transform 0.08s, border-color 0.12s; }
+.lt-word:hover:not(.used) { transform: translateY(-2px); border-color: var(--accent); }
+.lt-word.used { opacity: 0.25; cursor: default; }
+.lt-submit { width: 100%; max-width: 320px; }
+/* Reveal: the student's filled sentence, coloured per blank, + corrections. */
+.diff-line.lt-reveal { margin-bottom: 6px; }
+.lt-corrections { display: flex; flex-direction: column; gap: 4px; margin: 8px 0 2px; }
+.lt-correction { color: var(--good); font-weight: 800; }
+.reveal-sentence.lt { text-align: center; }
 .reveal-sentence { font-size: clamp(1.15rem, 2.6vw, 1.7rem); font-weight: 700; color: var(--ink); margin-top: 12px; line-height: 1.5; }
 .rs-fill { background: var(--skb); color: #fff; padding: 1px 8px; border-radius: 6px; font-weight: 900; }
 .reveal-why { margin-top: 10px; color: var(--skb-dark); font-weight: 700; font-style: italic; }
@@ -4464,8 +4494,8 @@ document.addEventListener("DOMContentLoaded", App.init);
       /* ---------------- Auto-translate (German → English) ----------------
          Scoped to straightforward German→English pairs: base vocab (words),
          Wortmonster compounds, and Hör gut zu! prompts. Deliberately NOT wired
-         into Fall-Detektiv — its case sentences must stay fully manual, since a
-         generic translation can obscure which noun carries the grammatical case.
+         into Lücken-Text — its fill-in sentences must stay fully manual, since a
+         generic translation can obscure which word carries the grammatical point.
          AI-filled values are DRAFTS: dashed + badged "AI · review" until the
          teacher edits the field or clicks ✓ to confirm. We never silently
          overwrite an existing translation — only empty fields (a per-field
@@ -4650,7 +4680,7 @@ document.addEventListener("DOMContentLoaded", App.init);
           el("p", {
             class: "adm-hint",
             html:
-              "These sentences power <b>🕵️ Fall-Detektiv</b> in Live Class Mode. Put <code>___</code> where the article belongs, then give the correct article. " +
+              "These sentences power <b>✏️ Lücken-Text</b> (fill in the blank) in Live Class Mode. Put <code>___</code> where the missing word belongs, then give the correct word. " +
               "Group them by case below; when the class plays this exercise, <b>all</b> its sentences are used. Changes save automatically."
           })
         );
@@ -4910,7 +4940,7 @@ document.addEventListener("DOMContentLoaded", App.init);
       // Live-Class-only games get a badge; the rest come from the registered
       // Solo games passed in `games`. Every game owns its own exercises.
       var LIVE_GAMES = [
-        { id: "cases", name: "Fall-Detektiv", emoji: "🕵️", color: "#8b5cf6" },
+        { id: "cases", name: "Lücken-Text", emoji: "✏️", color: "#8b5cf6" },
         { id: "compounds", name: "Wortmonster", emoji: "🧟", color: "#22c55e" },
         { id: "plurals", name: "Plural-Palast", emoji: "🏰", color: "#e0731c" },
         { id: "verbs", name: "Konjugations-Karussell", emoji: "🎠", color: "#e11d74" },
@@ -5655,97 +5685,245 @@ document.addEventListener("DOMContentLoaded", App.init);
     };
   }
 
-  /* ---- Fall-Detektiv (Case Detective): pick the correctly-declined article ---- */
-  // Render a sentence, styling the blank and (on the host) the clue word, which
-  // glows after a short delay via CSS so struggling students get a hint.
-  function renderSentence(el, sentence, clueWord, isHost) {
-    return String(sentence).split(/(\s+)/).map(function (tok) {
-      if (/^\s+$/.test(tok)) return document.createTextNode(tok);
-      if (tok.indexOf("___") >= 0) return el("span", { class: "cases-blank", text: "____" });
-      var core = tok.replace(/[.,!?;:]/g, "");
-      if (isHost && clueWord && core.toLowerCase() === clueWord.toLowerCase()) {
-        return el("span", { class: "cases-clue", text: tok });
-      }
-      return el("span", { text: tok });
-    });
-  }
-
-  // Three wrong article options. Use the ones stored with the sentence if
-  // present; otherwise pick three other real German articles (so teacher-added
-  // rows work without having to type distractors by hand).
+  /* ==================================================================
+     Lücken-Text (Fill in the Blank) — a general fill-in-the-blank format.
+     A sentence has one OR MANY blanks (___1___, ___2___, …). The teacher
+     picks Tap (a shared word bank of answers + distractors) or Type (an
+     inline text box per blank). Any content set that provides sentences +
+     blanks can plug in — case articles are just the first data set. See the
+     schema in js/data-cases.js. This game replaces the old case-only
+     "Fall-Detektiv"; its single-blank case sentences migrate in unchanged
+     (one blank each), and it keeps reading the same "cases" content bank.
+     ================================================================== */
   var ARTICLE_POOL = ["der", "die", "das", "den", "dem", "des"];
   function caseDistractors(s) {
     return wrongOptions(s.distractors, s.correct, ARTICLE_POOL, 3);
   }
 
-  var casesAdapter = {
-    meta: { name: "Fall-Detektiv", emoji: "🕵️", contentType: "cases" },
-    timeLimit: 20000,
-    supportsTyping: true, // teacher can choose tap-options or type-the-answer
+  // Answer matching: case-insensitive, punctuation stripped, ä/ö/ü/ß folded to
+  // ae/oe/ue/ss — the same lenient rules used by Hör gut zu!'s type mode.
+  function ltNorm(s) {
+    return String(s == null ? "" : s).toLowerCase()
+      .replace(/[.,!?;:"'“”„«»()¡¿…\-–—]/g, "")
+      .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
+      .trim();
+  }
+
+  // If a sentence uses plain "___" gaps (legacy), number them ___1___, ___2___…
+  // in reading order so every blank has a stable id. Already-numbered sentences
+  // are returned untouched.
+  function ensureNumbered(sentence, blanks) {
+    if (/___\d+___/.test(sentence)) return sentence;
+    var i = 0;
+    return sentence.replace(/_{2,}/g, function () {
+      var b = blanks[i]; i++;
+      return "___" + (b ? b.id : i) + "___";
+    });
+  }
+
+  // Accept BOTH the new multi-blank schema and the legacy single-blank case
+  // rows (sentence + correct + distractors) a teacher may have in the editor,
+  // and normalise to { sentence, blanks:[{id,correct}], wordBank, explanation }.
+  function normBlankEntry(s) {
+    if (!s) return null;
+    if (Array.isArray(s.blanks) && s.blanks.length) {
+      var blanks = s.blanks.map(function (b, i) {
+        return { id: (b.id != null ? b.id : i + 1), correct: String(b.correct == null ? "" : b.correct).trim() };
+      }).filter(function (b) { return b.correct !== ""; });
+      if (!blanks.length) return null;
+      var wordBank = (Array.isArray(s.wordBank) && s.wordBank.length)
+        ? s.wordBank.map(function (w) { return String(w).trim(); }).filter(Boolean)
+        : blanks.map(function (b) { return b.correct; });
+      return { sentence: ensureNumbered(String(s.sentence || ""), blanks), blanks: blanks, wordBank: wordBank, explanation: s.explanation || "" };
+    }
+    // Legacy: one blank marked by "___", with a single correct article.
+    if (s.sentence && String(s.sentence).indexOf("___") >= 0 && s.correct) {
+      var sent = String(s.sentence).replace(/_{2,}/, "___1___");
+      return {
+        sentence: sent,
+        blanks: [{ id: 1, correct: String(s.correct).trim() }],
+        wordBank: [String(s.correct).trim()].concat(caseDistractors(s)),
+        explanation: s.explanation || ""
+      };
+    }
+    return null;
+  }
+
+  // The full correct sentence, blanks filled in — for reveal + pronunciation.
+  function fillBlanksText(round) {
+    var byId = {};
+    (round.blanks || []).forEach(function (b) { byId[b.id] = b.correct; });
+    return String(round.sentence).replace(/___(\d+)___/g, function (_, n) {
+      return byId[n] != null ? byId[n] : "___";
+    });
+  }
+
+  // Host board: the sentence with visible numbered gaps, no answers shown.
+  function blanksHostNodes(el, sentence) {
+    return String(sentence).split(/(___\d+___)/).map(function (part) {
+      var m = /^___(\d+)___$/.exec(part);
+      if (m) return el("span", { class: "lt-gap", text: "＿＿" });
+      return part ? el("span", { text: part }) : document.createTextNode("");
+    });
+  }
+
+  var blanksAdapter = {
+    meta: { name: "Lücken-Text", emoji: "✏️", contentType: "cases" },
+    timeLimit: 20000,           // used only as a fallback elapsed cap; no countdown
+    supportsTyping: true,       // teacher chooses Tap (word bank) or Type (inline)
+    blanks: true,               // routes to the fill-in player + per-blank reveal
+    statefulPlayer: true,       // the phone widget builds once per round (no rebuild)
     pickLabel: "Exercise",
-    // The "topics" for this game are the teacher's exercises.
+    typeLabels: {
+      options: ["Tap the words", "Word bank — pick & place"],
+      type: ["Type the answers", "Free recall — harder"]
+    },
     getTopics: function () {
       var store = window.ContentStore;
       var list = (store && store.exercisesFor) ? store.exercisesFor("cases") : [];
       return list.map(function (e) {
         var n = (e.accusative || []).length + (e.dative || []).length + (e.genitive || []).length;
-        return { id: e.id, name: e.name, emoji: "🕵️", english: n + (n === 1 ? " sentence" : " sentences") };
+        return { id: e.id, name: e.name, emoji: "✏️", english: n + (n === 1 ? " sentence" : " sentences") };
       });
     },
     buildRounds: function (topic) {
       var store = window.ContentStore;
       var e = (store && store.exercise) ? store.exercise("cases", topic && topic.id) : null;
       var C = e || window.CaseData || { accusative: [], dative: [], genitive: [] };
-      // An exercise mixes all three cases it contains (its own difficulty scope).
+      // A case exercise mixes the three case groups it contains; a future flat
+      // content set may instead expose an "items" array — accept both.
       var pool = (C.accusative || []).concat(C.dative || []).concat(C.genitive || []);
-      // Skip half-finished rows a teacher may have added in the editor.
-      pool = pool.filter(function (s) {
-        return s && s.sentence && String(s.sentence).indexOf("___") >= 0 && s.correct;
-      });
-      return kit().sample(pool, Math.min(10, pool.length)).map(function (s) {
+      if (!pool.length && Array.isArray(C.items)) pool = C.items;
+      var norm = pool.map(normBlankEntry).filter(Boolean);
+      return kit().sample(norm, Math.min(10, norm.length)).map(function (s) {
         return {
-          type: "cases", sentence: s.sentence, blank: s.blank || "", clueWord: s.clueWord || "",
-          options: kit().shuffle([s.correct].concat(caseDistractors(s))),
-          answer: s.correct, correct: s.correct, explanation: s.explanation || ""
+          type: "blanks",
+          sentence: s.sentence,
+          blanks: s.blanks,
+          wordBank: kit().shuffle(s.wordBank.slice()),
+          explanation: s.explanation || ""
         };
       });
     },
     hostContent: function (el, round) {
-      return el("div", { class: "cases-q" }, [
-        el("div", { class: "cases-tag", text: "🕵️ Which article fits the blank?" }),
-        el("div", { class: "cases-sentence" }, renderSentence(el, round.sentence, round.clueWord, true))
+      var many = (round.blanks || []).length > 1;
+      var typing = round.answerMode === "type";
+      return el("div", { class: "lt-q" }, [
+        el("div", { class: "lt-tag", text: "✏️ Fill in the blank" + (many ? "s" : "") }),
+        el("div", { class: "lt-sentence host" }, blanksHostNodes(el, round.sentence)),
+        el("div", { class: "lt-hostnote", text: typing
+          ? "⌨️ Students type the missing word" + (many ? "s" : "") + " on their phones"
+          : "🔤 Students build the sentence from a word bank on their phones" })
       ]);
     },
+    // The interactive fill-in widget — self-contained so both Live and the Solo
+    // wrapper reuse it. api.submit({ blanks: { id: text } }) once every gap is set.
     playerContent: function (el, round, api) {
-      var sentence = el("div", { class: "cases-sentence phone" }, renderSentence(el, round.sentence, round.clueWord, false));
-      if (round.answerMode === "type") {
-        var input = el("input", { class: "type-input", attrs: { type: "text", placeholder: "type the article…", autocapitalize: "off", autocomplete: "off", spellcheck: "false" } });
-        var submit = function () { var v = (input.value || "").trim(); if (v) api.submit({ text: v }); };
-        input.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
-        setTimeout(function () { try { input.focus(); } catch (e) {} }, 50);
-        return el("div", { class: "cases-player" }, [
-          sentence,
-          el("div", { class: "type-row" }, [input, el("button", { class: "btn primary type-go", text: "Submit", on: { click: submit } })])
-        ]);
+      var typing = round.answerMode === "type";
+      var order = [];            // blank ids in reading order
+      var state = {};            // id -> { value, fromBank, el }
+      var bankBtns = [];         // { btn, word, usedBy }
+      var submitBtn;
+
+      function refresh() {
+        var allFilled = order.length && order.every(function (id) { return state[id].value !== ""; });
+        if (submitBtn) submitBtn.disabled = !allFilled;
       }
-      return el("div", { class: "cases-player" }, [
-        sentence,
-        el("div", { class: "live-q-options phone" }, round.options.map(function (opt, i) {
-          return el("button", {
-            class: "live-opt phone", attrs: { style: "--c:" + COLORS[i] },
-            on: { click: function () { api.submit({ choice: opt }); } }
-          }, [el("span", { class: "opt-shape", text: SHAPES[i] }), el("span", { class: "opt-text", text: opt })]);
-        }))
-      ]);
+      function nextEmptyId() {
+        for (var k = 0; k < order.length; k++) { if (state[order[k]].value === "") return order[k]; }
+        return null;
+      }
+      function doSubmit() {
+        if (submitBtn && submitBtn.disabled) return;
+        var answers = {};
+        order.forEach(function (id) { answers[id] = state[id].value; });
+        api.submit({ blanks: answers });
+      }
+      function fillSlot(id, word, bankIdx) {
+        var st = state[id];
+        st.value = word; st.fromBank = (bankIdx == null ? null : bankIdx);
+        st.el.textContent = word; st.el.classList.remove("empty"); st.el.classList.add("filled");
+        refresh();
+      }
+      function clearSlot(id) {              // tap mode: return the word to the bank
+        var st = state[id];
+        if (st.value === "") return;
+        var bi = st.fromBank;
+        st.value = ""; st.fromBank = null;
+        st.el.textContent = "＿＿"; st.el.classList.add("empty"); st.el.classList.remove("filled");
+        if (bi != null && bankBtns[bi]) { bankBtns[bi].usedBy = null; bankBtns[bi].btn.classList.remove("used"); bankBtns[bi].btn.disabled = false; }
+        refresh();
+      }
+      function placeWord(bankIdx) {
+        var entry = bankBtns[bankIdx];
+        if (!entry || entry.usedBy != null) return;
+        var id = nextEmptyId();
+        if (id == null) return;
+        entry.usedBy = id; entry.btn.classList.add("used"); entry.btn.disabled = true;
+        fillSlot(id, entry.word, bankIdx);
+        try { kit().beep && kit().beep("good"); } catch (e) {}
+      }
+
+      var sentEl = el("div", { class: "lt-sentence phone" });
+      String(round.sentence).split(/(___\d+___)/).forEach(function (part) {
+        var m = /^___(\d+)___$/.exec(part);
+        if (m) {
+          var id = parseInt(m[1], 10);
+          order.push(id);
+          state[id] = { value: "", fromBank: null, el: null };
+          var slot;
+          if (typing) {
+            slot = el("input", { class: "lt-input", attrs: { type: "text", size: "6", "aria-label": "blank " + id, autocapitalize: "off", autocomplete: "off", spellcheck: "false", placeholder: "?" } });
+            slot.addEventListener("input", function () { state[id].value = slot.value.trim(); refresh(); });
+            slot.addEventListener("keydown", function (ev) {
+              if (ev.key !== "Enter") return;
+              ev.preventDefault();
+              var pos = order.indexOf(id);
+              if (pos >= 0 && pos < order.length - 1) { try { state[order[pos + 1]].el.focus(); } catch (e) {} }
+              else doSubmit();
+            });
+          } else {
+            slot = el("button", { class: "lt-slot empty", attrs: { type: "button" }, text: "＿＿", on: { click: function () { clearSlot(id); } } });
+          }
+          state[id].el = slot;
+          sentEl.appendChild(slot);
+        } else if (part) {
+          sentEl.appendChild(el("span", { class: "lt-txt", text: part }));
+        }
+      });
+
+      var children = [sentEl];
+      if (typing) {
+        children.push(el("div", { class: "lt-typehint", text: "Tap a blank and type the missing word." + (order.length > 1 ? " Enter jumps to the next." : "") }));
+        setTimeout(function () { try { state[order[0]].el.focus(); } catch (e) {} }, 60);
+      } else {
+        var bank = el("div", { class: "lt-bank" });
+        kit().shuffle((round.wordBank || []).slice()).forEach(function (w, i) {
+          var btn = el("button", { class: "lt-word", attrs: { type: "button" }, text: w, on: { click: function () { placeWord(i); } } });
+          bankBtns.push({ btn: btn, word: w, usedBy: null });
+          bank.appendChild(btn);
+        });
+        children.push(bank);
+      }
+      submitBtn = el("button", { class: "btn primary lt-submit", text: "Submit", attrs: { disabled: "true" }, on: { click: doSubmit } });
+      children.push(submitBtn);
+      refresh();
+      return el("div", { class: "lt-player" }, children);
     },
+    // Per-blank partial credit: 0…1000 points scaled by the share of blanks right.
     score: function (round, payload, elapsedMs, timeLimit) {
-      var given = payload ? (payload.choice != null ? payload.choice : (payload.text || "").trim().toLowerCase()) : "";
-      if (given !== round.answer) return { correct: false, points: 0 };
-      var frac = Math.max(0, 1 - elapsedMs / timeLimit);
-      return { correct: true, points: Math.round(500 + 500 * frac) };
+      var ans = (payload && payload.blanks) || {};
+      var blanks = round.blanks || [];
+      var total = blanks.length || 1;
+      var matched = 0;
+      blanks.forEach(function (b) {
+        var g = ltNorm(ans[b.id]);
+        if (g !== "" && g === ltNorm(b.correct)) matched++;
+      });
+      return { correct: matched === total, points: Math.round((matched / total) * 1000), matched: matched, total: total };
     },
-    correctLabel: function (round) { return round.correct; },
-    speakOnReveal: function (round) { return String(round.sentence).replace("___", round.correct); }
+    correctLabel: function (round) { return fillBlanksText(round); },
+    speakOnReveal: function (round) { return fillBlanksText(round); }
   };
 
   /* ---- Wortmonster (Word Monster): build compound nouns from two tiles ---- */
@@ -6237,7 +6415,7 @@ document.addEventListener("DOMContentLoaded", App.init);
   window.LiveGames = {
     quiz: choiceAdapter({ name: "Vocabulary Quiz", emoji: "🎯", contentType: "vocab" }),
     memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" }),
-    cases: casesAdapter,
+    cases: blanksAdapter,
     wortmonster: compoundAdapter,
     plural: pluralAdapter,
     verben: verbAdapter,
@@ -6278,6 +6456,19 @@ window.LiveMode = (function () {
       if (/^\s+$/.test(tok)) return document.createTextNode(tok);
       if (tok.indexOf("___") >= 0) return el("span", { class: "rs-fill", text: article });
       return el("span", { text: tok });
+    });
+  }
+
+  // Lücken-Text reveal: the sentence with every numbered blank replaced by its
+  // correct word, each highlighted. `filled` maps blank id -> shown text/class.
+  function blanksFilled(sentence, filled) {
+    return String(sentence).split(/(___\d+___)/).map(function (part) {
+      var m = /^___(\d+)___$/.exec(part);
+      if (m) {
+        var f = filled(parseInt(m[1], 10));
+        return el("span", { class: f.cls, text: f.text });
+      }
+      return part ? el("span", { text: part }) : document.createTextNode("");
     });
   }
 
@@ -6663,6 +6854,11 @@ window.LiveMode = (function () {
           meaning: r.meaning || null, tiles: r.tiles || null,
           words: r.words || null, speed: r.speed || null,
           answerMode: sess.answerMode || "options",
+          // Lücken-Text: phones need the blank ids (to lay out the gaps) and, in
+          // tap mode, the shuffled word bank — but NEVER the correct answers, so
+          // type mode can't be peeked. The bank naturally contains the answers.
+          blanks: (adapter.blanks && r.blanks) ? r.blanks.map(function (b) { return { id: b.id }; }) : null,
+          wordBank: (adapter.blanks && sess.answerMode !== "type") ? (r.wordBank || null) : null,
           // Type mode needs the answer on the phone (to diff on submit). Only sent
           // for the type-diff game in type mode — tap mode still hides it.
           correct: (adapter.typeResult && sess.answerMode === "type") ? (r.correct || r.word || null) : null,
@@ -6805,10 +7001,11 @@ window.LiveMode = (function () {
         });
         results.sort(function (x, y) { return y.points - x.points; });
         results.forEach(function (rr, idx) { rr.rank = idx + 1; });
-        window.LiveDB.updateSession(code, {
-          status: "reveal", scores: scores,
-          reveal: { index: i, correct: adapter.correctLabel(r), explanation: r.explanation || null, results: results }
-        });
+        var revealDoc = { index: i, correct: adapter.correctLabel(r), explanation: r.explanation || null, results: results };
+        // Lücken-Text: now that the round is over it's safe to ship the correct
+        // answers so each phone can mark its own blanks right/wrong.
+        if (adapter.blanks) { revealDoc.blanks = r.blanks; revealDoc.sentence = r.sentence; }
+        window.LiveDB.updateSession(code, { status: "reveal", scores: scores, reveal: revealDoc });
         var german = adapter.speakOnReveal(r);
         if (german) kit.speak(german);
         renderReveal(i, r, results, scores);
@@ -6862,25 +7059,40 @@ window.LiveMode = (function () {
     function renderReveal(i, r, results) {
       var last = (i + 1) >= rounds.length;
       var isMatch = !!adapter.match;
+      var isBlanks = !!adapter.blanks;
       var correctCount = results.filter(function (x) { return x.correct; }).length;
       var mtotal = (r.words || []).length;
       // Leaderboard for THIS question only (ranked by points earned this round).
       var ranked = results.filter(function (x) { return x.answered; }).sort(function (a, b) { return b.points - a.points; });
-      var answerBlock = isMatch
-        ? el("div", { class: "reveal-answer" }, [
-            el("div", { class: "reveal-label", text: "Round complete" }),
-            el("div", { class: "reveal-value", text: "🎧 " + mtotal + (mtotal === 1 ? " pair" : " pairs") })
-          ])
-        : el("div", { class: "reveal-answer" }, [
-            el("div", { class: "reveal-label", text: "Correct answer" }),
-            el("div", { class: "reveal-value", text: adapter.correctLabel(r) }),
-            r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null,
-            r.sentence ? el("div", { class: "reveal-sentence" }, filledSentence(r.sentence, r.correct)) : null,
-            r.explanation ? el("div", { class: "reveal-why", text: r.explanation }) : null
-          ]);
+      var answerBlock;
+      if (isMatch) {
+        answerBlock = el("div", { class: "reveal-answer" }, [
+          el("div", { class: "reveal-label", text: "Round complete" }),
+          el("div", { class: "reveal-value", text: "🎧 " + mtotal + (mtotal === 1 ? " pair" : " pairs") })
+        ]);
+      } else if (isBlanks) {
+        // The full sentence with every gap filled + highlighted, plus the note.
+        var byId = {}; (r.blanks || []).forEach(function (b) { byId[b.id] = b.correct; });
+        answerBlock = el("div", { class: "reveal-answer" }, [
+          el("div", { class: "reveal-label", text: "Correct answer" }),
+          el("div", { class: "reveal-sentence lt" }, blanksFilled(r.sentence, function (id) { return { cls: "rs-fill", text: byId[id] != null ? byId[id] : "___" }; })),
+          r.explanation ? el("div", { class: "reveal-why", text: r.explanation }) : null
+        ]);
+      } else {
+        answerBlock = el("div", { class: "reveal-answer" }, [
+          el("div", { class: "reveal-label", text: "Correct answer" }),
+          el("div", { class: "reveal-value", text: adapter.correctLabel(r) }),
+          r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null,
+          r.sentence ? el("div", { class: "reveal-sentence" }, filledSentence(r.sentence, r.correct)) : null,
+          r.explanation ? el("div", { class: "reveal-why", text: r.explanation }) : null
+        ]);
+      }
+      var showCount = isMatch || isBlanks;   // board shows an "x/y" suffix per student
       var statText = isMatch
         ? correctCount + " of " + results.length + " finished every pair"
-        : correctCount + " of " + results.length + " correct";
+        : (isBlanks
+            ? correctCount + " of " + results.length + " filled every blank"
+            : correctCount + " of " + results.length + " correct");
       show(screen("host", [
         el("div", { class: "host-topbar" }, [el("div", { class: "host-q-num", text: (isMatch ? "Round " : "Question ") + (i + 1) + " / " + rounds.length })]),
         answerBlock,
@@ -6890,8 +7102,8 @@ window.LiveMode = (function () {
           ? el("div", { class: "board-list" }, ranked.slice(0, 8).map(function (x, idx) {
               return el("div", { class: "board-row" + (idx === 0 && x.points > 0 ? " top" : "") }, [
                 el("span", { class: "board-rank", text: (idx + 1) }),
-                el("span", { class: "board-name", text: x.name + (isMatch ? "  (" + x.matched + "/" + x.total + ")" : "") }),
-                el("span", { class: "board-pts", text: x.points > 0 ? "+" + x.points : (isMatch ? "0" : "✗") })
+                el("span", { class: "board-name", text: x.name + (showCount ? "  (" + x.matched + "/" + x.total + ")" : "") }),
+                el("span", { class: "board-pts", text: x.points > 0 ? "+" + x.points : (showCount ? "0" : "✗") })
               ]);
             }))
           : el("p", { class: "live-muted", text: "No answers this round." }),
@@ -7038,13 +7250,15 @@ window.LiveMode = (function () {
     var lastStatus = null, lastQ = -1, lastSeq = null;
     var matchRenderedQ = -1; // match board is stateful — render it once per round
     var typeRenderedQ = -1;  // type input is stateful too — render once per round
+    var statefulRenderedQ = -1; // Lücken-Text widget: build once, don't rebuild
     var typeState = { qi: -1, text: "" }; // this phone's last typed answer
+    var blanksState = { qi: -1, answers: null }; // this phone's submitted blanks
 
     track(window.LiveDB.listenSession(code, function (s) {
       if (!s) { show(screen("player live-center", [el("div", { class: "live-card" }, [el("h2", { text: "Room closed" })])])); return; }
       // A new game in the same room resets question numbering — allow answering again.
       var seq = s.gameSeq || 0;
-      if (seq !== lastSeq) { answeredIndex = -1; matchRenderedQ = -1; typeRenderedQ = -1; lastSeq = seq; }
+      if (seq !== lastSeq) { answeredIndex = -1; matchRenderedQ = -1; typeRenderedQ = -1; statefulRenderedQ = -1; lastSeq = seq; }
       var qi = s.round ? s.round.index : -1;
       if (s.status === lastStatus && qi === lastQ && s.status !== "question") return;
       lastStatus = s.status; lastQ = qi;
@@ -7069,12 +7283,21 @@ window.LiveMode = (function () {
           typeRenderedQ = qi;
           return typePlayerScreen(s, qAdapter);
         }
+        if (qAdapter && qAdapter.statefulPlayer) {
+          // Lücken-Text: the fill-in widget holds in-progress taps/typing, so it
+          // must be built once and never rebuilt while the student is working.
+          if (answeredIndex === qi) return waitScreen("Answer locked ✔", "Waiting for the class…");
+          if (statefulRenderedQ === qi) return;
+          statefulRenderedQ = qi;
+          return answerScreen(s);
+        }
         if (answeredIndex === qi) return waitScreen("Answer locked ✔", "Waiting for the class…");
         return answerScreen(s);
       }
       if (s.status === "reveal") {
         var rAdapter = window.LiveGames[s.gameId];
         if (rAdapter && rAdapter.typeResult && s.answerMode === "type") return typeRevealScreen(s, rAdapter);
+        if (rAdapter && rAdapter.blanks) return blanksRevealScreen(s, rAdapter);
         return resultScreen(s);
       }
       if (s.status === "leaderboard") return standingScreen(s);
@@ -7099,16 +7322,21 @@ window.LiveMode = (function () {
         submit: function (payload) {
           if (locked || answeredIndex === r.index) return;
           locked = true; answeredIndex = r.index;
+          // Remember this phone's blanks so it can mark them right/wrong at reveal.
+          if (payload && payload.blanks) blanksState = { qi: r.index, answers: payload.blanks };
           window.LiveDB.submitAnswer(code, r.index, stu.id, payload);
           waitScreen("Answer locked ✔", "Waiting for the class…");
         }
       };
+      var hint = adapter.blanks
+        ? (s.answerMode === "type" ? "Fill in the blanks ✍️" : "Tap the words to fill the blanks 👇")
+        : "Tap your answer 👇";
       var body = screen("player", [
         el("div", { class: "player-topbar" }, [
           el("div", { class: "player-name-tag", text: stu.name }),
           el("div", { class: "player-qnum", text: "Q" + (r.index + 1) })
         ]),
-        el("div", { class: "player-prompt-hint", text: "Tap your answer 👇" }),
+        el("div", { class: "player-prompt-hint", text: hint }),
         adapter.playerContent(el, r, api)
       ]);
       show(body);
@@ -7327,6 +7555,55 @@ window.LiveMode = (function () {
       show(typeDiffNode(r, typeState.text, adapter, me || { points: 0, matched: 0, total: 0 }));
     }
 
+    // Lücken-Text reveal: the sentence with THIS phone's answers dropped into the
+    // gaps, each coloured green/red, plus the correct word under any wrong gap.
+    function blanksRevealScreen(s, adapter) {
+      var r = s.round;
+      // Didn't submit before the teacher revealed → locked out with the answer.
+      if (answeredIndex !== r.index || blanksState.qi !== r.index) {
+        kit.beep("bad");
+        return show(screen("player live-center res-bad", [el("div", { class: "live-card" }, [
+          el("div", { class: "player-name-tag", text: stu.name }),
+          el("div", { class: "live-big-emoji", text: "⏰" }),
+          el("h2", { text: "Too slow!" }),
+          el("p", { class: "live-sub", text: "Answer: " + (s.reveal ? s.reveal.correct : "") }),
+          el("div", { class: "player-points", text: "0 points" })
+        ])]));
+      }
+      var me = (s.reveal && s.reveal.results || []).filter(function (x) { return x.studentId === stu.id; })[0] || { points: 0, matched: 0, total: 0, correct: false };
+      var mine = blanksState.answers || {};
+      var correctById = {}; (s.reveal && s.reveal.blanks || []).forEach(function (b) { correctById[b.id] = b.correct; });
+      var normEq = function (a, b) {
+        var n = function (x) {
+          return String(x == null ? "" : x).toLowerCase()
+            .replace(/[.,!?;:"'“”„«»()¡¿…\-–—]/g, "")
+            .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").trim();
+        };
+        return n(a) !== "" && n(a) === n(b);
+      };
+      var sentence = s.reveal && s.reveal.sentence ? s.reveal.sentence : r.sentence;
+      var line = el("div", { class: "diff-line lt-reveal" }, blanksFilled(sentence, function (id) {
+        var typed = mine[id], right = normEq(typed, correctById[id]);
+        return { cls: "diff-word diff-" + (right ? "correct" : "wrong"), text: (typed && String(typed).trim()) ? typed : "＿＿" };
+      }));
+      // Corrections list for any blank the student got wrong.
+      var wrongs = (s.reveal && s.reveal.blanks || []).filter(function (b) { return !normEq(mine[b.id], b.correct); });
+      var body = [
+        el("div", { class: "player-name-tag", text: stu.name }),
+        el("div", { class: "diff-label", text: "Your answer" }),
+        line
+      ];
+      if (wrongs.length) {
+        body.push(el("div", { class: "lt-corrections" }, wrongs.map(function (b) {
+          return el("div", { class: "lt-correction", text: "✓ " + b.correct });
+        })));
+      }
+      if (s.reveal && s.reveal.explanation) body.push(el("p", { class: "player-why", text: s.reveal.explanation }));
+      body.push(el("div", { class: "player-points", text: (me.points > 0 ? "+" + me.points : "0") + " points" }));
+      body.push(el("div", { class: "diff-score", text: (me.matched || 0) + " of " + (me.total || (s.reveal && s.reveal.blanks || []).length) + " blanks correct" }));
+      show(screen("player live-center " + (me.correct ? "res-good" : "res-bad"), [el("div", { class: "live-card diff-card" }, body)]));
+    }
+
     function resultScreen(s) {
       if (s.reveal && s.reveal.match) return matchResultScreen(s);
       var me = (s.reveal && s.reveal.results || []).filter(function (x) { return x.studentId === stu.id; })[0];
@@ -7411,9 +7688,9 @@ window.LiveMode = (function () {
   //              its own prompt), so we render only that (plus a tag).
   //   "match"  — Hör-Paare's tap-the-pairs board (its own little runner).
   var SOLO_GAMES = [
-    { key: "cases", name: "Fall-Detektiv", emoji: "🕵️", color: "#8b5cf6", layout: "player",
-      tag: "🕵️ Which article fits the blank?",
-      description: "Spot the right article (der/die/das…) to crack each case. Grammar detective work." },
+    { key: "cases", name: "Lücken-Text", emoji: "✏️", color: "#8b5cf6", layout: "player",
+      tag: "✏️ Fill in the blank",
+      description: "Fill the blanks in each sentence — pick the missing words from the bank." },
     { key: "wortmonster", name: "Wortmonster", emoji: "🧟", color: "#22c55e", layout: "player",
       tag: "🧟 Build the German word",
       description: "Smash two parts together to build German compound nouns." },
