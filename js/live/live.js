@@ -271,8 +271,12 @@ window.LiveMode = (function () {
           ]));
           n++;
         }
-        if (gAdapter3.audioSpeed) {
-          step.appendChild(el("div", { class: "live-label", text: n + " · Audio speed" }));
+        // Some games only want the speed picker for certain exercises (e.g. a
+        // Passage only when its passage is audio) — respect an optional wantsSpeed.
+        var showSpeed = gAdapter3.audioSpeed && (!gAdapter3.wantsSpeed || gAdapter3.wantsSpeed(topic));
+        if (showSpeed) {
+          var isPassageAudio = gameId === "passage";
+          step.appendChild(el("div", { class: "live-label", text: n + (isPassageAudio ? " · Passage speed" : " · Audio speed") }));
           var speedRow = el("div", { class: "setup-modes" }, SPEEDS.map(function (s) {
             return el("button", {
               class: "mode-pill" + (speed === s.v ? " sel" : ""),
@@ -282,8 +286,11 @@ window.LiveMode = (function () {
           step.appendChild(speedRow);
           step.appendChild(el("div", { class: "setup-preview" }, [
             el("span", { class: "live-muted", text: "Preview at " + speed + "×:" }),
-            el("button", { class: "btn ghost", html: "▶ Word", attrs: { title: "Hear a word at this speed" }, on: { click: function () { preview("word"); } } }),
-            el("button", { class: "btn ghost", html: "▶ Sentence", attrs: { title: "Hear a full sentence at this speed" }, on: { click: function () { preview("sentence"); } } })
+            isPassageAudio
+              ? el("button", { class: "btn ghost", html: "▶ Passage", attrs: { title: "Hear the passage at this speed" }, on: { click: function () { preview("sentence"); } } })
+              : el("button", { class: "btn ghost", html: "▶ Word", attrs: { title: "Hear a word at this speed" }, on: { click: function () { preview("word"); } } }),
+            isPassageAudio ? null
+              : el("button", { class: "btn ghost", html: "▶ Sentence", attrs: { title: "Hear a full sentence at this speed" }, on: { click: function () { preview("sentence"); } } })
           ]));
           n++;
         }
@@ -328,6 +335,8 @@ window.LiveMode = (function () {
             if (!t) return;
             (/\s/.test(String(t).trim()) ? sentences : words).push(t);
           });
+          // A Passage's audio IS the passage — preview it directly.
+          if (ex && ex.passage && ex.passage.value) sentences.unshift(String(ex.passage.value));
         } catch (e) {}
         var pool = kind === "sentence" ? sentences : words;
         var fallback = kind === "sentence" ? "Heute lernen wir zusammen ein bisschen Deutsch." : "Kirche";
@@ -413,9 +422,10 @@ window.LiveMode = (function () {
     function adapterForRound(r) { return (r && r.fmt && window.LiveGames[r.fmt]) || adapter; }
     // The passage (text/audio) rides only on the in-memory round — never written
     // to the session doc, so it can never reach a phone. Kept here for the
-    // passage-first screen and the "Show passage again" overlay.
-    var passageInfo = null;
-    (rounds || []).some(function (r) { if (r && r.passage) { passageInfo = r.passage; return true; } return false; });
+    // passage-first screen and the "Show passage again" overlay. passageSpeed is
+    // the teacher's chosen playback rate (doStart stamps r.speed on every round).
+    var passageInfo = null, passageSpeed = 1;
+    (rounds || []).some(function (r) { if (r && r.passage) { passageInfo = r.passage; passageSpeed = r.speed || 1; return true; } return false; });
 
     track(window.LiveDB.listenSession(code, function (s) {
       sess = s;
@@ -449,8 +459,8 @@ window.LiveMode = (function () {
       if (!passage) return [el("p", { class: "live-muted", text: "No passage." })];
       if (passage.type === "audio") {
         var plays = 0, btn;
-        var label = function () { return plays === 0 ? "🔊 Play the passage" : "🔁 Play again"; };
-        btn = el("button", { class: "btn primary big listen-play", on: { click: function () { plays++; try { window.MatchTiles.play(kit, passage, 1); } catch (e) {} btn.innerHTML = label(); } } });
+        var label = function () { return (plays === 0 ? "🔊 Play the passage" : "🔁 Play again") + (passageSpeed !== 1 ? "  ·  " + passageSpeed + "×" : ""); };
+        btn = el("button", { class: "btn primary big listen-play", on: { click: function () { plays++; try { window.MatchTiles.play(kit, passage, passageSpeed); } catch (e) {} btn.innerHTML = label(); } } });
         btn.innerHTML = label();
         return [el("div", { class: "passage-audio" }, [el("div", { class: "listen-emoji", text: "🎧" }), btn])];
       }

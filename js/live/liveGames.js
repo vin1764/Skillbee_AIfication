@@ -841,6 +841,14 @@
     timeLimit: 20000,
     pickLabel: "Exercise",
     passage: true,               // routes to the passage-first + Show-Passage flow
+    audioSpeed: true,            // teacher can pick the AUDIO passage's playback speed
+    // Only offer the speed picker when the chosen exercise's passage is audio —
+    // a text passage isn't played, so speed is meaningless there.
+    wantsSpeed: function (topic) {
+      var store = window.ContentStore;
+      var e = (store && store.exercise) ? store.exercise("passage", topic && topic.id) : null;
+      return !!(e && e.passage && e.passage.type === "audio");
+    },
     getTopics: function () {
       var store = window.ContentStore;
       var list = (store && store.exercisesFor) ? store.exercisesFor("passage") : [];
