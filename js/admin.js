@@ -978,7 +978,8 @@
         return [
           ctxBlock,
           el("div", { class: "adm-tf-block" }, [
-            typePickerRow("Statement", q.statement, "type"),
+            // A statement is only ever text or spoken audio — never an icon/image.
+            typePickerRow("Statement", q.statement, "type", ["text", "audio"]),
             el("div", { class: "adm-mcq-field" }, [entryInput(q.statement, "value", q.statement.type)])
           ]),
           tfAnswerToggle(q)
@@ -1089,8 +1090,11 @@
       }
 
       // A labelled 4-chip type picker bound to obj[field]; a change re-renders.
-      function typePickerRow(label, obj, field) {
-        var TYPES = [["text", "Text", "🔤"], ["icon", "Icon", "😀"], ["image", "Image", "🖼"], ["audio", "Audio", "🔊"]];
+      function typePickerRow(label, obj, field, only) {
+        var ALL = [["text", "Text", "🔤"], ["icon", "Icon", "😀"], ["image", "Image", "🖼"], ["audio", "Audio", "🔊"]];
+        // `only` (optional) restricts the offered types — e.g. a True/False
+        // statement is only ever spoken or written, never a picture or icon.
+        var TYPES = only ? ALL.filter(function (t) { return only.indexOf(t[0]) >= 0; }) : ALL;
         var chipRow = el("div", { class: "adm-typechips" });
         TYPES.forEach(function (T) {
           chipRow.appendChild(el("button", { class: "adm-typechip" + (obj[field] === T[0] ? " sel" : ""), attrs: { type: "button", title: T[1] }, on: { click: function () {

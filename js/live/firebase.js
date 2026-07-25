@@ -226,6 +226,21 @@
           return arr;
         });
     },
+    // Speed Challenge is student-paced: every phone is on its own question, so the
+    // host can't watch "the current question" — it watches the WHOLE answers
+    // subcollection and derives each student's progress + running score from it.
+    listenAllAnswers: function (code, cb) {
+      return db
+        .collection("sessions").doc(code).collection("answers")
+        .onSnapshot(
+          function (snap) {
+            var arr = [];
+            snap.forEach(function (d) { arr.push(d.data()); });
+            cb(arr);
+          },
+          function (e) { cb([], e); }
+        );
+    },
 
     /* ---------------- teacher PIN config ---------------- */
     getConfig: function () {
