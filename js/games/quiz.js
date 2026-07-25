@@ -58,12 +58,12 @@
       const wrap = el("div", { class: "quiz" });
       stage.appendChild(wrap);
 
-      function questionNode(q, promptSpeak) {
+      function questionNode(q, promptSpeak, onListen) {
         if (q.type === "text") {
           return el("div", { class: "quiz-word" }, [document.createTextNode(q.value + " "), promptSpeak ? kit.speakerButton(q.value) : null]);
         }
         if (q.type === "audio") {
-          return el("div", { class: "quiz-audio" }, [el("button", { class: "btn primary big", html: "🔊 Play the audio", on: { click: () => { try { MT.play(kit, q); } catch (e) {} } } })]);
+          return el("div", { class: "quiz-audio" }, [el("button", { class: "btn primary big", html: "🔊 Play the audio", on: { click: () => { if (onListen) onListen(); try { MT.play(kit, q); } catch (e) {} } } })]);
         }
         if (q.type === "image") return el("div", { class: "quiz-media" }, [el("img", { class: "mcq-q-img", attrs: { src: q.value, alt: "" } })]);
         return el("div", { class: "quiz-media" }, [el("span", { class: "mcq-q-icon", text: q.value })]); // icon
@@ -73,6 +73,13 @@
         clearInterval(timer);
         locked = false;
         const item = pool[index];
+        // Listening needs time: when the question or any option is audio, the
+        // countdown only begins at the FIRST listen (until then the bar sits
+        // full — no pressure) and then drains at half speed (~8s instead of
+        // ~4s). Plain text/image/icon rounds keep the snappy Kahoot pace.
+        const hasAudio = item.q.type === "audio" || item.options.some((o) => o.type === "audio");
+        let clockArmed = !hasAudio;
+        const armClock = () => { clockArmed = true; };
 
         wrap.innerHTML = "";
         wrap.appendChild(
@@ -86,7 +93,7 @@
         wrap.appendChild(
           el("div", { class: "quiz-question" }, [
             el("div", { class: "quiz-lang-tag", text: item.q.type === "audio" ? "Listen — which one?" : "What is it?" }),
-            questionNode(item.q, item.promptSpeak)
+            questionNode(item.q, item.promptSpeak, armClock)
           ])
         );
 
@@ -104,6 +111,7 @@
             const chooseBtn = el("button", { class: "mcq-audio-choose", attrs: { type: "button", disabled: "true" }, text: "Listen first" });
             playBtn.addEventListener("click", () => {
               if (locked) return;
+              armClock(); // first listen starts the countdown
               try { MT.play(kit, opt); } catch (e) {}
               playLbl.textContent = "Play again";
               if (chooseBtn.disabled) { chooseBtn.disabled = false; chooseBtn.textContent = "✓ Choose"; }
@@ -123,9 +131,11 @@
         wrap.__buttons = buttons;
 
         timeLeft = 100;
+        const drain = hasAudio ? 0.75 : 1.5; // audio rounds get double the window
         const fill = document.getElementById("tfill");
         timer = setInterval(() => {
-          timeLeft -= 1.5;
+          if (!clockArmed) return; // audio round, nothing played yet — no countdown
+          timeLeft -= drain;
           if (fill) fill.style.width = Math.max(0, timeLeft) + "%";
           if (timeLeft <= 0) { clearInterval(timer); choose(null, item); }
         }, 60);

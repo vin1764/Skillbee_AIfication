@@ -3415,12 +3415,12 @@ document.addEventListener("DOMContentLoaded", App.init);
       const wrap = el("div", { class: "quiz" });
       stage.appendChild(wrap);
 
-      function questionNode(q, promptSpeak) {
+      function questionNode(q, promptSpeak, onListen) {
         if (q.type === "text") {
           return el("div", { class: "quiz-word" }, [document.createTextNode(q.value + " "), promptSpeak ? kit.speakerButton(q.value) : null]);
         }
         if (q.type === "audio") {
-          return el("div", { class: "quiz-audio" }, [el("button", { class: "btn primary big", html: "🔊 Play the audio", on: { click: () => { try { MT.play(kit, q); } catch (e) {} } } })]);
+          return el("div", { class: "quiz-audio" }, [el("button", { class: "btn primary big", html: "🔊 Play the audio", on: { click: () => { if (onListen) onListen(); try { MT.play(kit, q); } catch (e) {} } } })]);
         }
         if (q.type === "image") return el("div", { class: "quiz-media" }, [el("img", { class: "mcq-q-img", attrs: { src: q.value, alt: "" } })]);
         return el("div", { class: "quiz-media" }, [el("span", { class: "mcq-q-icon", text: q.value })]); // icon
@@ -3430,6 +3430,13 @@ document.addEventListener("DOMContentLoaded", App.init);
         clearInterval(timer);
         locked = false;
         const item = pool[index];
+        // Listening needs time: when the question or any option is audio, the
+        // countdown only begins at the FIRST listen (until then the bar sits
+        // full — no pressure) and then drains at half speed (~8s instead of
+        // ~4s). Plain text/image/icon rounds keep the snappy Kahoot pace.
+        const hasAudio = item.q.type === "audio" || item.options.some((o) => o.type === "audio");
+        let clockArmed = !hasAudio;
+        const armClock = () => { clockArmed = true; };
 
         wrap.innerHTML = "";
         wrap.appendChild(
@@ -3443,7 +3450,7 @@ document.addEventListener("DOMContentLoaded", App.init);
         wrap.appendChild(
           el("div", { class: "quiz-question" }, [
             el("div", { class: "quiz-lang-tag", text: item.q.type === "audio" ? "Listen — which one?" : "What is it?" }),
-            questionNode(item.q, item.promptSpeak)
+            questionNode(item.q, item.promptSpeak, armClock)
           ])
         );
 
@@ -3461,6 +3468,7 @@ document.addEventListener("DOMContentLoaded", App.init);
             const chooseBtn = el("button", { class: "mcq-audio-choose", attrs: { type: "button", disabled: "true" }, text: "Listen first" });
             playBtn.addEventListener("click", () => {
               if (locked) return;
+              armClock(); // first listen starts the countdown
               try { MT.play(kit, opt); } catch (e) {}
               playLbl.textContent = "Play again";
               if (chooseBtn.disabled) { chooseBtn.disabled = false; chooseBtn.textContent = "✓ Choose"; }
@@ -3480,9 +3488,11 @@ document.addEventListener("DOMContentLoaded", App.init);
         wrap.__buttons = buttons;
 
         timeLeft = 100;
+        const drain = hasAudio ? 0.75 : 1.5; // audio rounds get double the window
         const fill = document.getElementById("tfill");
         timer = setInterval(() => {
-          timeLeft -= 1.5;
+          if (!clockArmed) return; // audio round, nothing played yet — no countdown
+          timeLeft -= drain;
           if (fill) fill.style.width = Math.max(0, timeLeft) + "%";
           if (timeLeft <= 0) { clearInterval(timer); choose(null, item); }
         }, 60);
@@ -7182,14 +7192,10 @@ document.addEventListener("DOMContentLoaded", App.init);
       return { correct: true, points: Math.round(500 + 500 * frac) };
     },
     correctLabel: function (round) { return round.answer ? "Wahr (True)" : "Falsch (False)"; },
-    // Pronounce the statement's German (or the context's) at reveal, when spoken.
-    speakOnReveal: function (round) {
-      var s = round.statement || {};
-      if (s.type === "audio" || s.type === "text") return s.value;
-      var c = round.context || {};
-      if (c.type === "audio" || c.type === "text") return c.value;
-      return null;
-    }
+    // Nothing plays at reveal: the statement was already heard/read during the
+    // question, and replaying it over the Wahr/Falsch verdict was noise (both
+    // the Live host and the Solo wrapper route their reveal audio through here).
+    speakOnReveal: function () { return null; }
   };
 
   /* ---- Passage (Lese & Hör): an ORCHESTRATOR, not a new question engine ------
