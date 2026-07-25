@@ -804,14 +804,10 @@
       return { correct: true, points: Math.round(500 + 500 * frac) };
     },
     correctLabel: function (round) { return round.answer ? "Wahr (True)" : "Falsch (False)"; },
-    // Pronounce the statement's German (or the context's) at reveal, when spoken.
-    speakOnReveal: function (round) {
-      var s = round.statement || {};
-      if (s.type === "audio" || s.type === "text") return s.value;
-      var c = round.context || {};
-      if (c.type === "audio" || c.type === "text") return c.value;
-      return null;
-    }
+    // Nothing plays at reveal: the statement was already heard/read during the
+    // question, and replaying it over the Wahr/Falsch verdict was noise (both
+    // the Live host and the Solo wrapper route their reveal audio through here).
+    speakOnReveal: function () { return null; }
   };
 
   /* ---- Passage (Lese & Hör): an ORCHESTRATOR, not a new question engine ------
