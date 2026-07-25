@@ -1334,8 +1334,10 @@ window.LiveMode = (function () {
         playerRun(code, stu);
       }).catch(function (e) {
         busy = false;
+        // Show the underlying reason — a bare "try again" hides real problems
+        // (rules, network) and makes them impossible to report or diagnose.
         if (e && e.code === "name-taken") errBox.textContent = "Someone just picked " + stu.name + " — choose another.";
-        else errBox.textContent = "Couldn't join — try again.";
+        else errBox.textContent = "Couldn't join — try again." + (e && e.message ? " (" + e.message + ")" : "");
         renderNames();
       });
     }
