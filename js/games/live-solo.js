@@ -29,7 +29,11 @@
     { key: "hoerpaare", name: "Match the Following", emoji: "🔗", color: "#06b6d4", layout: "match",
       description: "Match each tile to its pair — text, icons, pictures or audio." },
     { key: "truefalse", name: "Wahr oder Falsch?", emoji: "⚖️", color: "#f59e0b", layout: "prompt",
-      description: "Decide whether each statement is true or false." }
+      description: "Decide whether each statement is true or false." },
+    { key: "scramble", name: "Sentence Scramble", emoji: "🧱", color: "#3b4de8", layout: "prompt",
+      description: "Tap the shuffled German words back into the correct order." },
+    { key: "hangman", name: "Hangman", emoji: "🔤", color: "#6a4c93", layout: "prompt",
+      description: "Spell the German word the clue describes, letter by letter." }
   ];
 
   function register() {
@@ -78,10 +82,12 @@
       if (cfg.layout === "player") {
         if (cfg.tag) card.appendChild(el("div", { class: "cases-tag", text: cfg.tag }));
       } else {
-        // Reuse the adapter's board prompt, but drop its non-interactive option
-        // tiles — the tap-options rendered below are the interactive ones.
+        // Reuse the adapter's board prompt, but drop the pieces meant only for the
+        // teacher's board: non-interactive option tiles, the "students do it on their
+        // phones" notes, and the host's duplicate audio button (the interactive UI
+        // below already has its own).
         var host = adapter.hostContent(el, r);
-        Array.prototype.forEach.call(host.querySelectorAll(".live-q-options.board"), function (n) { n.remove(); });
+        Array.prototype.forEach.call(host.querySelectorAll(".live-q-options.board, .scr-hostnote, .hang-hostnote, .scr-host-audio"), function (n) { n.remove(); });
         card.appendChild(host);
       }
       var subApi = {

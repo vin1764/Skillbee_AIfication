@@ -43,6 +43,44 @@ window.LiveMode = (function () {
     });
   }
 
+  // A self-contained countdown bar shared by the board and the phones (Per-Question
+  // and Speed Challenge Timer Modes). Returns the DOM node plus controls. It calls
+  // onExpire exactly once when it hits zero. pause() freezes the remaining time and
+  // resume() continues — used so re-showing a passage never eats a student's time.
+  function makeCountdown(totalSecs, onExpire) {
+    var wrap = document.createElement("div");
+    wrap.className = "live-timer";
+    var fill = document.createElement("div");
+    fill.className = "live-timer-fill";
+    var lbl = document.createElement("div");
+    lbl.className = "live-timer-num";
+    wrap.appendChild(fill); wrap.appendChild(lbl);
+    var total = Math.max(1, totalSecs || 1) * 1000;
+    // Test-only time compression (window.__TIMER_SCALE__): production leaves this
+    // unset so clocks run in real seconds; tests set e.g. 0.03 to make a 10s timer
+    // expire in ~300ms so auto-reveal / clock-end paths are exercised quickly.
+    try { if (window.__TIMER_SCALE__ > 0) total = Math.round(total * window.__TIMER_SCALE__); } catch (e) {}
+    var remaining = total;    // ms left as of the last (re)start
+    var since = null;         // Date.now() while running, else null (paused/stopped)
+    var iv = null, fired = false;
+    function leftMs() {
+      var r = remaining - (since != null ? (Date.now() - since) : 0);
+      return r < 0 ? 0 : r;
+    }
+    function paint() {
+      var r = leftMs();
+      fill.style.width = Math.round((r / total) * 100) + "%";
+      lbl.textContent = Math.ceil(r / 1000) + "s";
+      if (r <= 8000) wrap.classList.add("urgent"); else wrap.classList.remove("urgent");
+      if (r <= 0 && !fired) { fired = true; stop(); try { if (onExpire) onExpire(); } catch (e) {} }
+    }
+    function start() { if (fired) return; if (since == null) since = Date.now(); if (!iv) iv = setInterval(paint, 100); paint(); }
+    function pause() { if (since != null) { remaining = leftMs(); since = null; } }
+    function resume() { if (!fired && since == null) { since = Date.now(); } }
+    function stop() { if (iv) { clearInterval(iv); iv = null; } }
+    return { node: wrap, start: start, pause: pause, resume: resume, stop: stop, leftMs: leftMs };
+  }
+
   /* ---------- entry ---------- */
   function start(container, api) {
     C = container; el = api.el; kit = api.kit; store = api.store; goBack = api.back;
@@ -217,6 +255,15 @@ window.LiveMode = (function () {
     stop();
     window.AppNav.set(opts.back, null);
     var gameId = null, topic = null, persistMode = "fresh", answerMode = "options", speed = 1;
+    // Timer Mode (cross-cutting pacing, chosen per game at hosting time):
+    //   "manual"       — teacher reveals each question (the original behaviour)
+    //   "per_question" — a countdown per question; on expiry the board auto-reveals
+    //   "speed"        — one clock for the whole set; students race independently
+    var timerMode = "manual", perQuestionSecs = 20, speedSecs = 120;
+    // Slider bounds — a scroller lets the teacher dial any value, including much
+    // shorter rounds than a fixed preset row allowed.
+    var PQ_MIN = 3, PQ_MAX = 60;        // per-question: 3s … 60s
+    var SPEED_MIN = 15, SPEED_MAX = 300; // whole-set clock: 15s … 5 min
     var gameIds = Object.keys(window.LiveGames);
     var SPEEDS = [
       { v: 0.75, label: "Slow", sub: "0.75×" },
@@ -268,17 +315,45 @@ window.LiveMode = (function () {
         }
       }
 
-      // 3) answer mode / audio speed (per game) + scoreboard + start
+      // 3) timer mode / answer mode / audio speed (per game) + scoreboard + start
       if (gameId && topic) {
         var gAdapter3 = window.LiveGames[gameId];
         var n = 3;
+        // Timer Mode — shown for every game EXCEPT Match the Following, which is
+        // inherently self-paced (each phone works the whole board at its own pace)
+        // and always runs its own flow.
+        var supportsTimer = !gAdapter3.match;
+        if (supportsTimer) {
+          step.appendChild(el("div", { class: "live-label", text: n + " · Timer mode" }));
+          step.appendChild(el("div", { class: "setup-modes" }, [
+            timerPill("manual", "Manual reveal", "Teacher reveals each answer"),
+            timerPill("per_question", "Per-question timer", "A countdown on every question"),
+            timerPill("speed", "Speed Challenge", "One clock — students race the whole set")
+          ]));
+          if (timerMode === "per_question") {
+            step.appendChild(secondsSlider("Seconds per question", perQuestionSecs, PQ_MIN, PQ_MAX, 1, secsLabel, function (v) { perQuestionSecs = v; }));
+          } else if (timerMode === "speed") {
+            step.appendChild(secondsSlider("Total time for the whole set", speedSecs, SPEED_MIN, SPEED_MAX, 5, minsLabel, function (v) { speedSecs = v; }));
+          }
+          n++;
+        } else {
+          timerMode = "manual";
+        }
         if (gAdapter3.supportsTyping) {
           var tl = gAdapter3.typeLabels || { options: ["Tap the article", "Multiple choice — faster"], type: ["Type the article", "Free recall — harder"] };
           step.appendChild(el("div", { class: "live-label", text: n + " · How students answer" }));
-          step.appendChild(el("div", { class: "setup-modes" }, [
-            answerPill("options", tl.options[0], tl.options[1]),
-            answerPill("type", tl.type[0], tl.type[1])
-          ]));
+          if (timerMode === "speed") {
+            // Speed Challenge sends every question to the phone up front; type mode
+            // would ship the answer too (peekable). Lock to tap and say why.
+            answerMode = "options";
+            step.appendChild(el("div", { class: "setup-modes" }, [answerPill("options", tl.options[0], tl.options[1])]));
+            step.appendChild(el("p", { class: "live-muted setup-note", text: "Speed Challenge uses tap answers so nobody can peek ahead." }));
+          } else {
+            step.appendChild(el("div", { class: "setup-modes" }, [
+              answerPill("options", tl.options[0], tl.options[1]),
+              answerPill("type", tl.type[0], tl.type[1])
+            ]));
+          }
           n++;
         }
         // Some games only want the speed picker for certain exercises (e.g. a
@@ -318,6 +393,64 @@ window.LiveMode = (function () {
           class: "mode-pill" + (answerMode === id ? " sel" : ""),
           on: { click: function () { answerMode = id; renderStep(); } }
         }, [el("b", { text: title }), el("span", { text: sub })]);
+      }
+
+      function timerPill(id, title, sub) {
+        return el("button", {
+          class: "mode-pill" + (timerMode === id ? " sel" : ""),
+          on: { click: function () { timerMode = id; renderStep(); } }
+        }, [el("b", { text: title }), el("span", { text: sub })]);
+      }
+
+      function secsLabel(v) { return v + "s"; }
+      function minsLabel(v) {
+        if (v < 60) return v + "s";
+        var m = Math.floor(v / 60), s = v % 60;
+        return s ? m + "m " + s + "s" : m + " min";
+      }
+      // A scroller (slider) PLUS a manual number box for the per-question /
+      // total-time control — drag to dial any value between min…max, or just type
+      // the exact seconds. The two stay in sync and both feed `onSet(v)`. Updates
+      // happen in place WITHOUT re-rendering the setup (a re-render mid-drag would
+      // drop the slider), and clamping only snaps the number box on blur so typing
+      // a multi-digit value (e.g. "120") isn't fought mid-keystroke.
+      function secondsSlider(labelText, current, min, max, stepv, fmt, onSet) {
+        var valLbl = el("span", { class: "setup-secs-val", text: fmt(current) });
+        var slider = el("input", { class: "setup-secs-slider", attrs: { type: "range", min: String(min), max: String(max), step: String(stepv), value: String(current), "aria-label": labelText } });
+        var numInput = el("input", { class: "setup-secs-input", attrs: { type: "number", min: String(min), max: String(max), step: String(stepv), value: String(current), "aria-label": labelText + " (seconds)" } });
+        function apply(v, from) {
+          if (isNaN(v)) return;
+          var c = Math.round(v);
+          if (c < min) c = min; if (c > max) c = max;
+          onSet(c);
+          valLbl.textContent = fmt(c);
+          slider.value = String(c);
+          if (from !== "num") numInput.value = String(c); // don't fight the typist
+        }
+        slider.addEventListener("input", function () { apply(parseInt(slider.value, 10), "slider"); });
+        numInput.addEventListener("input", function () { var v = parseInt(numInput.value, 10); if (!isNaN(v)) apply(v, "num"); });
+        numInput.addEventListener("change", function () {
+          var v = parseInt(numInput.value, 10);
+          if (isNaN(v)) v = current;
+          if (v < min) v = min; if (v > max) v = max;
+          numInput.value = String(v); apply(v, "slider"); // snap the box into range
+        });
+        return el("div", { class: "setup-secs" }, [
+          el("div", { class: "setup-secs-head" }, [
+            el("div", { class: "setup-secs-label", text: labelText }),
+            valLbl
+          ]),
+          el("div", { class: "setup-secs-scroller" }, [
+            el("span", { class: "setup-secs-end", text: fmt(min) }),
+            slider,
+            el("span", { class: "setup-secs-end", text: fmt(max) })
+          ]),
+          el("div", { class: "setup-secs-manual" }, [
+            el("span", { class: "setup-secs-manual-lbl", text: "Or type exactly:" }),
+            numInput,
+            el("span", { class: "setup-secs-unit", text: "sec" })
+          ])
+        ]);
       }
 
       function modeBtn(id, title, sub) {
@@ -361,7 +494,13 @@ window.LiveMode = (function () {
       var rounds = adapter.buildRounds(topic);
       if (!rounds.length) { alert("This topic has no usable content."); return; }
       if (adapter.audioSpeed) rounds.forEach(function (r) { r.speed = speed; });
-      opts.onStart({ gameId: gameId, topic: topic, answerMode: answerMode, persistMode: persistMode, adapter: adapter, rounds: rounds, speed: speed });
+      var tm = adapter.match ? "manual" : timerMode; // match runs its own self-paced flow
+      var am = (tm === "speed" && adapter.supportsTyping) ? "options" : answerMode;
+      opts.onStart({
+        gameId: gameId, topic: topic, answerMode: am, persistMode: persistMode,
+        adapter: adapter, rounds: rounds, speed: speed,
+        timerMode: tm, perQuestionSecs: perQuestionSecs, speedSecs: speedSecs
+      });
     }
   }
 
@@ -380,7 +519,8 @@ window.LiveMode = (function () {
             gameId: sel.gameId, gameName: sel.adapter.meta.name, topicName: sel.topic.name,
             status: "lobby", questionIndex: -1, totalQuestions: sel.rounds.length,
             round: null, reveal: null, scores: seed.scores, persistMode: sel.persistMode,
-            answerMode: sel.answerMode, gameSeq: 0
+            answerMode: sel.answerMode, gameSeq: 0,
+            timerMode: sel.timerMode, perQuestionSecs: sel.perQuestionSecs, speedSecs: sel.speedSecs
           }).then(function (code) {
             hostRun(code, sel.adapter, sel.rounds, roster);
           }).catch(function (e) { alert("Could not start: " + e.message); });
@@ -406,11 +546,25 @@ window.LiveMode = (function () {
     var TL = adapter.timeLimit || 20000;
     var hostRenderedQ = -1; // host question screen is built once per round; later
                             // answers only update the counter, never rebuild the DOM
-    var hostPhase = "lobby"; // "lobby" | "question" | "reveal" | "podium". Once the
-                             // teacher reveals, late-arriving answer/progress
-                             // snapshots must NOT rebuild the question screen over
-                             // the reveal — renderQuestion/renderMatchHost bail
-                             // unless we're actually in the question phase.
+    var hostPhase = "lobby"; // "lobby" | "passage" | "question" | "reveal" | "speed"
+                             // | "podium". Once the teacher reveals, late-arriving
+                             // answer/progress snapshots must NOT rebuild the
+                             // question screen over the reveal —
+                             // renderQuestion/renderMatchHost bail unless we're
+                             // actually in the question phase.
+    var hostCountdown = null; // Per-Question mode: the board's countdown for the
+                              // current question (drives the auto-reveal on expiry).
+    var hostSpeedCountdown = null; // Speed Challenge: the single shared clock.
+    var speedAnswersUnsub = null;  // Speed Challenge: listener over ALL answers.
+    var speedRenderedOnce = false; // Speed board built once, then refreshed in place.
+    var speedFinished = false;     // finishSpeed() is idempotent (clock / all-done / button).
+
+    // Timer Mode config — read from the session doc (written at setup). The board
+    // is the single authority on advancement in every mode, so these just choose
+    // WHICH pacing the shared flow uses.
+    function timerMode() { return (sess && sess.timerMode) || "manual"; }
+    function perQSecs() { return (sess && sess.perQuestionSecs) || 20; }
+    function speedSecs() { return (sess && sess.speedSecs) || 120; }
 
     // Every write that moves the room forward runs inside a click handler. The
     // Firestore SDK throws SYNCHRONOUSLY on invalid data (e.g. an `undefined`
@@ -456,6 +610,7 @@ window.LiveMode = (function () {
       if (hostPhase === "lobby") return hostLobby();
       // Mid-game: refresh the answered denominator / board markers in place.
       if (hostPhase === "question" && sess.round) renderQuestion(sess.round.index, rounds[sess.round.index], (latestAnswers || []).length);
+      if (hostPhase === "speed") return renderSpeedHost();
     }
     track(window.LiveDB.listenJoined(code, function (arr) { joinedList = arr; onPresence(); }));
     // Heartbeats stop silently on disconnect (no write), so poll to notice names
@@ -497,9 +652,19 @@ window.LiveMode = (function () {
               el("div", { class: "join-chips missing" }, missing.map(function (s) { return el("span", { class: "join-chip out", text: s.name }); }))
             ])
           : el("div", { class: "join-allin", text: "🎉 Everyone's in!" }),
-        el("button", { class: "btn primary big", text: "Start game ▶", attrs: joinedNames.length ? {} : { disabled: "true" }, on: { click: (adapter.passage ? hostPassage : nextQuestion) } }),
+        el("button", { class: "btn primary big", text: "Start game ▶", attrs: joinedNames.length ? {} : { disabled: "true" }, on: { click: (adapter.passage ? hostPassage : beginQuestions) } }),
         el("button", { class: "back-link small", html: "✕ Close room", on: { click: closeRoom } })
       ]));
+    }
+
+    // After the lobby (and, for a Passage game, after the shared passage step),
+    // pacing splits: Speed Challenge runs the student-paced flow; Manual and
+    // Per-Question run the shared question-by-question flow. For a Passage game
+    // this is called only when the teacher taps "Start questions", so the Speed
+    // clock begins AFTER the shared passage viewing (never counts against it).
+    function beginQuestions() {
+      if (timerMode() === "speed") return hostSpeed();
+      return nextQuestion();
     }
 
     /* ---- Passage (Lese & Hör): the passage is shown ONLY on the host screen.
@@ -528,7 +693,7 @@ window.LiveMode = (function () {
           el("div", { class: "passage-tag", text: (passageInfo && passageInfo.type === "audio") ? "🎧 Listen to the passage" : "📖 Read the passage" })
         ].concat(passageBodyNodes(passageInfo))),
         el("div", { class: "host-controls" }, [
-          el("button", { class: "btn primary big", text: "Start questions ▶", on: { click: nextQuestion } })
+          el("button", { class: "btn primary big", text: "Start questions ▶", on: { click: beginQuestions } })
         ])
       ]));
     }
@@ -553,12 +718,55 @@ window.LiveMode = (function () {
       try { if (window.VoiceBox && window.VoiceBox.stop) window.VoiceBox.stop(); } catch (e) {}
       resumeClock();
     }
-    // Timer-pause hooks. No-ops today: there is no running clock yet (Manual
-    // pacing only). When Per-Question / Speed Challenge Timer Modes are built,
-    // pause/resume the current question's clock here so re-showing the passage
-    // never eats a student's time.
-    function pauseClock() { /* Timer Modes: pause the current question clock */ }
-    function resumeClock() { /* Timer Modes: resume the current question clock */ }
+    // Timer-pause hooks: re-showing the passage must never eat a student's time.
+    // Pause whichever clock is live (the per-question countdown or the Speed
+    // Challenge clock) on both the board AND the phones (qPaused flag), and resume
+    // together when the overlay closes. A no-op in Manual mode (no clock).
+    function pauseClock() {
+      if (hostCountdown) hostCountdown.pause();
+      if (hostSpeedCountdown) hostSpeedCountdown.pause();
+      safeUpdate({ qPaused: true });
+    }
+    function resumeClock() {
+      if (hostCountdown) hostCountdown.resume();
+      if (hostSpeedCountdown) hostSpeedCountdown.resume();
+      safeUpdate({ qPaused: false });
+    }
+
+    // The player-safe view of a round: exactly what a phone may see, with the
+    // correct answers stripped out (MCQ options without the winning flag; blanks
+    // without the answer mapping) so a phone can never peek. Used for BOTH the
+    // shared question doc (Manual / Per-Question) and the up-front Speed Challenge
+    // set. `startedAt` / `deadlineSecs` are stamped by the caller.
+    // NOTE: r.passage is deliberately NEVER included — the passage is host-only.
+    function playerSafeRound(r, ra, idx, answerMode) {
+      return {
+        index: idx, type: r.type, fmt: r.fmt || null, de: r.de || null, emoji: r.emoji || null,
+        // MCQ: send the typed question + options WITHOUT the `correct` flag.
+        question: (ra.mcq && r.question) ? r.question : null,
+        options: (ra.mcq && r.options)
+          ? r.options.map(function (o) { return { type: o.type, value: o.value }; })
+          : (r.options || null),
+        sentence: r.sentence || null, blank: r.blank || null, clueWord: r.clueWord || null,
+        meaning: r.meaning || null, tiles: r.tiles || null,
+        words: r.words || null, pairs: r.pairs || null, speed: r.speed || null,
+        answerMode: answerMode || "options",
+        // Lücken-Text: blank ids (to lay out gaps) + the tap word bank, but NEVER
+        // the correct answers, so type mode can't be peeked.
+        blanks: (ra.blanks && r.blanks) ? r.blanks.map(function (b) { return { id: b.id }; }) : null,
+        wordBank: (ra.blanks && answerMode !== "type") ? (r.wordBank || null) : null,
+        // Sentence Scramble: the phone gets ONLY the shuffled tiles (sent above) +
+        // the mode (for the hint). The answer order (correctWords) is scored
+        // host-side, and the listen-mode audio plays on the BOARD — so the answer
+        // sentence never reaches a phone (strictly no text leak).
+        mode: (ra.scramble) ? (r.mode || null) : null,
+        // Hangman: the target word rides along for local letter-checking (it's never
+        // shown until guessed); the reference clue stays host-only.
+        word: (ra.hangman && r.word) ? r.word : null,
+        // Type mode needs the answer on the phone (to diff on submit) — tap hides it.
+        correct: (ra.typeResult && answerMode === "type") ? (r.correct || r.word || null) : null
+      };
+    }
 
     function nextQuestion() {
       var i = (sess.questionIndex == null ? -1 : sess.questionIndex) + 1;
@@ -568,52 +776,28 @@ window.LiveMode = (function () {
       // Carry the session's answer mode onto the in-memory round so the host
       // view (hostContent) and scoring (score) both know Tap vs Type.
       r.answerMode = sess.answerMode || "options";
-      safeUpdate({
-        status: "question", questionIndex: i, reveal: null,
-        round: {
-          index: i, type: r.type, fmt: r.fmt || null, de: r.de || null, emoji: r.emoji || null,
-          // MCQ: send the typed question + options WITHOUT the `correct` flag so a
-          // phone can't peek which option wins. Other games keep options as-is
-          // (e.g. Hör gut zu!'s tap board sends plain option strings).
-          question: (ra.mcq && r.question) ? r.question : null,
-          options: (ra.mcq && r.options)
-            ? r.options.map(function (o) { return { type: o.type, value: o.value }; })
-            : (r.options || null),
-          sentence: r.sentence || null, blank: r.blank || null, clueWord: r.clueWord || null,
-          meaning: r.meaning || null, tiles: r.tiles || null,
-          words: r.words || null, pairs: r.pairs || null, speed: r.speed || null,
-          answerMode: sess.answerMode || "options",
-          // Lücken-Text: phones need the blank ids (to lay out the gaps) and, in
-          // tap mode, the shuffled word bank — but NEVER the correct answers, so
-          // type mode can't be peeked. The bank naturally contains the answers.
-          blanks: (ra.blanks && r.blanks) ? r.blanks.map(function (b) { return { id: b.id }; }) : null,
-          wordBank: (ra.blanks && sess.answerMode !== "type") ? (r.wordBank || null) : null,
-          // Type mode needs the answer on the phone (to diff on submit). Only sent
-          // for the type-diff game in type mode — tap mode still hides it.
-          correct: (ra.typeResult && sess.answerMode === "type") ? (r.correct || r.word || null) : null,
-          startedAt: window.LiveDB.serverTs()
-          // NOTE: r.passage is deliberately NOT sent — the passage is host-only.
-        }
-      });
+      var roundDoc = playerSafeRound(r, ra, i, r.answerMode);
+      roundDoc.startedAt = window.LiveDB.serverTs();
+      // Per-Question mode: tell phones how many seconds they have, so each shows the
+      // matching countdown and locks itself out at zero (the board auto-reveals too).
+      if (timerMode() === "per_question") roundDoc.deadlineSecs = perQSecs();
+      safeUpdate({ status: "question", questionIndex: i, reveal: null, qPaused: false, round: roundDoc });
       watchAnswers(i, r);
     }
 
     function watchAnswers(i, r) {
       hostPhase = "question"; // we're now taking answers for round i
       if (answersUnsub) { answersUnsub(); answersUnsub = null; }
+      if (hostCountdown) { hostCountdown.stop(); hostCountdown = null; } // any prior question's clock
       var answered = 0;
       latestAnswers = []; // fresh question
       answersUnsub = window.LiveDB.listenAnswers(code, i, function (arr) {
         latestAnswers = arr; // keep the newest set so reveal needn't re-query
         answered = arr.length;
         renderQuestion(i, r, answered);
-        var joinedN = presentCount() || (sess.students || []).length;
-        if (answered >= joinedN && joinedN > 0) { /* everyone answered — teacher may reveal */ }
       }, sess.gameSeq || 0); // answers are per-game — never surface a previous game's docs
-      // cosmetic countdown then auto-enable reveal
       clearTimeout(timer);
-      timer = setTimeout(function () {}, TL);
-      renderQuestion(i, r, 0);
+      renderQuestion(i, r, 0); // builds the screen (and, in Per-Question mode, its countdown)
     }
 
     function renderQuestion(i, r, answered) {
@@ -636,11 +820,19 @@ window.LiveMode = (function () {
         return;
       }
       hostRenderedQ = i;
+      // Per-Question mode: build the board's countdown; on zero it auto-reveals.
+      if (hostCountdown) { hostCountdown.stop(); hostCountdown = null; }
+      var timerNode = null;
+      if (timerMode() === "per_question") {
+        hostCountdown = makeCountdown(perQSecs(), function () { if (hostPhase === "question") reveal(i, r); });
+        timerNode = hostCountdown.node;
+      }
       show(screen("host", [
         el("div", { class: "host-topbar" }, [
           el("div", { class: "host-q-num", text: "Question " + (i + 1) + " / " + rounds.length }),
           el("div", { class: "host-answered", text: answered + " of " + joinedN + " answered" })
         ]),
+        timerNode,
         adapterForRound(r).hostContent(el, r),
         el("div", { class: "host-controls" }, [
           // Passage games: let the teacher re-show the passage mid-question without
@@ -649,53 +841,98 @@ window.LiveMode = (function () {
           el("button", { class: "btn primary big", text: "Reveal answer ▶", on: { click: function () { reveal(i, r); } } })
         ])
       ]));
+      if (hostCountdown) { hostCountdown.start(); if (sess && sess.qPaused) hostCountdown.pause(); }
     }
 
-    // ---- Host: live per-student progress for the individual match game ----
-    // Build the per-student progress rows + the "N finished" count from the
-    // progress docs the live listener has delivered so far.
+    // ---- Host: the LIVE RACE board for the individual match game ----
+    // Each student races to match every pair. This turns the progress docs into a
+    // ranked leaderboard: who has matched how many, who finished (fastest first)
+    // and in what time, plus their first-try accuracy — so the competition is
+    // visible on the board as it happens (not a blank "waiting" screen).
     function matchProgress(r) {
       var total = (r.pairs || []).length || 1;
       var joinedIds = Object.keys(presentMap());
-      // Best progress per student, from the docs the live listener delivered.
+      var startedAt = sess.round && sess.round.startedAt && sess.round.startedAt.toMillis ? sess.round.startedAt.toMillis() : null;
+      // Best (most complete) progress per student, from the docs delivered so far.
       var prog = {};
       latestAnswers.forEach(function (a) {
         if (a.studentId == null) return;
-        var cur = prog[a.studentId] || { matched: 0, done: false };
+        var cur = prog[a.studentId] || { matched: 0, firstTry: 0, wrong: 0, done: false, doneTs: null };
         if ((a.matched || 0) > cur.matched) cur.matched = a.matched || 0;
-        if (a.done) cur.done = true;
+        if ((a.firstTry || 0) > cur.firstTry) cur.firstTry = a.firstTry || 0;
+        if ((a.wrong || 0) > cur.wrong) cur.wrong = a.wrong || 0;
+        if (a.done) {
+          cur.done = true;
+          var t = a.ts && a.ts.toMillis ? a.ts.toMillis() : null;
+          if (t != null && (cur.doneTs == null || t < cur.doneTs)) cur.doneTs = t;
+        }
         prog[a.studentId] = cur;
       });
-      // Show the students who joined (fall back to the full roster before anyone joins).
       var roster = sess.students || [];
-      var shown = joinedIds.length
-        ? roster.filter(function (s) { return joinedIds.indexOf(s.id) >= 0; })
-        : roster;
-      var doneCount = 0;
-      var rows = shown.map(function (stu) {
-        var p = prog[stu.id] || { matched: 0, done: false };
-        if (p.done) doneCount++;
-        var pct = Math.round(Math.min(1, p.matched / total) * 100);
-        return el("div", { class: "match-prow" + (p.done ? " done" : "") }, [
-          el("span", { class: "match-pname", text: stu.name }),
-          el("div", { class: "match-pbar" }, [
-            el("div", { class: "match-pfill", attrs: { style: "width:" + pct + "%" } })
-          ]),
-          el("span", { class: "match-pcount", text: (p.done ? "✓ " : "") + p.matched + "/" + total })
-        ]);
+      var shown = joinedIds.length ? roster.filter(function (s) { return joinedIds.indexOf(s.id) >= 0; }) : roster;
+      var pm = presentMap();
+      var items = shown.map(function (stu) {
+        var p = prog[stu.id] || { matched: 0, firstTry: 0, wrong: 0, done: false, doneTs: null };
+        var secs = (p.done && p.doneTs != null && startedAt != null) ? Math.max(1, Math.round((p.doneTs - startedAt) / 1000)) : null;
+        return { id: stu.id, name: stu.name, matched: p.matched, firstTry: p.firstTry, wrong: p.wrong, done: p.done, secs: secs, offline: !pm[stu.id] };
       });
-      return { rows: rows, doneCount: doneCount, denom: (shown.length || roster.length) };
+      // Finished first (fastest first), then racers by how many they've matched.
+      items.sort(function (a, b) {
+        if (a.done && b.done) return (a.secs || 0) - (b.secs || 0);
+        if (a.done !== b.done) return a.done ? -1 : 1;
+        return b.matched - a.matched;
+      });
+      var doneCount = items.filter(function (x) { return x.done; }).length;
+      return { items: items, total: total, doneCount: doneCount, denom: (shown.length || roster.length) };
+    }
+
+    function matchRowNode(x, rank, total) {
+      var pct = Math.round(Math.min(1, total ? x.matched / total : 0) * 100);
+      var medal = x.done ? (rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : "#" + rank) : "";
+      return el("div", { class: "match-prow" + (x.done ? " done" : "") + (x.offline ? " offline" : ""), attrs: x.offline ? { title: "Disconnected" } : {} }, [
+        el("span", { class: "match-prank", text: medal }),
+        el("span", { class: "match-pname", text: x.name + (x.offline ? "  ⚠" : "") }),
+        el("div", { class: "match-pbar" }, [el("div", { class: "match-pfill", attrs: { style: "width:" + pct + "%" } })]),
+        x.done
+          ? el("span", { class: "match-pdone", text: "✓ " + x.secs + "s · " + x.firstTry + "/" + total + " 1st-try" })
+          : el("span", { class: "match-pcount", text: x.matched + "/" + total })
+      ]);
+    }
+
+    // The matching CONTENT shown on the projector so the class can follow along:
+    // both sides as two SHUFFLED columns, deliberately NOT paired up (the answer
+    // key is never given away during play). Audio tiles are playable by the
+    // teacher; visual tiles (text/icon/image) are display-only. Built once per
+    // round (never re-shuffled by a progress update).
+    function matchBoardDisplay(r) {
+      var pairs = r.pairs || [];
+      var rate = r.speed || 1;
+      var lefts = kit.shuffle(pairs.map(function (p) { return p.q; }));
+      var rights = kit.shuffle(pairs.map(function (p) { return p.a; }));
+      function tile(side) {
+        var t = window.MatchTiles.render(el, side); // same tile the students see
+        if (window.MatchTiles.isAudio(side)) {
+          t.addEventListener("click", function () { try { window.MatchTiles.play(kit, side, rate); } catch (e) {} });
+        } else {
+          t.disabled = true; // projector reference only — not interactive
+        }
+        return t;
+      }
+      return el("div", { class: "match-hboard" }, [
+        el("div", { class: "match-col match-hcol" }, lefts.map(tile)),
+        el("div", { class: "match-col match-hcol" }, rights.map(tile))
+      ]);
     }
 
     function renderMatchHost(i, r) {
       var d = matchProgress(r);
       // The `.match-progress` container is ALWAYS rendered (a "waiting…" line lives
       // inside it when empty), so once the round is built we only ever refresh the
-      // bars + counter in place. Rebuilding the whole screen on every matched pair
+      // rows + counter in place. Rebuilding the whole screen on every matched pair
       // would keep destroying the "Reveal & score" button under the teacher.
       function fill(container) {
         container.innerHTML = "";
-        if (d.rows.length) d.rows.forEach(function (row) { container.appendChild(row); });
+        if (d.items.length) d.items.forEach(function (x, idx) { container.appendChild(matchRowNode(x, idx + 1, d.total)); });
         else container.appendChild(el("p", { class: "live-muted", text: "Waiting for students to join…" }));
       }
       var counter = document.querySelector(".host-answered");
@@ -710,15 +947,151 @@ window.LiveMode = (function () {
       fill(progContainer);
       show(screen("host", [
         el("div", { class: "host-topbar" }, [
-          el("div", { class: "host-q-num", text: "Round " + (i + 1) + " / " + rounds.length }),
+          el("div", { class: "host-q-num", text: "🔗 Match the Following" + (rounds.length > 1 ? "  ·  Round " + (i + 1) + " / " + rounds.length : "") }),
           el("div", { class: "host-answered", text: d.doneCount + " of " + d.denom + " finished" })
         ]),
-        el("div", { class: "match-host-tag", text: "🔗 Each student matches every pair" }),
+        el("div", { class: "match-host-tag", text: "⚡ Race to match all " + d.total + " pairs — fastest with the most first-try matches wins!" }),
+        matchBoardDisplay(r),
+        el("div", { class: "match-progress-label", text: "Live progress" }),
         progContainer,
         el("div", { class: "host-controls" }, [
           el("button", { class: "btn primary big", text: "Reveal & score ▶", on: { click: function () { reveal(i, r); } } })
         ])
       ]));
+    }
+
+    /* ============================================================
+       SPEED CHALLENGE (student-paced) — one shared clock; each phone races the
+       whole set independently. The board can't show "the current question"
+       (everyone's on a different one), so it shows aggregate progress + the one
+       countdown, and tallies every answer when the clock (or an "end now") fires.
+       ============================================================ */
+    function hostSpeed() {
+      hostPhase = "speed";
+      speedRenderedOnce = false;
+      speedFinished = false;
+      var am = sess.answerMode || "options";
+      // Ship the WHOLE set to the phones up front, answers stripped (playerSafeRound
+      // masks them), so each phone can walk it locally without peeking.
+      var safeRounds = rounds.map(function (r, idx) {
+        var ra = adapterForRound(r);
+        r.answerMode = am;
+        return playerSafeRound(r, ra, idx, am);
+      });
+      safeUpdate({
+        status: "speed", questionIndex: -1, round: null, reveal: null, qPaused: false,
+        speedRounds: safeRounds, speedSecs: speedSecs(), totalQuestions: rounds.length,
+        speedStartedAt: window.LiveDB.serverTs()
+      });
+      latestAnswers = [];
+      if (hostSpeedCountdown) { hostSpeedCountdown.stop(); }
+      hostSpeedCountdown = makeCountdown(speedSecs(), function () { finishSpeed(); });
+      if (speedAnswersUnsub) { speedAnswersUnsub(); speedAnswersUnsub = null; }
+      speedAnswersUnsub = window.LiveDB.listenAllAnswers(code, function (arr) {
+        latestAnswers = arr;
+        renderSpeedHost();
+      });
+      track(function () { if (speedAnswersUnsub) { speedAnswersUnsub(); speedAnswersUnsub = null; } });
+      renderSpeedHost();
+    }
+
+    // Per-student progress + running score, derived from ALL answer docs. Each
+    // answer is scored with its round's adapter at full credit (elapsed 0), so a
+    // student's score simply reflects how many they got right.
+    function speedProgress() {
+      var N = rounds.length;
+      var byStu = {};
+      (latestAnswers || []).forEach(function (a) {
+        if (a.studentId == null) return;
+        var s = byStu[a.studentId] || { answered: {}, pts: 0 };
+        if (!s.answered[a.questionIndex]) {
+          s.answered[a.questionIndex] = true;
+          var r = rounds[a.questionIndex];
+          if (r) {
+            var ra = adapterForRound(r);
+            var sc; try { sc = ra.score(r, a, 0, TL) || {}; } catch (e) { sc = { points: 0 }; }
+            s.pts += sc.points || 0;
+          }
+        }
+        byStu[a.studentId] = s;
+      });
+      var pm = presentMap();
+      var roster = sess.students || [];
+      var joinedIds = Object.keys(pm);
+      var shown = joinedIds.length ? roster.filter(function (s) { return pm[s.id]; }) : roster;
+      var rows = shown.map(function (stu) {
+        var s = byStu[stu.id] || { answered: {}, pts: 0 };
+        return { id: stu.id, name: stu.name, done: Object.keys(s.answered).length, total: N, pts: s.pts, offline: !pm[stu.id] };
+      }).sort(function (a, b) { return b.pts - a.pts || b.done - a.done; });
+      var allDone = shown.length > 0 && rows.every(function (r) { return r.done >= N; });
+      return { rows: rows, N: N, allDone: allDone };
+    }
+
+    function renderSpeedHost() {
+      if (hostPhase !== "speed") return;
+      var d = speedProgress();
+      function rowNode(r) {
+        var pct = Math.round(Math.min(1, r.total ? r.done / r.total : 0) * 100);
+        return el("div", { class: "speed-prow" + (r.done >= r.total ? " done" : "") + (r.offline ? " offline" : ""), attrs: r.offline ? { title: "Disconnected" } : {} }, [
+          el("span", { class: "speed-pname", text: r.name + (r.offline ? "  ⚠" : "") }),
+          el("div", { class: "speed-pbar" }, [el("div", { class: "speed-pfill", attrs: { style: "width:" + pct + "%" } })]),
+          el("span", { class: "speed-pcount", text: (r.done >= r.total ? "✓ " : "") + r.done + "/" + r.total }),
+          el("span", { class: "speed-ppts", text: r.pts })
+        ]);
+      }
+      var doneCount = d.rows.filter(function (r) { return r.done >= r.N; }).length;
+      var doneText = doneCount + " of " + d.rows.length + " finished all " + d.N;
+      // Build once, then refresh the rows + counter in place (keeps the one clock
+      // node and the "End now" button stable under the teacher).
+      var rowsBox = document.querySelector(".speed-rows");
+      if (speedRenderedOnce && rowsBox) {
+        rowsBox.innerHTML = "";
+        d.rows.forEach(function (r) { rowsBox.appendChild(rowNode(r)); });
+        var dc = document.querySelector(".speed-donecount");
+        if (dc) dc.textContent = doneText;
+        if (d.allDone) finishSpeed(); // everyone's done — no need to wait for the clock
+        return;
+      }
+      speedRenderedOnce = true;
+      show(screen("host", [
+        el("div", { class: "host-topbar" }, [
+          el("div", { class: "host-q-num", text: "⚡ Speed Challenge" }),
+          el("div", { class: "host-answered speed-donecount", text: doneText })
+        ]),
+        hostSpeedCountdown ? hostSpeedCountdown.node : null,
+        el("div", { class: "speed-host-tag", text: "Students race through all " + d.N + " questions on their phones" }),
+        el("div", { class: "speed-rows" }, d.rows.map(rowNode)),
+        el("div", { class: "host-controls" }, [
+          passageInfo ? el("button", { class: "btn ghost show-passage-btn", html: "📖 Show passage", on: { click: function () { showPassageOverlay(passageInfo); } } }) : null,
+          el("button", { class: "btn primary big", text: "End now & show results ▶", on: { click: finishSpeed } })
+        ])
+      ]));
+      if (hostSpeedCountdown) { hostSpeedCountdown.start(); if (sess && sess.qPaused) hostSpeedCountdown.pause(); }
+    }
+
+    // Tally every answer (however far each student got) and go to the podium. Safe
+    // to call more than once — the clock, the all-done shortcut and the manual
+    // "End now" button all funnel through here.
+    function finishSpeed() {
+      if (speedFinished) return;
+      speedFinished = true;
+      if (hostSpeedCountdown) { hostSpeedCountdown.stop(); }
+      if (speedAnswersUnsub) { speedAnswersUnsub(); speedAnswersUnsub = null; }
+      var scores = Object.assign({}, sess.scores || {});
+      var counted = {};
+      (latestAnswers || []).forEach(function (a) {
+        if (a.studentId == null) return;
+        var k = a.questionIndex + "_" + a.studentId;
+        if (counted[k]) return; counted[k] = true;
+        var r = rounds[a.questionIndex];
+        if (!r) return;
+        var ra = adapterForRound(r);
+        var sc; try { sc = ra.score(r, a, 0, TL) || {}; } catch (e) { sc = { points: 0 }; }
+        scores[a.studentId] = (scores[a.studentId] || 0) + (sc.points || 0);
+      });
+      sess.scores = scores;       // so podium()/renderPodium read the final tally
+      safeUpdate({ scores: scores });
+      podium();
     }
 
     // renderReveal is well-tested, but a reveal must NEVER leave the teacher stuck
@@ -746,6 +1119,7 @@ window.LiveMode = (function () {
       // Revealing is the teacher's call at ANY moment. Mark the phase first so a
       // late answer snapshot can't rebuild the question screen over this reveal.
       hostPhase = "reveal";
+      if (hostCountdown) { hostCountdown.stop(); hostCountdown = null; } // Per-Question clock is done
       var ra = adapterForRound(r); // this round's format adapter
       if (ra.match) return revealMatch(i, r);
       clearTimeout(timer);
@@ -816,21 +1190,29 @@ window.LiveMode = (function () {
       (sess.students || []).forEach(function (stu) {
         var a = best[stu.id];
         if (!a) {
-          results.push({ studentId: stu.id, name: stu.name, correct: false, points: 0, answered: false, matched: 0, total: total });
+          results.push({ studentId: stu.id, name: stu.name, correct: false, points: 0, answered: false, matched: 0, total: total, firstTry: 0, wrong: 0, secs: null });
           return;
         }
         var matched = Math.min(a.matched || 0, total);
+        var firstTry = Math.min(a.firstTry != null ? a.firstTry : 0, matched);
         var wrong = a.wrong || 0;
         var done = !!a.done || matched >= total;
         var ts = a.ts && a.ts.toMillis ? a.ts.toMillis() : null;
         var elapsed = (startedAt != null && ts != null) ? Math.max(0, ts - startedAt) : TL;
+        var secs = (startedAt != null && ts != null) ? Math.max(1, Math.round(elapsed / 1000)) : null;
         var frac = Math.max(0, 1 - elapsed / TL);
-        // Partial credit for pairs found + a speed bonus only when fully done,
-        // minus a deduction for each wrong tap. Floored at zero.
-        var pts = Math.round((matched / total) * 600) + (done ? Math.round(400 * frac) : 0) - 40 * wrong;
+        // HYBRID scoring — rewards BOTH getting pairs right first time AND speed:
+        //   first-try accuracy  → up to 400  (brute-forcing loses this)
+        //   completion          → up to 200  (matching all pairs)
+        //   speed on finishing  → up to 400  (fastest finisher earns the most)
+        // So a careful + quick student beats one who taps around until it sticks.
+        var accPts = Math.round((firstTry / total) * 400);
+        var compPts = Math.round((matched / total) * 200);
+        var speedPts = done ? Math.round(400 * frac) : 0;
+        var pts = accPts + compPts + speedPts;
         if (pts < 0) pts = 0;
         scores[stu.id] = (scores[stu.id] || 0) + pts;
-        results.push({ studentId: stu.id, name: stu.name, correct: done, points: pts, answered: matched > 0, matched: matched, total: total });
+        results.push({ studentId: stu.id, name: stu.name, correct: done, points: pts, answered: matched > 0, matched: matched, total: total, firstTry: firstTry, wrong: wrong, secs: secs });
       });
       results.sort(function (x, y) { return y.points - x.points; });
       results.forEach(function (rr, idx) { rr.rank = idx + 1; });
@@ -853,9 +1235,22 @@ window.LiveMode = (function () {
       var ranked = results.filter(function (x) { return x.answered; }).sort(function (a, b) { return b.points - a.points; });
       var answerBlock;
       if (isMatch) {
+        // Show the answer key — the correct pairs — so the class can review. An
+        // audio side shows the German word as text (a static "tap to hear" tile
+        // would be useless here).
+        var akSide = function (side) {
+          if (side && side.type === "audio") return [el("span", { class: "match-ak-audio", text: "🔊 " + (side.value || "") })];
+          return window.MatchTiles.content(el, side);
+        };
         answerBlock = el("div", { class: "reveal-answer" }, [
-          el("div", { class: "reveal-label", text: "Round complete" }),
-          el("div", { class: "reveal-value", text: "🔗 " + mtotal + (mtotal === 1 ? " pair" : " pairs") })
+          el("div", { class: "reveal-label", text: "The correct pairs" }),
+          el("div", { class: "match-answerkey" }, (r.pairs || []).map(function (pair) {
+            return el("div", { class: "match-akrow" }, [
+              el("div", { class: "match-akside mt-" + ((pair.q || {}).type || "text") }, akSide(pair.q)),
+              el("span", { class: "match-akarrow", text: "↔" }),
+              el("div", { class: "match-akside mt-" + ((pair.a || {}).type || "text") }, akSide(pair.a))
+            ]);
+          }))
         ]);
       } else if (isBlanks) {
         // The full sentence with every gap filled + highlighted, plus the note.
@@ -901,9 +1296,13 @@ window.LiveMode = (function () {
               var pm = presentMap();
               return ranked.slice(0, 8).map(function (x, idx) {
                 var offline = !pm[x.studentId]; // dropped mid-game — small, quiet cue
+                // Match: show first-try accuracy + finish time (that's the race).
+                var suffix = isMatch
+                  ? "  (" + (x.firstTry != null ? x.firstTry : 0) + "/" + x.total + " 1st-try" + (x.secs != null ? " · " + x.secs + "s" : "") + ")"
+                  : (isBlanks ? "  (" + x.matched + "/" + x.total + ")" : "");
                 return el("div", { class: "board-row" + (idx === 0 && x.points > 0 ? " top" : "") + (offline ? " offline" : ""), attrs: offline ? { title: "Disconnected" } : {} }, [
                   el("span", { class: "board-rank", text: (idx + 1) }),
-                  el("span", { class: "board-name", text: x.name + (showCount ? "  (" + x.matched + "/" + x.total + ")" : "") + (offline ? "  ⚠" : "") }),
+                  el("span", { class: "board-name", text: x.name + suffix + (offline ? "  ⚠" : "") }),
                   el("span", { class: "board-pts", text: x.points > 0 ? "+" + x.points : (showCount ? "0" : "✗") })
                 ]);
               });
@@ -977,7 +1376,8 @@ window.LiveMode = (function () {
             gameId: sel.gameId, gameName: sel.adapter.meta.name, topicName: sel.topic.name,
             status: "lobby", questionIndex: -1, totalQuestions: sel.rounds.length,
             round: null, reveal: null, scores: seedScores, answerMode: sel.answerMode,
-            persistMode: sel.persistMode, gameSeq: seq + 1
+            persistMode: sel.persistMode, gameSeq: seq + 1,
+            timerMode: sel.timerMode, perQuestionSecs: sel.perQuestionSecs, speedSecs: sel.speedSecs
           }).then(function () {
             hostRun(code, sel.adapter, sel.rounds, roster);
           }).catch(function (e) { alert("Could not start: " + e.message); });
@@ -1125,7 +1525,7 @@ window.LiveMode = (function () {
     stop();
     rememberRoom(code, stu); // enables one-tap rejoin after a reload
     // Back leaves the room; confirm while the student is on an answering screen.
-    window.AppNav.set(function () { landing(); }, function () { return !!document.querySelector(".match-board, .live-q-options.phone, .cases-player, .wm-player, .tf-player"); });
+    window.AppNav.set(function () { landing(); }, function () { return !!document.querySelector(".match-board, .live-q-options.phone, .cases-player, .wm-player, .tf-player, .speed-player, .scr-player, .hang-player"); });
     // Presence heartbeat: keep this student's claimed name alive. If the phone
     // dies or the tab closes, the heartbeats stop and the name frees up (after
     // JOIN_STALE_MS); a clean tab-close frees it instantly via leaveSession.
@@ -1143,15 +1543,32 @@ window.LiveMode = (function () {
     var matchRenderedQ = -1; // match board is stateful — render it once per round
     var typeRenderedQ = -1;  // type input is stateful too — render once per round
     var statefulRenderedQ = -1; // Lücken-Text widget: build once, don't rebuild
+    var answerRenderedQ = -1; // plain answer screen: build once per round too (so a
+                              // mid-question session change — e.g. a pause flag —
+                              // never rebuilds it under the student)
     var typeState = { qi: -1, text: "" }; // this phone's last typed answer
     var blanksState = { qi: -1, answers: null }; // this phone's submitted blanks
+    var curCountdown = null;  // the phone's active countdown (Per-Question / Speed)
+    var speedStarted = false; // Speed Challenge: the self-paced screen is built once
 
     track(window.LiveDB.listenSession(code, function (s) {
       if (!s) { forgetRoom(); show(screen("player live-center", [el("div", { class: "live-card" }, [el("h2", { text: "Room closed" })])])); return; }
       // A new game in the same room resets question numbering — allow answering again.
       var seq = s.gameSeq || 0;
-      if (seq !== lastSeq) { answeredIndex = -1; matchRenderedQ = -1; typeRenderedQ = -1; statefulRenderedQ = -1; lastSeq = seq; }
+      if (seq !== lastSeq) {
+        answeredIndex = -1; matchRenderedQ = -1; typeRenderedQ = -1; statefulRenderedQ = -1;
+        answerRenderedQ = -1; speedStarted = false;
+        if (curCountdown) { curCountdown.stop(); curCountdown = null; }
+        lastSeq = seq;
+      }
       var qi = s.round ? s.round.index : -1;
+      // Passage re-shown (Per-Question / Speed): pause/resume the phone's own clock
+      // so re-reading never costs time. This must run BEFORE the early-return below.
+      if (curCountdown && (s.status === "question" || s.status === "speed")) {
+        if (s.qPaused) curCountdown.pause(); else curCountdown.resume();
+      }
+      // Left the timed screens entirely — kill any lingering countdown interval.
+      if (curCountdown && s.status !== "question" && s.status !== "speed") { curCountdown.stop(); curCountdown = null; }
       if (s.status === lastStatus && qi === lastQ && s.status !== "question") return;
       lastStatus = s.status; lastQ = qi;
       // Leaving a question (to reveal / leaderboard / podium / ended): stop any
@@ -1186,7 +1603,16 @@ window.LiveMode = (function () {
           return answerScreen(s);
         }
         if (answeredIndex === qi) return waitScreen("Answer locked ✔", "Waiting for the class…");
+        if (answerRenderedQ === qi) return; // already showing this question — don't rebuild
+        answerRenderedQ = qi;
         return answerScreen(s);
+      }
+      // Speed Challenge: the phone self-paces through the whole set. Build the
+      // racing screen once; it manages its own position and clock from there.
+      if (s.status === "speed") {
+        if (speedStarted) return;
+        speedStarted = true;
+        return speedPlayerScreen(s);
       }
       if (s.status === "reveal") {
         var rAdapter = playerAdapter(s);
@@ -1216,24 +1642,106 @@ window.LiveMode = (function () {
         submit: function (payload) {
           if (locked || answeredIndex === r.index) return;
           locked = true; answeredIndex = r.index;
+          if (curCountdown) { curCountdown.stop(); curCountdown = null; }
           // Remember this phone's blanks so it can mark them right/wrong at reveal.
           if (payload && payload.blanks) blanksState = { qi: r.index, answers: payload.blanks };
           window.LiveDB.submitAnswer(code, r.index, stu.id, payload, s.gameSeq || 0);
           waitScreen("Answer locked ✔", "Waiting for the class…");
         }
       };
+      // Per-Question mode: a countdown that locks this phone out at zero (the board
+      // reveals at the same moment, so an un-answered student sees "Too slow").
+      if (curCountdown) { curCountdown.stop(); curCountdown = null; }
+      var timerNode = null;
+      if (r.deadlineSecs) {
+        curCountdown = makeCountdown(r.deadlineSecs, function () {
+          locked = true;
+          if (answeredIndex !== r.index) {
+            show(screen("player live-center res-bad", [el("div", { class: "live-card" }, [
+              el("div", { class: "player-name-tag", text: stu.name }),
+              el("div", { class: "live-big-emoji", text: "⏰" }),
+              el("h2", { text: "Time's up!" }),
+              el("p", { class: "live-sub", text: "Waiting for the answer…" })
+            ])]));
+          }
+        });
+        timerNode = curCountdown.node;
+      }
       var hint = adapter.blanks
         ? (s.answerMode === "type" ? "Fill in the blanks ✍️" : "Tap the words to fill the blanks 👇")
-        : "Tap your answer 👇";
+        : adapter.scramble
+          ? (r.mode === "listen-unscramble" ? "Listen, then tap the words in order 🎧" : "Tap the words in the right order 👇")
+          : adapter.hangman ? "Guess the letters 👇"
+          : "Tap your answer 👇";
       var body = screen("player", [
         el("div", { class: "player-topbar" }, [
           el("div", { class: "player-name-tag", text: stu.name }),
           el("div", { class: "player-qnum", text: "Q" + (r.index + 1) })
         ]),
+        timerNode,
         el("div", { class: "player-prompt-hint", text: hint }),
         adapter.playerContent(el, r, api)
       ]);
       show(body);
+      if (curCountdown) { curCountdown.start(); if (s.qPaused) curCountdown.pause(); }
+    }
+
+    /* ---- Speed Challenge: the phone races the WHOLE set on its own ----
+       The board shipped every question up front (answers stripped). This screen
+       walks them locally at the student's own pace, submitting each answer to its
+       own question index. A cosmetic countdown mirrors the shared clock, but the
+       real end is the board flipping to the podium — so a tiny clock difference or
+       a passage-pause never wrongly cuts a student off. */
+    function speedPlayerScreen(s) {
+      var setRounds = s.speedRounds || [];
+      var N = setRounds.length;
+      var pos = 0;
+      if (curCountdown) { curCountdown.stop(); curCountdown = null; }
+      curCountdown = makeCountdown(s.speedSecs || 120, function () { /* board owns the real end */ });
+      var qnum = el("div", { class: "player-qnum speed-qnum", text: (N ? 1 : 0) + " / " + N });
+      var qWrap = el("div", { class: "speed-qwrap" });
+      var body = screen("player speed-player", [
+        el("div", { class: "player-topbar" }, [
+          el("div", { class: "player-name-tag", text: stu.name }),
+          qnum
+        ]),
+        curCountdown.node,
+        el("div", { class: "player-prompt-hint speed-hint", text: "Answer as many as you can! 👇" }),
+        qWrap
+      ]);
+
+      function renderPos() {
+        if (pos >= N) {
+          qnum.textContent = N + " / " + N;
+          qWrap.innerHTML = "";
+          qWrap.appendChild(el("div", { class: "live-card speed-done" }, [
+            el("div", { class: "live-big-emoji", text: "🏁" }),
+            el("h2", { text: "All done!" }),
+            el("p", { class: "live-sub", text: "You answered all " + N + ". Waiting for the clock…" })
+          ]));
+          return;
+        }
+        qnum.textContent = (pos + 1) + " / " + N;
+        var r = setRounds[pos];
+        var adapter = (r && r.fmt && window.LiveGames[r.fmt]) || window.LiveGames[s.gameId];
+        var advanced = false;
+        var api = {
+          submit: function (payload) {
+            if (advanced) return;         // one submit per question
+            advanced = true;
+            window.LiveDB.submitAnswer(code, pos, stu.id, payload);
+            pos++;
+            try { kit.beep && kit.beep("good"); } catch (e) {}
+            renderPos();
+          }
+        };
+        qWrap.innerHTML = "";
+        try { qWrap.appendChild(adapter.playerContent(el, r, api)); }
+        catch (e) { qWrap.appendChild(el("p", { class: "live-muted", text: "Skipping…" })); pos++; renderPos(); }
+      }
+      renderPos();
+      show(body);
+      curCountdown.start(); if (s.qPaused) curCountdown.pause();
     }
 
     /* ---- Individual match board (Hör-Paare) ----
@@ -1248,6 +1756,11 @@ window.LiveMode = (function () {
       var total = pairs.length;
       var rate = r.speed || 1;
       var matched = 0, wrong = 0, finished = false;
+      // First-try accuracy (hybrid scoring): a pair counts as "first try" only if
+      // neither of its tiles was ever part of a wrong attempt. A wrong tap smudges
+      // BOTH pairs it involved, so brute-forcing your way to a match earns the
+      // completion + speed points but loses the first-try bonus.
+      var smudged = {}, firstTry = 0;
       var startTs = Date.now();
       var MT = window.MatchTiles;
 
@@ -1267,7 +1780,7 @@ window.LiveMode = (function () {
         // silently if the host has already moved on.
         try {
           window.LiveDB.submitProgress(code, r.index, stu.id, matched, {
-            matched: matched, total: total, wrong: wrong, done: matched >= total
+            matched: matched, total: total, wrong: wrong, firstTry: firstTry, done: matched >= total
           }, s.gameSeq || 0).catch(function () {});
         } catch (e) {}
       }
@@ -1281,6 +1794,7 @@ window.LiveMode = (function () {
         if (!sel.q || !sel.a) return;
         var q = sel.q, a = sel.a;
         if (q.idx === a.idx) {
+          if (!smudged[q.idx]) firstTry++; // matched cleanly, never guessed wrong on it
           matched++;
           counter.textContent = matched + " / " + total;
           q.btn.classList.remove("sel"); a.btn.classList.remove("sel");
@@ -1293,6 +1807,7 @@ window.LiveMode = (function () {
           if (matched >= total) return finish();
         } else {
           wrong++;
+          smudged[q.idx] = true; smudged[a.idx] = true; // both pairs guessed wrong
           busy = true;
           q.btn.classList.remove("sel"); a.btn.classList.remove("sel");
           q.btn.classList.add("wrong"); a.btn.classList.add("wrong");
@@ -1321,7 +1836,7 @@ window.LiveMode = (function () {
           el("div", { class: "player-name-tag", text: stu.name }),
           el("div", { class: "live-big-emoji", text: "🔗" }),
           el("h2", { text: "All matched! 🎉" }),
-          el("p", { class: "live-sub", text: "You matched all " + total + " pairs in " + secs + "s" }),
+          el("p", { class: "live-sub", text: "Done in " + secs + "s  ·  " + firstTry + " of " + total + " on the first try" }),
           wrong ? el("p", { class: "player-why", text: wrong + (wrong === 1 ? " wrong tap" : " wrong taps") }) : null,
           el("p", { class: "live-sub", text: "Waiting for the class…" })
         ])]));
@@ -1504,13 +2019,15 @@ window.LiveMode = (function () {
     function matchResultScreen(s) {
       var me = (s.reveal && s.reveal.results || []).filter(function (x) { return x.studentId === stu.id; })[0];
       var matched = me ? me.matched : 0, total = me ? me.total : 0, pts = me ? me.points : 0;
+      var firstTry = me && me.firstTry != null ? me.firstTry : 0;
+      var secs = me ? me.secs : null;
       var allDone = !!(me && me.correct);
       kit.beep(allDone ? "good" : "bad");
       show(screen("player live-center " + (allDone ? "res-good" : "res-bad"), [el("div", { class: "live-card" }, [
         el("div", { class: "player-name-tag", text: stu.name }),
         el("div", { class: "live-big-emoji", text: allDone ? "🔗" : (matched > 0 ? "🧩" : "⏰") }),
         el("h2", { text: allDone ? "All matched!" : (matched > 0 ? "Time's up" : "Too slow") }),
-        el("p", { class: "live-sub", text: "You matched " + matched + " of " + total + (total === 1 ? " pair" : " pairs") }),
+        el("p", { class: "live-sub", text: firstTry + " of " + total + " on the first try" + (allDone && secs != null ? "  ·  " + secs + "s" : "") }),
         el("div", { class: "player-points", text: (pts > 0 ? "+" + pts : "0") + " points" })
       ])]));
     }

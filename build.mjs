@@ -26,8 +26,6 @@ const jsFiles = [
   "js/voice.js",
   "js/games/quiz.js",
   "js/games/memory.js",
-  "js/games/hangman.js",
-  "js/games/scramble.js",
   "js/translate.js",
   "js/emoji.js",
   "js/admin.js",

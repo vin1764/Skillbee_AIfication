@@ -514,6 +514,8 @@
       // Solo games passed in `games`. Every game owns its own exercises.
       var LIVE_GAMES = [
         { id: "cases", name: "Lücken-Text", emoji: "✏️", color: "#8b5cf6" },
+        { id: "scramble", name: "Sentence Scramble", emoji: "🧱", color: "#3b4de8" },
+        { id: "hangman", name: "Hangman", emoji: "🔤", color: "#6a4c93" },
         { id: "compounds", name: "Wortmonster", emoji: "🧟", color: "#22c55e" },
         { id: "listening", name: "Hör gut zu!", emoji: "👂", color: "#0ea5b7" },
         { id: "hoerpaare", name: "Match the Following", emoji: "🔗", color: "#06b6d4" },
@@ -522,6 +524,8 @@
       ];
       function liveKind(id) {
         if (id === "cases") return "cases";
+        if (id === "scramble") return "scramble";
+        if (id === "hangman") return "hangman";
         if (id === "hoerpaare") return "pairs";
         if (id === "truefalse") return "truefalse";
         if (id === "passage") return "passage";
@@ -544,10 +548,11 @@
         for (var i = 0; i < all.length; i++) if (all[i].id === id) return all[i];
         return null;
       }
-      // Games you can copy an exercise FROM into `gameId`. Only the vocab-word
-      // games (Memory / Hangman) share a compatible content shape. Quiz-Blitz is
-      // authored as multiple-choice questions, so it isn't part of this group.
-      var WORD_COPY_GROUP = ["memory", "hangman"];
+      // Games you can copy an exercise FROM into `gameId`: they must share a
+      // content shape. Memory is now the only plain vocab-word game — Quiz-Blitz is
+      // authored MCQ, and Hangman moved to its own reference/word format — so there
+      // is no cross-game word copy at the moment (the list is kept for future ones).
+      var WORD_COPY_GROUP = ["memory"];
       function copySourcesFor(gameId) {
         if (WORD_COPY_GROUP.indexOf(gameId) < 0) return [];
         return WORD_COPY_GROUP.filter(function (g) { return g !== gameId && store.exercisesFor(g).length > 0; });
@@ -590,12 +595,14 @@
         if (kind === "cases") return (ex.items || []).length || ((ex.accusative || []).length + (ex.dative || []).length + (ex.genitive || []).length);
         if (kind === "words") return (ex.words || []).length;
         if (kind === "sentences") return (ex.sentences || []).length;
-        if (kind === "pairs" || kind === "truefalse" || kind === "passage") return (ex.questions || []).length;
+        if (kind === "hangman") return (ex.items || []).length;
+        if (kind === "pairs" || kind === "truefalse" || kind === "passage" || kind === "scramble") return (ex.questions || []).length;
         return (ex.items || []).length;
       }
       function unitFor(id, kind) {
         if (kind === "words") return " words";
-        if (kind === "sentences") return " sentences";
+        if (kind === "sentences" || kind === "scramble") return " sentences";
+        if (kind === "hangman") return " words";
         if (kind === "pairs") return " questions";
         if (kind === "truefalse") return " statements";
         if (kind === "passage") return " questions";
@@ -712,6 +719,8 @@
         if (currentGame === "quiz") renderQuizExercise(body, ex);
         else if (game.kind === "words") renderWordsExercise(body, ex);
         else if (game.kind === "sentences") renderSentencesExercise(body, ex);
+        else if (game.kind === "scramble") renderScramble(body, ex);
+        else if (game.kind === "hangman") renderHangman(body, ex);
         else if (game.kind === "pairs") renderPairsExercise(body, ex);
         else if (game.kind === "truefalse") renderTrueFalse(body, ex);
         else if (game.kind === "passage") renderPassage(body, ex);
@@ -966,6 +975,120 @@
         }));
       }
 
+      /* ---- Sentence Scramble editor: each sentence has a MODE + (mode-dependent)
+             context block + the German answer sentence that gets scrambled. Reuses
+             the Wahr-oder-Falsch type picker + entry input for the Question mode. */
+      var SCR_MODES = ["translation", "listen-unscramble", "question-answer"];
+      function renderScramble(body, ex) {
+        if (!Array.isArray(ex.questions)) ex.questions = [];
+        body.appendChild(el("p", { class: "adm-hint", html:
+          "These power <b>🧱 Sentence Scramble</b> in Live Class Mode — students tap the shuffled words into order. " +
+          "Pick a <b>mode</b> per sentence: <b>Translation</b> (show the English), <b>Listen &amp; Unscramble</b> (play the audio, rebuild by ear), " +
+          "or <b>Question–Answer</b> (show a question — the tiles are the answer). Only the sentence's own words become tiles. Changes save automatically." }));
+        body.appendChild(el("div", { class: "adm-ex-head" }, [
+          input(ex, "emoji", "🧱", "adm-emoji", 6),
+          input(ex, "english", "Short description (optional, e.g. Present tense)", "adm-input")
+        ]));
+        var list = ex.questions;
+        if (!list.length) body.appendChild(emptyState("No sentences yet — add the first one below."));
+        list.forEach(function (q, qi) { body.appendChild(scrambleCard(q, list, qi)); });
+        body.appendChild(addRowBtn("+ Sentence", function () {
+          list.push({ mode: "translation", context: { type: "text", value: "" }, answer: "" });
+          store.save(); render();
+        }));
+      }
+      function scrambleModePicker(q) {
+        var MODES = [["translation", "Translation", "🌐"], ["listen-unscramble", "Listen & Unscramble", "🎧"], ["question-answer", "Question–Answer", "❓"]];
+        var row = el("div", { class: "adm-typechips" });
+        MODES.forEach(function (M) {
+          row.appendChild(el("button", { class: "adm-typechip" + (q.mode === M[0] ? " sel" : ""), attrs: { type: "button", title: M[1] }, on: { click: function () {
+            if (q.mode === M[0]) return;
+            q.mode = M[0];
+            if (M[0] === "listen-unscramble") q.context = null;
+            else if (!q.context || typeof q.context !== "object") q.context = { type: "text", value: "" };
+            store.save(); render();
+          } } }, [el("span", { class: "adm-typechip-ic", text: M[2] }), el("span", { class: "adm-typechip-lbl", text: M[1] })]));
+        });
+        return el("div", { class: "adm-typepick" }, [el("span", { class: "adm-side-lbl", text: "Mode" }), row]);
+      }
+      function scrambleCard(q, arr, index) {
+        if (SCR_MODES.indexOf(q.mode) < 0) q.mode = "translation";
+        var card = el("div", { class: "adm-cpair adm-scr-card" });
+        card.appendChild(el("div", { class: "adm-cpair-topbar" }, [
+          el("span", { class: "adm-cpair-n", text: "Sentence " + (index + 1) }),
+          el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove sentence" }, on: { click: function () { arr.splice(index, 1); store.save(); render(); } } })
+        ]));
+        card.appendChild(scrambleModePicker(q));
+        if (q.mode === "translation") {
+          if (!q.context || typeof q.context !== "object") q.context = { type: "text", value: "" };
+          q.context.type = "text";
+          card.appendChild(el("div", { class: "adm-scr-block" }, [
+            el("span", { class: "adm-side-lbl", text: "English hint" }),
+            el("div", { class: "adm-mcq-field" }, [input(q.context, "value", "e.g. I am learning German", "adm-input")])
+          ]));
+        } else if (q.mode === "question-answer") {
+          if (!q.context || typeof q.context !== "object") q.context = { type: "text", value: "" };
+          card.appendChild(el("div", { class: "adm-scr-block" }, [
+            typePickerRow("Question", q.context, "type"),
+            el("div", { class: "adm-mcq-field" }, [entryInput(q.context, "value", q.context.type)])
+          ]));
+        } else {
+          card.appendChild(el("div", { class: "adm-scr-note", text: "🎧 No hint shown — students rebuild it purely from the audio." }));
+        }
+        card.appendChild(el("div", { class: "adm-scr-block" }, [
+          el("span", { class: "adm-side-lbl", text: q.mode === "question-answer" ? "Answer sentence (German)" : "German sentence" }),
+          el("div", { class: "adm-mcq-field" }, [
+            el("div", { class: "adm-side-row" }, [
+              input(q, "answer", "e.g. Ich lerne Deutsch", "adm-input"),
+              el("button", { class: "btn small adm-audio-prev", attrs: { type: "button", title: "Hear it" }, html: "▶", on: { click: function () { try { if (window.VoiceBox) window.VoiceBox.speak(q.answer || ""); } catch (e) {} } } })
+            ])
+          ])
+        ]));
+        return card;
+      }
+
+      /* ---- Hangman editor: each word has a required reference block (the clue) +
+             the German word to spell. Reuses the type picker + entry input. */
+      function renderHangman(body, ex) {
+        if (!Array.isArray(ex.items)) ex.items = [];
+        body.appendChild(el("p", { class: "adm-hint", html:
+          "These power <b>🔤 Hangman</b> in Live Class Mode. Each word has a <b>reference clue</b> — a picture, icon, audio or text — " +
+          "that tells students what to spell (an image of a dog → <b>Hund</b>, audio spoken → spell it). They guess letters on their phones. Changes save automatically." }));
+        body.appendChild(el("div", { class: "adm-ex-head" }, [
+          input(ex, "emoji", "🔤", "adm-emoji", 6),
+          input(ex, "english", "Short description (optional, e.g. Animals)", "adm-input")
+        ]));
+        var list = ex.items;
+        if (!list.length) body.appendChild(emptyState("No words yet — add the first one below."));
+        list.forEach(function (it, i) { body.appendChild(hangmanCard(it, list, i)); });
+        body.appendChild(addRowBtn("+ Word", function () {
+          list.push({ reference: { type: "text", value: "" }, word: "" });
+          store.save(); render();
+        }));
+      }
+      function hangmanCard(it, arr, index) {
+        if (!it.reference || typeof it.reference !== "object") it.reference = { type: "text", value: "" };
+        var card = el("div", { class: "adm-cpair adm-hang-card" });
+        card.appendChild(el("div", { class: "adm-cpair-topbar" }, [
+          el("span", { class: "adm-cpair-n", text: "Word " + (index + 1) }),
+          el("button", { class: "adm-del", html: "🗑", attrs: { title: "Remove word" }, on: { click: function () { arr.splice(index, 1); store.save(); render(); } } })
+        ]));
+        card.appendChild(el("div", { class: "adm-hang-block" }, [
+          typePickerRow("Clue", it.reference, "type"),
+          el("div", { class: "adm-mcq-field" }, [entryInput(it.reference, "value", it.reference.type)])
+        ]));
+        card.appendChild(el("div", { class: "adm-hang-block" }, [
+          el("span", { class: "adm-side-lbl", text: "Word to spell (German)" }),
+          el("div", { class: "adm-mcq-field" }, [
+            el("div", { class: "adm-side-row" }, [
+              input(it, "word", "e.g. Hund", "adm-input"),
+              el("button", { class: "btn small adm-audio-prev", attrs: { type: "button", title: "Hear it" }, html: "▶", on: { click: function () { try { if (window.VoiceBox) window.VoiceBox.speak(it.word || ""); } catch (e) {} } } })
+            ])
+          ])
+        ]));
+        return card;
+      }
+
       // The True/False editor body (context + statement + answer), WITHOUT the
       // card chrome — reused standalone and embedded in a Passage question.
       function tfBody(q) {
@@ -978,7 +1101,8 @@
         return [
           ctxBlock,
           el("div", { class: "adm-tf-block" }, [
-            typePickerRow("Statement", q.statement, "type"),
+            // A statement is only ever text or spoken audio — never an icon/image.
+            typePickerRow("Statement", q.statement, "type", ["text", "audio"]),
             el("div", { class: "adm-mcq-field" }, [entryInput(q.statement, "value", q.statement.type)])
           ]),
           tfAnswerToggle(q)
@@ -1089,8 +1213,11 @@
       }
 
       // A labelled 4-chip type picker bound to obj[field]; a change re-renders.
-      function typePickerRow(label, obj, field) {
-        var TYPES = [["text", "Text", "🔤"], ["icon", "Icon", "😀"], ["image", "Image", "🖼"], ["audio", "Audio", "🔊"]];
+      function typePickerRow(label, obj, field, only) {
+        var ALL = [["text", "Text", "🔤"], ["icon", "Icon", "😀"], ["image", "Image", "🖼"], ["audio", "Audio", "🔊"]];
+        // `only` (optional) restricts the offered types — e.g. a True/False
+        // statement is only ever spoken or written, never a picture or icon.
+        var TYPES = only ? ALL.filter(function (t) { return only.indexOf(t[0]) >= 0; }) : ALL;
         var chipRow = el("div", { class: "adm-typechips" });
         TYPES.forEach(function (T) {
           chipRow.appendChild(el("button", { class: "adm-typechip" + (obj[field] === T[0] ? " sel" : ""), attrs: { type: "button", title: T[1] }, on: { click: function () {
