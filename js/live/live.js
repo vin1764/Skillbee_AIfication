@@ -250,8 +250,10 @@ window.LiveMode = (function () {
     //   "per_question" — a countdown per question; on expiry the board auto-reveals
     //   "speed"        — one clock for the whole set; students race independently
     var timerMode = "manual", perQuestionSecs = 20, speedSecs = 120;
-    var PQ_CHOICES = [{ v: 10, label: "10s" }, { v: 15, label: "15s" }, { v: 20, label: "20s" }, { v: 30, label: "30s" }, { v: 45, label: "45s" }, { v: 60, label: "60s" }];
-    var SPEED_CHOICES = [{ v: 60, label: "1 min" }, { v: 90, label: "90s" }, { v: 120, label: "2 min" }, { v: 180, label: "3 min" }, { v: 300, label: "5 min" }];
+    // Slider bounds — a scroller lets the teacher dial any value, including much
+    // shorter rounds than a fixed preset row allowed.
+    var PQ_MIN = 3, PQ_MAX = 60;        // per-question: 3s … 60s
+    var SPEED_MIN = 15, SPEED_MAX = 300; // whole-set clock: 15s … 5 min
     var gameIds = Object.keys(window.LiveGames);
     var SPEEDS = [
       { v: 0.75, label: "Slow", sub: "0.75×" },
@@ -319,9 +321,9 @@ window.LiveMode = (function () {
             timerPill("speed", "Speed Challenge", "One clock — students race the whole set")
           ]));
           if (timerMode === "per_question") {
-            step.appendChild(secondsControl("Seconds per question", perQuestionSecs, PQ_CHOICES, function (v) { perQuestionSecs = v; renderStep(); }));
+            step.appendChild(secondsSlider("Seconds per question", perQuestionSecs, PQ_MIN, PQ_MAX, 1, secsLabel, function (v) { perQuestionSecs = v; }));
           } else if (timerMode === "speed") {
-            step.appendChild(secondsControl("Total time for the whole set", speedSecs, SPEED_CHOICES, function (v) { speedSecs = v; renderStep(); }));
+            step.appendChild(secondsSlider("Total time for the whole set", speedSecs, SPEED_MIN, SPEED_MAX, 5, minsLabel, function (v) { speedSecs = v; }));
           }
           n++;
         } else {
@@ -390,17 +392,34 @@ window.LiveMode = (function () {
         }, [el("b", { text: title }), el("span", { text: sub })]);
       }
 
-      // A row of preset seconds/minutes buttons for the per-question / total-time
-      // control. `choices` is [{ v, label }]; `onPick(v)` re-renders with the pick.
-      function secondsControl(labelText, current, choices, onPick) {
+      function secsLabel(v) { return v + "s"; }
+      function minsLabel(v) {
+        if (v < 60) return v + "s";
+        var m = Math.floor(v / 60), s = v % 60;
+        return s ? m + "m " + s + "s" : m + " min";
+      }
+      // A scroller (slider) for the per-question / total-time control — dial any
+      // value between min…max (finer + lower than fixed presets allowed). Dragging
+      // updates the value + live label in place WITHOUT re-rendering the setup (a
+      // re-render mid-drag would drop the slider), so `onSet(v)` just stores it.
+      function secondsSlider(labelText, current, min, max, stepv, fmt, onSet) {
+        var valLbl = el("span", { class: "setup-secs-val", text: fmt(current) });
+        var slider = el("input", { class: "setup-secs-slider", attrs: { type: "range", min: String(min), max: String(max), step: String(stepv), value: String(current), "aria-label": labelText } });
+        slider.addEventListener("input", function () {
+          var v = parseInt(slider.value, 10);
+          onSet(v);
+          valLbl.textContent = fmt(v);
+        });
         return el("div", { class: "setup-secs" }, [
-          el("div", { class: "setup-secs-label", text: labelText }),
-          el("div", { class: "setup-modes secs-row" }, choices.map(function (c) {
-            return el("button", {
-              class: "mode-pill secs" + (current === c.v ? " sel" : ""),
-              on: { click: function () { onPick(c.v); } }
-            }, [el("b", { text: c.label })]);
-          }))
+          el("div", { class: "setup-secs-head" }, [
+            el("div", { class: "setup-secs-label", text: labelText }),
+            valLbl
+          ]),
+          el("div", { class: "setup-secs-scroller" }, [
+            el("span", { class: "setup-secs-end", text: fmt(min) }),
+            slider,
+            el("span", { class: "setup-secs-end", text: fmt(max) })
+          ])
         ]);
       }
 

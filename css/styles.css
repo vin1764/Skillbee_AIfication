@@ -1205,9 +1205,15 @@ input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf
 
 /* ===== Timer Modes (Manual / Per-Question / Speed Challenge) ===== */
 /* Setup: seconds-per-question / total-time preset picker. */
-.setup-secs { margin: 12px 0 4px; }
-.setup-secs-label { font-size: 0.85rem; font-weight: 800; color: var(--ink-soft); margin-bottom: 8px; }
-.secs-row .mode-pill.secs { padding: 10px 16px; min-width: 64px; align-items: center; }
+.setup-secs { margin: 12px 0 4px; max-width: 460px; }
+.setup-secs-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+.setup-secs-label { font-size: 0.85rem; font-weight: 800; color: var(--ink-soft); }
+.setup-secs-val { font-size: 1.25rem; font-weight: 900; color: var(--skb-dark); font-variant-numeric: tabular-nums; }
+.setup-secs-scroller { display: flex; align-items: center; gap: 10px; }
+.setup-secs-end { font-size: 0.72rem; font-weight: 700; color: var(--ink-soft); min-width: 2.6em; text-align: center; }
+.setup-secs-slider { flex: 1; -webkit-appearance: none; appearance: none; height: 8px; border-radius: 999px; background: #e8ecf7; outline: none; }
+.setup-secs-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 26px; height: 26px; border-radius: 50%; background: var(--skb); border: 3px solid #fff; box-shadow: var(--shadow); cursor: pointer; }
+.setup-secs-slider::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: var(--skb); border: 3px solid #fff; box-shadow: var(--shadow); cursor: pointer; }
 .setup-note { margin: 8px 2px 0; font-size: 0.85rem; }
 
 /* Shared countdown bar (board + phone). Fills from full to empty over the limit. */
