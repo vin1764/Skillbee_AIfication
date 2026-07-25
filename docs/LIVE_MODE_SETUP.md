@@ -35,6 +35,12 @@ it usually means the rules need re-publishing — tell me and I'll help.
 > that feature, just repeat the 5 steps above with the latest `firestore.rules` — otherwise the
 > content editor will keep working on each device but won't sync between them.
 
+> **⚠️ Re-publish after the live-presence update.** The rules now also cover **live
+> presence** (the lobby's "X of Y joined" list, names graying out as they're taken, and a
+> dropped phone freeing its name automatically). The app still works with the older rules —
+> students can join and play either way — but those presence extras stay off until you repeat
+> the 5 steps above with the latest `firestore.rules`.
+
 ---
 
 ## 1b. Content syncs automatically (no more files)
