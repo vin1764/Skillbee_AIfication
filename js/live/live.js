@@ -535,8 +535,13 @@ window.LiveMode = (function () {
   /* ============================================================
      HOST — run the session (lobby → questions → podium)
      ============================================================ */
-  function hostRun(code, adapter, rounds, roster) {
+  function hostRun(code, adapter, rounds, roster, opts) {
     stop();
+    // "Play another game": the class is ALREADY in this room, so the next game
+    // must start straight away — no second join-lobby, no extra Start tap.
+    // Connected phones follow the session doc into the new game on their own;
+    // a dropped phone rejoins mid-game via the landing rejoin button / name grid.
+    var autoStart = !!(opts && opts.autoStart);
     // Back closes the room; confirm while a question/reveal is on screen (mid-game).
     window.AppNav.set(function () { closeRoom(); }, function () { return !!document.querySelector(".host-controls, .reveal-answer"); });
     var sess = null;
@@ -621,7 +626,17 @@ window.LiveMode = (function () {
     track(window.LiveDB.listenSession(code, function (s) {
       sess = s;
       if (!s) return;
-      if (s.status === "lobby") hostLobby();
+      if (s.status === "lobby") {
+        if (autoStart) {
+          // Consume the flag first: this runs once, on the snapshot of the
+          // new game's own "lobby" write, then takes the exact same path as
+          // the lobby's Start button.
+          autoStart = false;
+          if (adapter.passage) hostPassage(); else beginQuestions();
+          return;
+        }
+        hostLobby();
+      }
     }));
 
     function hostLobby() {
@@ -635,11 +650,6 @@ window.LiveMode = (function () {
           el("div", { class: "roomcode-label", text: "Join at this screen's URL — room code:" }),
           el("div", { class: "roomcode", text: code })
         ]),
-        // Follow-up game in the same room: connected phones stay in on their
-        // own; a dropped phone re-enters the code and re-taps its name.
-        (sess.gameSeq || 0) > 0
-          ? el("p", { class: "live-muted rejoin-note", text: "Same room, next game — students already in stay in. Anyone who dropped can re-enter the code and tap their name again." })
-          : null,
         el("div", { class: "join-count", text: joinedNames.length + " of " + roster.length + " joined" }),
         joinedNames.length
           ? el("div", { class: "join-chips" }, joinedNames.map(function (s) { return el("span", { class: "join-chip", text: s.name }); }))
@@ -1379,7 +1389,8 @@ window.LiveMode = (function () {
             persistMode: sel.persistMode, gameSeq: seq + 1,
             timerMode: sel.timerMode, perQuestionSecs: sel.perQuestionSecs, speedSecs: sel.speedSecs
           }).then(function () {
-            hostRun(code, sel.adapter, sel.rounds, roster);
+            // The class is already in the room — skip the lobby, start playing.
+            hostRun(code, sel.adapter, sel.rounds, roster, { autoStart: true });
           }).catch(function (e) { alert("Could not start: " + e.message); });
         }
       });

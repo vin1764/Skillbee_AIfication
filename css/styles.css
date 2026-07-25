@@ -1222,8 +1222,6 @@ input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf
 .name-btn.taken { opacity: 0.45; cursor: pointer; }
 .name-btn.taken:hover { opacity: 0.7; }
 .name-btn.claiming { opacity: 0.7; }
-/* Host lobby note for follow-up games in the same room. */
-.rejoin-note { margin: 6px auto 0; max-width: 560px; }
 /* One-tap rejoin button on the Live landing screen (phone reloaded / next game). */
 .rejoin-live { margin: 2px auto 8px; display: block; }
 /* Small, quiet "disconnected" cue on the host board / leaderboard. */
