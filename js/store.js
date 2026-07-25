@@ -40,11 +40,12 @@
        cases (Lücken-Text)                   -> { id, name, items: [...] }
        item games (compounds/listening)      -> { id, name, items: [...] }
      --------------------------------------------------------------------- */
-  var WORD_GAMES = ["quiz", "memory", "hangman"];
+  var WORD_GAMES = ["quiz", "memory"];
   var ITEM_GAMES = ["compounds", "listening"];
 
   function gameKind(gameKey) {
-    if (gameKey === "scramble") return "sentences";
+    if (gameKey === "scramble") return "scramble";
+    if (gameKey === "hangman") return "hangman";
     if (gameKey === "cases") return "cases";
     if (gameKey === "hoerpaare") return "pairs";
     if (gameKey === "truefalse") return "truefalse";
@@ -245,6 +246,101 @@
     ];
   }
 
+  /* Sentence Scramble (Satzbau) — an exercise is a list of questions, each a
+     German answer sentence (scrambled into its own words as tiles) plus a MODE:
+       translation      → context is a text hint (the English translation)
+       listen-unscramble → no hint; the sentence's audio is played, rebuild by ear
+       question-answer   → context is a question (any block type); tiles are the answer
+     Reuses the Wahr-oder-Falsch { type, value } block for `context`. Only the
+     sentence's own words become tiles — no distractor tiles (intentional vs
+     Lücken-Text). */
+  var SCRAMBLE_MODES = ["translation", "listen-unscramble", "question-answer"];
+  function scrambleQuestion(q) {
+    q = (q && typeof q === "object") ? q : {};
+    var mode = SCRAMBLE_MODES.indexOf(q.mode) >= 0 ? q.mode : "translation";
+    var answer = String(q.answer == null ? "" : q.answer);
+    var context = null;
+    if (mode === "translation") {
+      var hint = (q.context && q.context.value != null) ? String(q.context.value) : "";
+      context = { type: "text", value: hint };          // the English translation
+    } else if (mode === "question-answer") {
+      context = tfBlock(q.context, false);              // the question — any block type
+    } // listen-unscramble keeps context null (nothing shown — pure listening)
+    return { mode: mode, context: context, answer: answer };
+  }
+  function scrambleExercise(name, questions) {
+    return { id: exId(), name: name || "Exercise 1", emoji: "🧱", english: "", questions: Array.isArray(questions) ? clone(questions) : [] };
+  }
+  function normalizeScrambleEx(e) {
+    if (!e.id) e.id = exId();
+    if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
+    if (typeof e.emoji !== "string") e.emoji = "🧱";
+    if (typeof e.english !== "string") e.english = "";
+    // Migrate the old sentence list [{ de, en }] → translation-mode questions.
+    if (!Array.isArray(e.questions)) {
+      e.questions = Array.isArray(e.sentences)
+        ? e.sentences.map(function (s) { return { mode: "translation", context: { type: "text", value: String((s && s.en) || "") }, answer: String((s && s.de) || "") }; })
+        : [];
+    }
+    delete e.sentences;
+    e.questions = e.questions.filter(function (q) { return q && typeof q === "object"; }).map(scrambleQuestion);
+  }
+  function defaultScrambleQuestions() {
+    var st = (window.GameData && window.GameData.SENTENCE_TOPICS) || [];
+    var out = [];
+    st.forEach(function (t) {
+      (t.sentences || []).forEach(function (s) {
+        if (s && s.de) out.push({ mode: "translation", context: { type: "text", value: String(s.en || "") }, answer: String(s.de) });
+      });
+    });
+    return out.slice(0, 8);
+  }
+
+  /* Hangman (Galgenmännchen) — an exercise is a list of items, each a target
+     `word` to spell plus a REQUIRED `reference` block (text / audio / image /
+     icon, the same Wahr-oder-Falsch block) that tells the student what the word
+     is: an image of a dog → "Hund", audio of a word → spell it, a text clue, an
+     icon. The letter-guessing gameplay is unchanged — only the clue is new. */
+  function stripArticle(w) { return String(w || "").replace(/^(der|die|das)\s+/i, "").trim(); }
+  function hangmanItem(it) {
+    it = (it && typeof it === "object") ? it : {};
+    return { reference: tfBlock(it.reference, false), word: String(it.word == null ? "" : it.word) };
+  }
+  function hangmanExercise(name, items) {
+    return { id: exId(), name: name || "Exercise 1", emoji: "🔤", english: "", items: Array.isArray(items) ? clone(items) : [] };
+  }
+  function normalizeHangmanEx(e) {
+    if (!e.id) e.id = exId();
+    if (typeof e.name !== "string" || !e.name) e.name = "Exercise";
+    if (typeof e.emoji !== "string") e.emoji = "🔤";
+    if (typeof e.english !== "string") e.english = "";
+    // Migrate the old word list [{ de, en, emoji }] → reference/word items. Prefer
+    // the emoji as an icon clue; strip the article from the German word to spell.
+    if (!Array.isArray(e.items)) {
+      e.items = Array.isArray(e.words)
+        ? e.words.map(function (w) {
+            var ref = (w && w.emoji) ? { type: "icon", value: String(w.emoji) } : { type: "text", value: String((w && w.en) || "") };
+            return { reference: ref, word: stripArticle((w && w.de) || "") };
+          })
+        : [];
+    }
+    delete e.words;
+    e.items = e.items.filter(function (it) { return it && typeof it === "object"; }).map(hangmanItem);
+  }
+  function defaultHangmanItems() {
+    var vt = (window.GameData && window.GameData.VOCAB_TOPICS) || [];
+    var pick = ["tiere", "essen", "familie"];
+    var out = [];
+    vt.filter(function (t) { return pick.indexOf(t.id) >= 0; }).forEach(function (t) {
+      (t.words || []).slice(0, 4).forEach(function (w) {
+        if (!w || !w.de) return;
+        var ref = w.emoji ? { type: "icon", value: String(w.emoji) } : { type: "text", value: String(w.en || "") };
+        out.push({ reference: ref, word: stripArticle(w.de) });
+      });
+    });
+    return out.slice(0, 10);
+  }
+
   /* Passage-based comprehension: an exercise is a passage (text or audio) plus an
      ORDERED list of questions, each in one of the reusable formats. A question is
      { format, content } where content is that format's OWN standard schema —
@@ -318,9 +414,8 @@
 
   function defaultExercises() {
     var vt = (window.GameData && window.GameData.VOCAB_TOPICS) || [];
-    var st = (window.GameData && window.GameData.SENTENCE_TOPICS) || [];
     // Each word game starts from a DIFFERENT subset of the built-in topics, so
-    // Quiz / Memory / Hangman aren't identical out of the box (teachers add more).
+    // Quiz / Memory aren't identical out of the box (teachers add more).
     var pickWords = function (ids) {
       var chosen = ids ? vt.filter(function (t) { return ids.indexOf(t.id) >= 0; }) : vt;
       if (!chosen.length) chosen = vt; // never seed a word game empty on a typo
@@ -329,8 +424,8 @@
     return {
       quiz: [wordsExercise("Exercise 1", [])], // Quiz-Blitz: authored MCQ, starts empty
       memory: pickWords(["tiere", "essen", "farben", "familie"]),
-      hangman: pickWords(["tiere", "essen", "familie", "verben"]),
-      scramble: st.map(function (t) { return topicToExercise(t, "sentences"); }),
+      hangman: [hangmanExercise("Exercise 1", defaultHangmanItems())],
+      scramble: [scrambleExercise("Exercise 1", defaultScrambleQuestions())],
       cases: [caseExercise("Exercise 1", defaultCases())],
       compounds: [listExercise("Exercise 1", defaultCompounds())],
       listening: [listExercise("Exercise 1", defaultListening())],
@@ -358,10 +453,14 @@
       if (!ex[g].length) ex[g] = [wordsExercise("Exercise 1", null)];
       ex[g].forEach(normalizeWordsEx);
     });
-    // sentence game (scramble)
-    if (!Array.isArray(ex.scramble)) ex.scramble = legacyTopicsFor(d, "scramble", "sentences").map(function (t) { return topicToExercise(t, "sentences"); });
-    if (!ex.scramble.length) ex.scramble = [sentencesExercise("Exercise 1", null)];
-    ex.scramble.forEach(normalizeSentencesEx);
+    // Sentence Scramble (mode-driven questions; migrates old {de,en} sentences)
+    if (!Array.isArray(ex.scramble)) ex.scramble = [scrambleExercise("Exercise 1", defaultScrambleQuestions())];
+    if (!ex.scramble.length) ex.scramble = [scrambleExercise("Exercise 1", null)];
+    ex.scramble.forEach(normalizeScrambleEx);
+    // Hangman (reference-driven; migrates old {de,en,emoji} words)
+    if (!Array.isArray(ex.hangman)) ex.hangman = [hangmanExercise("Exercise 1", defaultHangmanItems())];
+    if (!ex.hangman.length) ex.hangman = [hangmanExercise("Exercise 1", null)];
+    ex.hangman.forEach(normalizeHangmanEx);
     // cases (Fall-Detektiv)
     if (!Array.isArray(ex.cases)) ex.cases = [caseExercise("Exercise 1", d.cases)];
     if (!ex.cases.length) ex.cases = [caseExercise("Exercise 1", null)];
@@ -523,6 +622,8 @@
       if (kind === "cases") return caseExercise(name, null);
       if (kind === "words") return wordsExercise(name, null);
       if (kind === "sentences") return sentencesExercise(name, null);
+      if (kind === "scramble") return scrambleExercise(name, [{ mode: "translation", context: { type: "text", value: "" }, answer: "" }]);
+      if (kind === "hangman") return hangmanExercise(name, [{ reference: { type: "text", value: "" }, word: "" }]);
       if (kind === "pairs") return pairsExercise(name, [{ words: [{ de: "", en: "", emoji: "" }, { de: "", en: "", emoji: "" }, { de: "", en: "", emoji: "" }] }]);
       if (kind === "truefalse") return trueFalseExercise(name, [{ context: null, statement: { type: "text", value: "" }, answer: true }]);
       if (kind === "passage") return passageExercise(name, { type: "text", value: "" }, [{ format: "mcq", content: {} }]);

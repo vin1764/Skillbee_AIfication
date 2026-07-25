@@ -871,10 +871,242 @@
     }
   };
 
+  /* ---- Sentence Scramble (Satzbau) — tap the shuffled words into order --------
+     Three MODES drive the SAME tap-to-place mechanic (only the sentence's own
+     words become tiles — no distractors, unlike Lücken-Text):
+       translation      → the board shows an English hint
+       listen-unscramble → no hint; each phone replays the audio, rebuild by ear
+       question-answer   → the board shows a question; the tiles are the answer
+     The context/reference block reuses Wahr-oder-Falsch's tfBlockNode. correctWords
+     (the answer order) is scored host-side and NEVER sent to a phone; the phone
+     only ever gets the shuffled tiles (+ the audio in listen mode). */
+  function scrambleWords(answer) {
+    return String(answer == null ? "" : answer).replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  }
+  var scrambleAdapter = {
+    meta: { name: "Sentence Scramble", emoji: "🧱", contentType: "scramble" },
+    timeLimit: 30000,
+    pickLabel: "Exercise",
+    scramble: true,
+    statefulPlayer: true,          // the tap-to-place widget builds once per round
+    getTopics: function () {
+      var store = window.ContentStore;
+      var list = (store && store.exercisesFor) ? store.exercisesFor("scramble") : [];
+      return list.map(function (e) {
+        var n = (e.questions || []).filter(function (q) { return q && scrambleWords(q.answer).length >= 2; }).length;
+        return { id: e.id, name: e.name, emoji: e.emoji || "🧱", english: n + (n === 1 ? " sentence" : " sentences") };
+      });
+    },
+    buildRounds: function (topic) {
+      var store = window.ContentStore;
+      var e = (store && store.exercise) ? store.exercise("scramble", topic && topic.id) : null;
+      var items = ((e && e.questions) || []).filter(function (q) { return q && scrambleWords(q.answer).length >= 2; });
+      return kit().sample(items, Math.min(10, items.length)).map(function (q) {
+        var words = scrambleWords(q.answer);
+        var order = kit().shuffle(words.map(function (_, i) { return i; }));
+        if (words.length > 1 && order.every(function (v, i) { return v === i; })) order = order.reverse();
+        var tiles = order.map(function (wi) { return words[wi]; });
+        return {
+          type: "scramble", mode: q.mode,
+          context: (q.mode !== "listen-unscramble" && q.context) ? { type: q.context.type || "text", value: String(q.context.value || "") } : null,
+          targetAudio: (q.mode === "listen-unscramble") ? { value: String(q.answer) } : null,
+          tiles: tiles,           // shuffled — the only thing a phone ever receives
+          correctWords: words,    // host-only (scoring)
+          answer: String(q.answer)
+        };
+      });
+    },
+    hostContent: function (el, round) {
+      if (round.mode === "listen-unscramble") {
+        var plays = 0, btn;
+        var label = function () { return plays === 0 ? "🔊 Play the sentence" : "🔁 Play again"; };
+        btn = el("button", { class: "btn primary big listen-play", on: { click: function () { plays++; try { kit().speak(round.targetAudio.value, { rate: round.speed || 1 }); } catch (e) {} btn.innerHTML = label(); } } });
+        btn.innerHTML = label();
+        return el("div", { class: "scr-host" }, [
+          el("div", { class: "scr-tag", text: "🎧 Listen & unscramble" }),
+          el("div", { class: "scr-host-audio" }, [el("div", { class: "listen-emoji", text: "🎧" }), btn]),
+          el("div", { class: "scr-hostnote", text: "Students hear it on their phones and rebuild the sentence — by ear." })
+        ]);
+      }
+      return el("div", { class: "scr-host" }, [
+        el("div", { class: "scr-tag", text: round.mode === "question-answer" ? "🧱 Answer — in the right order" : "🧱 Put it in order" }),
+        round.context ? tfBlockNode(el, round.context, "context", round.mode === "question-answer" ? "Question" : "Meaning") : null,
+        el("div", { class: "scr-hostnote", text: "Students rebuild the German sentence from the shuffled words on their phones." })
+      ]);
+    },
+    playerContent: function (el, round, api) {
+      var tiles = (round.tiles || []).slice();
+      var built = [];            // positions (into tiles) chosen, in order
+      var bankBtns = [], submitBtn;
+      var answerRow = el("div", { class: "scr-answer-p" });
+      var bankRow = el("div", { class: "scr-bank-p" });
+      function refresh() { if (submitBtn) submitBtn.disabled = built.length !== tiles.length; }
+      function renderAnswer() {
+        answerRow.innerHTML = "";
+        built.forEach(function (pos, i) {
+          answerRow.appendChild(el("button", { class: "scr-word chosen", text: tiles[pos], on: { click: function () { unpick(i); } } }));
+        });
+        refresh();
+      }
+      function pick(pos) {
+        var b = bankBtns[pos];
+        if (b.disabled) return;
+        b.classList.add("used"); b.disabled = true;
+        built.push(pos);
+        try { kit().beep && kit().beep("good"); } catch (e) {}
+        renderAnswer();
+      }
+      function unpick(i) {
+        var pos = built[i]; var b = bankBtns[pos];
+        b.classList.remove("used"); b.disabled = false;
+        built.splice(i, 1);
+        renderAnswer();
+      }
+      tiles.forEach(function (w, pos) {
+        var b = el("button", { class: "scr-word", attrs: { type: "button" }, text: w, on: { click: function () { pick(pos); } } });
+        bankBtns.push(b); bankRow.appendChild(b);
+      });
+      var children = [];
+      // Listen & Unscramble: the audio plays on the BOARD (host) only — the phone
+      // is sent just the shuffled tiles, so the answer sentence never reaches it
+      // (strictly no text leak). In Solo, the rendered host content supplies the
+      // audio button, so a lone player can still hear + replay it.
+      if (round.mode === "listen-unscramble" && round.targetAudio) {
+        var plays = 0, pbtn;
+        var plabel = function () { return plays === 0 ? "🔊 Play the sentence" : "🔁 Play again"; };
+        pbtn = el("button", { class: "btn primary big listen-play", on: { click: function () { plays++; try { kit().speak(round.targetAudio.value, { rate: round.speed || 1 }); } catch (e) {} pbtn.innerHTML = plabel(); } } });
+        pbtn.innerHTML = plabel();
+        children.push(el("div", { class: "scr-player-audio" }, [el("div", { class: "listen-emoji", text: "🎧" }), pbtn]));
+      }
+      children.push(answerRow, bankRow);
+      submitBtn = el("button", { class: "btn primary scr-submit", text: "Submit", attrs: { disabled: "true" }, on: { click: function () { if (built.length !== tiles.length) return; api.submit({ words: built.map(function (p) { return tiles[p]; }) }); } } });
+      children.push(submitBtn);
+      renderAnswer();
+      return el("div", { class: "scr-player" }, children);
+    },
+    score: function (round, payload, elapsedMs, timeLimit) {
+      var built = (payload && payload.words) || [];
+      var ok = built.join(" ") === (round.correctWords || []).join(" ");
+      if (!ok) return { correct: false, points: 0 };
+      var frac = Math.max(0, 1 - elapsedMs / timeLimit);
+      return { correct: true, points: Math.round(500 + 500 * frac) };
+    },
+    correctLabel: function (round) { return round.answer; },
+    speakOnReveal: function (round) { return round.answer; }
+  };
+
+  /* ---- Hangman (Galgenmännchen) — spell the word a REFERENCE block describes ----
+     Every round carries a reference (text / audio / image / icon, the shared
+     Wahr-oder-Falsch block) shown on the board; the phone shows the blanks + a
+     letter grid and guesses exactly as before. The target `word` rides on the
+     round (needed for local letter-checking) but is never displayed until it's
+     guessed — the same way Lücken-Text type mode ships its answer. */
+  var HANG_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜ".split("");
+  var HANG_MAX_WRONG = 6;
+  var HANG_FACES = ["😀", "🙂", "😐", "😟", "😧", "😨", "💀"];
+  function hangIsLetter(ch) { return /[A-ZÄÖÜ]/.test(ch); }
+  var hangmanAdapter = {
+    meta: { name: "Hangman", emoji: "🔤", contentType: "hangman" },
+    timeLimit: 45000,
+    pickLabel: "Exercise",
+    hangman: true,
+    statefulPlayer: true,
+    getTopics: function () {
+      var store = window.ContentStore;
+      var list = (store && store.exercisesFor) ? store.exercisesFor("hangman") : [];
+      return list.map(function (e) {
+        var n = (e.items || []).filter(function (it) { return it && String(it.word || "").trim(); }).length;
+        return { id: e.id, name: e.name, emoji: e.emoji || "🔤", english: n + (n === 1 ? " word" : " words") };
+      });
+    },
+    buildRounds: function (topic) {
+      var store = window.ContentStore;
+      var e = (store && store.exercise) ? store.exercise("hangman", topic && topic.id) : null;
+      var items = ((e && e.items) || []).filter(function (it) { return it && String(it.word || "").trim() !== ""; });
+      return kit().sample(items, Math.min(10, items.length)).map(function (it) {
+        return {
+          type: "hangman",
+          reference: { type: (it.reference && it.reference.type) || "text", value: String((it.reference && it.reference.value) || "") },
+          word: String(it.word).trim()
+        };
+      });
+    },
+    hostContent: function (el, round) {
+      return el("div", { class: "hang-host" }, [
+        el("div", { class: "hang-tag", text: "🔤 Spell the German word" }),
+        tfBlockNode(el, round.reference, "reference", "Clue"),
+        el("div", { class: "hang-hostnote", text: "Students guess the letters on their phones." })
+      ]);
+    },
+    playerContent: function (el, round, api) {
+      var full = String(round.word || "");
+      var letters = full.toUpperCase().split("");
+      var guessed = {}, wrong = 0, done = false;
+      var faceEl = el("div", { class: "hang-face", text: HANG_FACES[0] });
+      var heartsEl = el("div", { class: "hang-hearts", text: "❤️".repeat(HANG_MAX_WRONG) });
+      var wordRow = el("div", { class: "hang-word" });
+      var kb = el("div", { class: "keyboard" });
+      var keyBtns = {};
+      function renderWord() {
+        wordRow.innerHTML = "";
+        letters.forEach(function (ch) {
+          if (!hangIsLetter(ch)) { wordRow.appendChild(el("span", { class: "hang-space", text: ch === " " ? "·" : ch })); return; }
+          var show = !!guessed[ch] || done;
+          wordRow.appendChild(el("span", { class: "hang-slot" + (show ? " filled" : ""), text: show ? ch : "" }));
+        });
+      }
+      function finish(won) {
+        if (done) return; done = true;
+        renderWord();
+        api.submit({ solved: won, wrong: wrong });
+      }
+      function guess(L) {
+        if (guessed[L] || done) return;
+        guessed[L] = true;
+        var btn = keyBtns[L];
+        if (btn) { btn.disabled = true; }
+        if (letters.indexOf(L) >= 0) {
+          if (btn) btn.classList.add("right");
+          try { kit().beep && kit().beep("good"); } catch (e) {}
+          renderWord();
+          if (letters.filter(hangIsLetter).every(function (c) { return guessed[c]; })) return finish(true);
+        } else {
+          wrong++;
+          if (btn) btn.classList.add("miss");
+          faceEl.textContent = HANG_FACES[Math.min(wrong, HANG_FACES.length - 1)];
+          heartsEl.textContent = "❤️".repeat(Math.max(0, HANG_MAX_WRONG - wrong));
+          try { kit().beep && kit().beep("bad"); } catch (e) {}
+          if (wrong >= HANG_MAX_WRONG) return finish(false);
+        }
+      }
+      HANG_ALPHABET.forEach(function (L) {
+        var btn = el("button", { class: "key", attrs: { type: "button" }, text: L, on: { click: function () { guess(L); } } });
+        keyBtns[L] = btn; kb.appendChild(btn);
+      });
+      renderWord();
+      return el("div", { class: "hang-player" }, [
+        el("div", { class: "hang-status" }, [faceEl, heartsEl]),
+        wordRow, kb
+      ]);
+    },
+    score: function (round, payload, elapsedMs, timeLimit) {
+      if (!payload || !payload.solved) return { correct: false, points: 0 };
+      var wrong = payload.wrong || 0;
+      var heartsFrac = Math.max(0, (HANG_MAX_WRONG - wrong) / HANG_MAX_WRONG);
+      var frac = Math.max(0, 1 - elapsedMs / timeLimit);
+      // Solving scores; fewer wrong guesses + faster = more. (Matches the solo feel.)
+      return { correct: true, points: Math.round(400 + 300 * heartsFrac + 300 * frac) };
+    },
+    correctLabel: function (round) { return round.word; },
+    speakOnReveal: function (round) { return round.word; }
+  };
+
   window.LiveGames = {
     quiz: choiceAdapter({ name: "Quiz-Blitz", emoji: "🎯", contentType: "vocab" }),
     passage: passageAdapter,
     truefalse: truefalseAdapter,
+    scramble: scrambleAdapter,
+    hangman: hangmanAdapter,
     memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" }),
     cases: blanksAdapter,
     wortmonster: compoundAdapter,

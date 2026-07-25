@@ -740,6 +740,14 @@ window.LiveMode = (function () {
         // the correct answers, so type mode can't be peeked.
         blanks: (ra.blanks && r.blanks) ? r.blanks.map(function (b) { return { id: b.id }; }) : null,
         wordBank: (ra.blanks && answerMode !== "type") ? (r.wordBank || null) : null,
+        // Sentence Scramble: the phone gets ONLY the shuffled tiles (sent above) +
+        // the mode (for the hint). The answer order (correctWords) is scored
+        // host-side, and the listen-mode audio plays on the BOARD — so the answer
+        // sentence never reaches a phone (strictly no text leak).
+        mode: (ra.scramble) ? (r.mode || null) : null,
+        // Hangman: the target word rides along for local letter-checking (it's never
+        // shown until guessed); the reference clue stays host-only.
+        word: (ra.hangman && r.word) ? r.word : null,
         // Type mode needs the answer on the phone (to diff on submit) — tap hides it.
         correct: (ra.typeResult && answerMode === "type") ? (r.correct || r.word || null) : null
       };
@@ -1463,7 +1471,7 @@ window.LiveMode = (function () {
   function playerRun(code, stu) {
     stop();
     // Back leaves the room; confirm while the student is on an answering screen.
-    window.AppNav.set(function () { landing(); }, function () { return !!document.querySelector(".match-board, .live-q-options.phone, .cases-player, .wm-player, .tf-player, .speed-player"); });
+    window.AppNav.set(function () { landing(); }, function () { return !!document.querySelector(".match-board, .live-q-options.phone, .cases-player, .wm-player, .tf-player, .speed-player, .scr-player, .hang-player"); });
     // Presence heartbeat: keep this student's claimed name alive. If the phone
     // dies or the tab closes, the heartbeats stop and the name frees up (after
     // JOIN_STALE_MS); a clean tab-close frees it instantly via leaveSession.
@@ -1607,7 +1615,10 @@ window.LiveMode = (function () {
       }
       var hint = adapter.blanks
         ? (s.answerMode === "type" ? "Fill in the blanks ✍️" : "Tap the words to fill the blanks 👇")
-        : "Tap your answer 👇";
+        : adapter.scramble
+          ? (r.mode === "listen-unscramble" ? "Listen, then tap the words in order 🎧" : "Tap the words in the right order 👇")
+          : adapter.hangman ? "Guess the letters 👇"
+          : "Tap your answer 👇";
       var body = screen("player", [
         el("div", { class: "player-topbar" }, [
           el("div", { class: "player-name-tag", text: stu.name }),
