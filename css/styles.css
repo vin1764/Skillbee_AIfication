@@ -1025,6 +1025,11 @@ input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf
 .match-prow.offline { opacity: 0.55; }
 .match-prow.offline .match-pname { font-style: italic; }
 .match-host-tag { text-align: center; color: var(--ink-soft); font-weight: 700; margin: 4px 0 16px; }
+/* Projector view of the content: both sides, shuffled, NOT paired up. */
+.match-hboard { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; max-width: 720px; margin: 0 auto 18px; }
+.match-hcol { gap: 8px; }
+.match-hboard .match-tile[disabled] { opacity: 1; }
+.match-progress-label { text-align: center; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 10px; }
 /* Reveal: the answer key (correct pairs) shown to the class. */
 .match-answerkey { display: flex; flex-direction: column; gap: 8px; max-width: 560px; margin: 10px auto 0; }
 .match-akrow { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; box-shadow: var(--shadow); }
@@ -1229,6 +1234,12 @@ input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf
 .setup-secs-slider { flex: 1; -webkit-appearance: none; appearance: none; height: 8px; border-radius: 999px; background: #e8ecf7; outline: none; }
 .setup-secs-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 26px; height: 26px; border-radius: 50%; background: var(--skb); border: 3px solid #fff; box-shadow: var(--shadow); cursor: pointer; }
 .setup-secs-slider::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: var(--skb); border: 3px solid #fff; box-shadow: var(--shadow); cursor: pointer; }
+/* Manual entry box beside the scroller — type the exact seconds. */
+.setup-secs-manual { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.setup-secs-manual-lbl { font-size: 0.82rem; font-weight: 700; color: var(--ink-soft); }
+.setup-secs-input { width: 72px; padding: 8px 10px; border: 2px solid var(--line-deep); border-radius: 10px; font-size: 1rem; font-weight: 800; text-align: center; color: var(--skb-dark); font-variant-numeric: tabular-nums; background: #fff; }
+.setup-secs-input:focus { outline: none; border-color: var(--skb); }
+.setup-secs-unit { font-size: 0.82rem; font-weight: 700; color: var(--ink-soft); }
 .setup-note { margin: 8px 2px 0; font-size: 0.85rem; }
 
 /* Shared countdown bar (board + phone). Fills from full to empty over the limit. */

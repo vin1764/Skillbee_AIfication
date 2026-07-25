@@ -398,17 +398,32 @@ window.LiveMode = (function () {
         var m = Math.floor(v / 60), s = v % 60;
         return s ? m + "m " + s + "s" : m + " min";
       }
-      // A scroller (slider) for the per-question / total-time control — dial any
-      // value between min…max (finer + lower than fixed presets allowed). Dragging
-      // updates the value + live label in place WITHOUT re-rendering the setup (a
-      // re-render mid-drag would drop the slider), so `onSet(v)` just stores it.
+      // A scroller (slider) PLUS a manual number box for the per-question /
+      // total-time control — drag to dial any value between min…max, or just type
+      // the exact seconds. The two stay in sync and both feed `onSet(v)`. Updates
+      // happen in place WITHOUT re-rendering the setup (a re-render mid-drag would
+      // drop the slider), and clamping only snaps the number box on blur so typing
+      // a multi-digit value (e.g. "120") isn't fought mid-keystroke.
       function secondsSlider(labelText, current, min, max, stepv, fmt, onSet) {
         var valLbl = el("span", { class: "setup-secs-val", text: fmt(current) });
         var slider = el("input", { class: "setup-secs-slider", attrs: { type: "range", min: String(min), max: String(max), step: String(stepv), value: String(current), "aria-label": labelText } });
-        slider.addEventListener("input", function () {
-          var v = parseInt(slider.value, 10);
-          onSet(v);
-          valLbl.textContent = fmt(v);
+        var numInput = el("input", { class: "setup-secs-input", attrs: { type: "number", min: String(min), max: String(max), step: String(stepv), value: String(current), "aria-label": labelText + " (seconds)" } });
+        function apply(v, from) {
+          if (isNaN(v)) return;
+          var c = Math.round(v);
+          if (c < min) c = min; if (c > max) c = max;
+          onSet(c);
+          valLbl.textContent = fmt(c);
+          slider.value = String(c);
+          if (from !== "num") numInput.value = String(c); // don't fight the typist
+        }
+        slider.addEventListener("input", function () { apply(parseInt(slider.value, 10), "slider"); });
+        numInput.addEventListener("input", function () { var v = parseInt(numInput.value, 10); if (!isNaN(v)) apply(v, "num"); });
+        numInput.addEventListener("change", function () {
+          var v = parseInt(numInput.value, 10);
+          if (isNaN(v)) v = current;
+          if (v < min) v = min; if (v > max) v = max;
+          numInput.value = String(v); apply(v, "slider"); // snap the box into range
         });
         return el("div", { class: "setup-secs" }, [
           el("div", { class: "setup-secs-head" }, [
@@ -419,6 +434,11 @@ window.LiveMode = (function () {
             el("span", { class: "setup-secs-end", text: fmt(min) }),
             slider,
             el("span", { class: "setup-secs-end", text: fmt(max) })
+          ]),
+          el("div", { class: "setup-secs-manual" }, [
+            el("span", { class: "setup-secs-manual-lbl", text: "Or type exactly:" }),
+            numInput,
+            el("span", { class: "setup-secs-unit", text: "sec" })
           ])
         ]);
       }
@@ -856,6 +876,31 @@ window.LiveMode = (function () {
       ]);
     }
 
+    // The matching CONTENT shown on the projector so the class can follow along:
+    // both sides as two SHUFFLED columns, deliberately NOT paired up (the answer
+    // key is never given away during play). Audio tiles are playable by the
+    // teacher; visual tiles (text/icon/image) are display-only. Built once per
+    // round (never re-shuffled by a progress update).
+    function matchBoardDisplay(r) {
+      var pairs = r.pairs || [];
+      var rate = r.speed || 1;
+      var lefts = kit.shuffle(pairs.map(function (p) { return p.q; }));
+      var rights = kit.shuffle(pairs.map(function (p) { return p.a; }));
+      function tile(side) {
+        var t = window.MatchTiles.render(el, side); // same tile the students see
+        if (window.MatchTiles.isAudio(side)) {
+          t.addEventListener("click", function () { try { window.MatchTiles.play(kit, side, rate); } catch (e) {} });
+        } else {
+          t.disabled = true; // projector reference only — not interactive
+        }
+        return t;
+      }
+      return el("div", { class: "match-hboard" }, [
+        el("div", { class: "match-col match-hcol" }, lefts.map(tile)),
+        el("div", { class: "match-col match-hcol" }, rights.map(tile))
+      ]);
+    }
+
     function renderMatchHost(i, r) {
       var d = matchProgress(r);
       // The `.match-progress` container is ALWAYS rendered (a "waiting…" line lives
@@ -883,6 +928,8 @@ window.LiveMode = (function () {
           el("div", { class: "host-answered", text: d.doneCount + " of " + d.denom + " finished" })
         ]),
         el("div", { class: "match-host-tag", text: "⚡ Race to match all " + d.total + " pairs — fastest with the most first-try matches wins!" }),
+        matchBoardDisplay(r),
+        el("div", { class: "match-progress-label", text: "Live progress" }),
         progContainer,
         el("div", { class: "host-controls" }, [
           el("button", { class: "btn primary big", text: "Reveal & score ▶", on: { click: function () { reveal(i, r); } } })
