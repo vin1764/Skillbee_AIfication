@@ -71,6 +71,16 @@ window.LiveMode = (function () {
       el("div", { class: "live-big-emoji", text: "📡" }),
       el("h2", { class: "live-title", text: "Live Class Mode" }),
       el("p", { class: "live-sub", text: "Play together in real time — one screen hosts, phones join with a room code." }),
+      // Phone was in a room recently (reload / next game in the same room):
+      // offer to jump straight back in without re-typing the code.
+      (function () {
+        var last = lastRoom();
+        return last ? el("button", {
+          class: "btn primary big rejoin-live",
+          html: "↻ Rejoin room " + last.code + " as " + last.name,
+          on: { click: function () { rejoinLast(last); } }
+        }) : null;
+      })(),
       el("div", { class: "live-choice" }, [
         el("button", { class: "live-choice-card host", on: { click: function () { if (window.TeacherGate) window.TeacherGate.require(hostRosters); else hostRosters(); } } }, [
           el("div", { class: "live-big-emoji", text: "🖥️" }),
@@ -470,6 +480,11 @@ window.LiveMode = (function () {
           el("div", { class: "roomcode-label", text: "Join at this screen's URL — room code:" }),
           el("div", { class: "roomcode", text: code })
         ]),
+        // Follow-up game in the same room: connected phones stay in on their
+        // own; a dropped phone re-enters the code and re-taps its name.
+        (sess.gameSeq || 0) > 0
+          ? el("p", { class: "live-muted rejoin-note", text: "Same room, next game — students already in stay in. Anyone who dropped can re-enter the code and tap their name again." })
+          : null,
         el("div", { class: "join-count", text: joinedNames.length + " of " + roster.length + " joined" }),
         joinedNames.length
           ? el("div", { class: "join-chips" }, joinedNames.map(function (s) { return el("span", { class: "join-chip", text: s.name }); }))
@@ -594,7 +609,7 @@ window.LiveMode = (function () {
         renderQuestion(i, r, answered);
         var joinedN = presentCount() || (sess.students || []).length;
         if (answered >= joinedN && joinedN > 0) { /* everyone answered — teacher may reveal */ }
-      });
+      }, sess.gameSeq || 0); // answers are per-game — never surface a previous game's docs
       // cosmetic countdown then auto-enable reveal
       clearTimeout(timer);
       timer = setTimeout(function () {}, TL);
@@ -980,12 +995,44 @@ window.LiveMode = (function () {
   /* ============================================================
      PLAYER (phone)
      ============================================================ */
+  // Remember which room/name this phone joined, so a reload (locked phone,
+  // suspended tab, or coming back for "Play another game" in the same room)
+  // offers a one-tap rejoin instead of demanding the code again. Cleared when
+  // the room actually ends; capped to one afternoon of lessons.
+  var LAST_KEY = "skillbee_live_last";
+  var LAST_TTL = 3 * 60 * 60 * 1000;
+  function lastRoom() {
+    try {
+      var r = JSON.parse(localStorage.getItem(LAST_KEY) || "null");
+      if (r && r.code && r.id && r.name && (Date.now() - (r.at || 0)) < LAST_TTL) return r;
+    } catch (e) {}
+    return null;
+  }
+  function rememberRoom(code, stu) {
+    try { localStorage.setItem(LAST_KEY, JSON.stringify({ code: code, id: stu.id, name: stu.name, at: Date.now() })); } catch (e) {}
+  }
+  function forgetRoom() { try { localStorage.removeItem(LAST_KEY); } catch (e) {} }
+
+  // One-tap rejoin from the Live landing screen. If the name is actively held
+  // by another phone, fall back to the name grid; if the room is gone, forget
+  // it and show the normal landing again.
+  function rejoinLast(last) {
+    window.LiveDB.getSession(last.code).then(function (s) {
+      if (!s || s.status === "ended") { forgetRoom(); landing(); return; }
+      var owner = window.LiveDB.deviceToken ? window.LiveDB.deviceToken() : ("d-" + Math.random());
+      window.LiveDB.claimName(last.code, last.id, last.name, owner).then(function () {
+        playerRun(last.code, { id: last.id, name: last.name });
+      }).catch(function () { playerPickName(last.code, s); });
+    }).catch(function () { playerJoin(last.code); });
+  }
+
   function playerJoin(prefill) {
     stop();
     window.AppNav.set(landing, null);
+    var remembered = lastRoom();
     var codeInput = el("input", {
       class: "code-input",
-      attrs: { type: "text", maxlength: 4, placeholder: "CODE", autocapitalize: "characters", value: typeof prefill === "string" ? prefill : "" }
+      attrs: { type: "text", maxlength: 4, placeholder: "CODE", autocapitalize: "characters", value: typeof prefill === "string" ? prefill : (remembered ? remembered.code : "") }
     });
     codeInput.addEventListener("input", function () { codeInput.value = codeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); });
     function go() {
@@ -1031,10 +1078,16 @@ window.LiveMode = (function () {
       grid.innerHTML = "";
       students.forEach(function (stu) {
         var isTaken = !!taken[stu.id];
+        // A taken name stays TAPPABLE. Hard-disabling it locked out every
+        // legitimate rejoin: a phone that reloaded mid-game, and every student
+        // coming back for "Play another game" in the same room (their previous
+        // claim still marks the name taken). claimName is the real arbiter —
+        // the same phone re-claims its name silently, while a name actively
+        // held by ANOTHER phone is refused with "name-taken".
         var btn = el("button", {
           class: "name-btn" + (isTaken ? " taken" : ""),
-          attrs: isTaken ? { disabled: "true" } : {},
-          on: { click: function () { if (!isTaken && !busy) pick(stu, btn); } }
+          attrs: isTaken ? { title: "Already joined — tap to reconnect" } : {},
+          on: { click: function () { if (!busy) pick(stu, btn); } }
         }, [el("span", { text: stu.name }), isTaken ? el("span", { class: "name-taken", text: "✓" }) : null]);
         grid.appendChild(btn);
       });
@@ -1070,6 +1123,7 @@ window.LiveMode = (function () {
 
   function playerRun(code, stu) {
     stop();
+    rememberRoom(code, stu); // enables one-tap rejoin after a reload
     // Back leaves the room; confirm while the student is on an answering screen.
     window.AppNav.set(function () { landing(); }, function () { return !!document.querySelector(".match-board, .live-q-options.phone, .cases-player, .wm-player, .tf-player"); });
     // Presence heartbeat: keep this student's claimed name alive. If the phone
@@ -1093,7 +1147,7 @@ window.LiveMode = (function () {
     var blanksState = { qi: -1, answers: null }; // this phone's submitted blanks
 
     track(window.LiveDB.listenSession(code, function (s) {
-      if (!s) { show(screen("player live-center", [el("div", { class: "live-card" }, [el("h2", { text: "Room closed" })])])); return; }
+      if (!s) { forgetRoom(); show(screen("player live-center", [el("div", { class: "live-card" }, [el("h2", { text: "Room closed" })])])); return; }
       // A new game in the same room resets question numbering — allow answering again.
       var seq = s.gameSeq || 0;
       if (seq !== lastSeq) { answeredIndex = -1; matchRenderedQ = -1; typeRenderedQ = -1; statefulRenderedQ = -1; lastSeq = seq; }
@@ -1142,7 +1196,7 @@ window.LiveMode = (function () {
       }
       if (s.status === "leaderboard") return standingScreen(s);
       if (s.status === "podium") return finalScreen(s);
-      if (s.status === "ended") return waitScreen("Game over", "Thanks for playing!");
+      if (s.status === "ended") { forgetRoom(); return waitScreen("Game over", "Thanks for playing!"); }
     }));
 
     function waitScreen(title, sub) {
@@ -1164,7 +1218,7 @@ window.LiveMode = (function () {
           locked = true; answeredIndex = r.index;
           // Remember this phone's blanks so it can mark them right/wrong at reveal.
           if (payload && payload.blanks) blanksState = { qi: r.index, answers: payload.blanks };
-          window.LiveDB.submitAnswer(code, r.index, stu.id, payload);
+          window.LiveDB.submitAnswer(code, r.index, stu.id, payload, s.gameSeq || 0);
           waitScreen("Answer locked ✔", "Waiting for the class…");
         }
       };
@@ -1214,7 +1268,7 @@ window.LiveMode = (function () {
         try {
           window.LiveDB.submitProgress(code, r.index, stu.id, matched, {
             matched: matched, total: total, wrong: wrong, done: matched >= total
-          }).catch(function () {});
+          }, s.gameSeq || 0).catch(function () {});
         } catch (e) {}
       }
 
@@ -1309,7 +1363,7 @@ window.LiveMode = (function () {
         if (!text) return;
         locked = true; answeredIndex = r.index;
         typeState = { qi: r.index, text: text };
-        window.LiveDB.submitAnswer(code, r.index, stu.id, { text: text });
+        window.LiveDB.submitAnswer(code, r.index, stu.id, { text: text }, s.gameSeq || 0);
         show(typeDiffNode(r, text, adapter, null)); // null = scored at reveal
       }
       input.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });

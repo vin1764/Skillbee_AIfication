@@ -242,25 +242,34 @@
     },
 
     /* ---------------- answers ---------------- */
-    submitAnswer: function (code, qIndex, studentId, payload) {
-      var id = qIndex + "_" + studentId; // one answer per student per question
+    // Answers are WRITE-ONCE documents (the rules forbid updates), and one room
+    // hosts MANY games via "Play another game". Every answer is therefore
+    // namespaced by `seq` (the session's gameSeq): without it, game 2's
+    // question 0 would collide with game 1's docs — the new answers rejected by
+    // write-once, and the host re-scoring game 1's stale answers.
+    submitAnswer: function (code, qIndex, studentId, payload, seq) {
+      seq = seq || 0;
+      var id = seq + "_" + qIndex + "_" + studentId; // one answer per student per question per game
       var ref = db.collection("sessions").doc(code).collection("answers").doc(id);
-      return ref.set(Object.assign({ questionIndex: qIndex, studentId: studentId, ts: serverTs() }, payload));
+      return ref.set(Object.assign({ questionIndex: qIndex, gameSeq: seq, studentId: studentId, ts: serverTs() }, payload));
     },
     // Per-match progress for the individual match game (Hör-Paare). Each matched
     // pair — and the final "done" state — is its own write-once document, so the
     // host can show a live progress bar per student. `key` (the running matched
     // count) makes each id unique per milestone. Reuses the same write-once
     // answers rule, so no security-rules change is needed.
-    submitProgress: function (code, qIndex, studentId, key, payload) {
-      var id = qIndex + "_" + studentId + "_" + key;
+    submitProgress: function (code, qIndex, studentId, key, payload, seq) {
+      seq = seq || 0;
+      var id = seq + "_" + qIndex + "_" + studentId + "_" + key;
       var ref = db.collection("sessions").doc(code).collection("answers").doc(id);
-      return ref.set(Object.assign({ questionIndex: qIndex, studentId: studentId, ts: serverTs() }, payload));
+      return ref.set(Object.assign({ questionIndex: qIndex, gameSeq: seq, studentId: studentId, ts: serverTs() }, payload));
     },
-    listenAnswers: function (code, qIndex, cb) {
+    // Both equality filters together need no composite index (zig-zag merge).
+    listenAnswers: function (code, qIndex, cb, seq) {
       return db
         .collection("sessions").doc(code).collection("answers")
         .where("questionIndex", "==", qIndex)
+        .where("gameSeq", "==", seq || 0)
         .onSnapshot(
           function (snap) {
             var arr = [];
@@ -270,10 +279,11 @@
           function (e) { cb([], e); }
         );
     },
-    getAnswers: function (code, qIndex) {
+    getAnswers: function (code, qIndex, seq) {
       return db
         .collection("sessions").doc(code).collection("answers")
         .where("questionIndex", "==", qIndex)
+        .where("gameSeq", "==", seq || 0)
         .get()
         .then(function (snap) {
           var arr = [];
