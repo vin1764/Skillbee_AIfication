@@ -59,22 +59,32 @@
     if (c && c.type === "text") return c.value;
     return null;
   }
-  // A phone option button rendered by type + a shape badge. Audio options play
-  // (preview) on the first tap and arm; a second tap on the armed tile submits —
-  // so a student can hear it before committing. Every other type submits on the
-  // first tap, so the fast Kahoot feel is unchanged.
+  // A phone option rendered by type + a shape badge. AUDIO options split into
+  // two SEPARATE controls — a play side that replays as often as the student
+  // likes (never submits) and a ✓ Choose side that commits. Choose unlocks
+  // after the first listen, which the old tap-twice flow also guaranteed —
+  // minus its trap of the second tap submitting when you just wanted to hear
+  // it again. Every other type submits on the first tap, so the fast Kahoot
+  // feel is unchanged.
   function mcqOptionButton(el, opt, i, submit) {
-    var armed = false;
-    var btn = el("button", { class: "live-opt phone mt-" + (opt.type || "text"), attrs: { style: "--c:" + COLORS[i] } },
-      [el("span", { class: "opt-shape", text: SHAPES[i] })].concat(window.MatchTiles.content(el, opt)));
-    btn.addEventListener("click", function () {
-      if (window.MatchTiles.isAudio(opt)) {
-        try { window.MatchTiles.play(kit(), opt); } catch (e) {}
-        if (!armed) { armed = true; btn.classList.add("armed"); var l = btn.querySelector(".match-slabel"); if (l) l.textContent = "Tap again to choose"; return; }
-      }
-      submit();
+    if (!window.MatchTiles.isAudio(opt)) {
+      var btn = el("button", { class: "live-opt phone mt-" + (opt.type || "text"), attrs: { style: "--c:" + COLORS[i] } },
+        [el("span", { class: "opt-shape", text: SHAPES[i] })].concat(window.MatchTiles.content(el, opt)));
+      btn.addEventListener("click", function () { submit(); });
+      return btn;
+    }
+    var playLbl = el("span", { class: "match-slabel", text: "Hear it" });
+    var playBtn = el("button", { class: "mcq-audio-play", attrs: { type: "button", "aria-label": "Play option " + (i + 1) } },
+      [el("span", { class: "match-ico", text: "🔊" }), playLbl]);
+    var chooseBtn = el("button", { class: "mcq-audio-choose", attrs: { type: "button", disabled: "true" }, text: "Listen first" });
+    playBtn.addEventListener("click", function () {
+      try { window.MatchTiles.play(kit(), opt); } catch (e) {}
+      playLbl.textContent = "Play again";
+      if (chooseBtn.disabled) { chooseBtn.disabled = false; chooseBtn.textContent = "✓ Choose"; }
     });
-    return btn;
+    chooseBtn.addEventListener("click", function () { if (!chooseBtn.disabled) submit(); });
+    return el("div", { class: "live-opt phone mt-audio split", attrs: { style: "--c:" + COLORS[i] } },
+      [el("span", { class: "opt-shape", text: SHAPES[i] }), playBtn, chooseBtn]);
   }
 
   function choiceAdapter(meta) {
