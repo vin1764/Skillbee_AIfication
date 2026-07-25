@@ -990,7 +990,7 @@ window.LiveMode = (function () {
       speedAnswersUnsub = window.LiveDB.listenAllAnswers(code, function (arr) {
         latestAnswers = arr;
         renderSpeedHost();
-      });
+      }, sess.gameSeq || 0); // this game's answers only — rooms host many games
       track(function () { if (speedAnswersUnsub) { speedAnswersUnsub(); speedAnswersUnsub = null; } });
       renderSpeedHost();
     }
@@ -1729,7 +1729,7 @@ window.LiveMode = (function () {
           submit: function (payload) {
             if (advanced) return;         // one submit per question
             advanced = true;
-            window.LiveDB.submitAnswer(code, pos, stu.id, payload);
+            window.LiveDB.submitAnswer(code, pos, stu.id, payload, s.gameSeq || 0);
             pos++;
             try { kit.beep && kit.beep("good"); } catch (e) {}
             renderPos();

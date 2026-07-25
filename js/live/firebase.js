@@ -292,11 +292,13 @@
         });
     },
     // Speed Challenge is student-paced: every phone is on its own question, so the
-    // host can't watch "the current question" — it watches the WHOLE answers
-    // subcollection and derives each student's progress + running score from it.
-    listenAllAnswers: function (code, cb) {
+    // host can't watch "the current question" — it watches every answer OF THIS
+    // GAME (gameSeq-filtered, like listenAnswers: a room hosts many games) and
+    // derives each student's progress + running score from it.
+    listenAllAnswers: function (code, cb, seq) {
       return db
         .collection("sessions").doc(code).collection("answers")
+        .where("gameSeq", "==", seq || 0)
         .onSnapshot(
           function (snap) {
             var arr = [];
