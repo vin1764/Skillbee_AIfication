@@ -589,10 +589,14 @@
         overlay.appendChild(card);
         document.body.appendChild(overlay);
       }
-      // Count the content rows inside a single exercise, given the game's kind.
-      function exerciseItemCount(kind, ex) {
+      // Count the content rows inside a single exercise, given the game's kind
+      // (and its id, for games that don't count by kind alone).
+      function exerciseItemCount(kind, ex, id) {
         if (!ex) return 0;
         if (kind === "cases") return (ex.items || []).length || ((ex.accusative || []).length + (ex.dative || []).length + (ex.genitive || []).length);
+        // Quiz-Blitz is MCQ now: count QUESTIONS = authored MCQ + any vocab words
+        // (each word auto-generates one question). Both play; both count.
+        if (id === "quiz") return (ex.mcq || []).length + (ex.words || []).length;
         if (kind === "words") return (ex.words || []).length;
         if (kind === "sentences") return (ex.sentences || []).length;
         if (kind === "hangman") return (ex.items || []).length;
@@ -600,6 +604,7 @@
         return (ex.items || []).length;
       }
       function unitFor(id, kind) {
+        if (id === "quiz") return " questions";  // Quiz-Blitz counts MCQ questions
         if (kind === "words") return " words";
         if (kind === "sentences" || kind === "scramble") return " sentences";
         if (kind === "hangman") return " words";
@@ -623,7 +628,7 @@
         var list = store.exercisesFor(game.id);
         var wrap = el("div", { class: "adm-ex-list" });
         list.forEach(function (e) {
-          var count = exerciseItemCount(game.kind, e);
+          var count = exerciseItemCount(game.kind, e, game.id);
           var card = el("div", { class: "adm-ex-card" });
           card.appendChild(el("button", {
             class: "adm-ex-main",
