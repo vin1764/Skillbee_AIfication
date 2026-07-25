@@ -243,7 +243,23 @@ kbd {
 .opt-shape { font-size: 1.2rem; }
 .quiz-opt.correct { border-color: var(--good); background: #eafaf7; }
 .quiz-opt.wrong { border-color: var(--bad); background: #ffeef0; }
-.quiz-opt.armed { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(11, 63, 221, 0.18); }
+/* Audio MCQ options (phone + solo): playing and choosing are SEPARATE
+   controls, so a student can replay an option any number of times before
+   committing. ✓ Choose unlocks after the first listen. */
+.live-opt.split, .quiz-opt.split { cursor: default; gap: 10px; }
+.live-opt.split:active { transform: none; box-shadow: 0 6px 0 var(--lip); }
+.quiz-opt.split:active { transform: none; }
+.mcq-audio-play, .mcq-audio-choose {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.55); background: rgba(255, 255, 255, 0.14);
+  color: #fff; border-radius: 12px; font-weight: 800; font-size: 1rem;
+  padding: 12px 10px; min-height: 52px;
+}
+.mcq-audio-play { flex: 1.25; }
+.mcq-audio-play .match-slabel { flex: 0 0 auto; text-align: center; font-size: 0.95rem; }
+.mcq-audio-choose { flex: 1; }
+.mcq-audio-play:not(:disabled):active, .mcq-audio-choose:not(:disabled):active { background: rgba(255, 255, 255, 0.34); }
+.mcq-audio-choose:disabled { opacity: 0.6; border-style: dashed; font-weight: 700; font-size: 0.85rem; }
 /* Solo quiz — typed question media + typed option tiles */
 .quiz-audio { margin: 14px 0; }
 .quiz-media { display: flex; justify-content: center; margin: 8px 0 14px; }
@@ -858,7 +874,6 @@ input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf
 .live-opt.board .match-img { max-height: 130px; }
 .live-opt .match-ico { flex: 0 0 auto; font-size: 1.6rem; }
 .live-opt .match-slabel { flex: 1; text-align: left; color: rgba(255, 255, 255, 0.92); font-weight: 700; font-size: 0.9rem; }
-.live-opt.armed { outline: 4px solid #fff; outline-offset: -4px; }
 /* MCQ reveal — the winning option rendered by its type */
 .reveal-value.mcq-reveal { display: flex; justify-content: center; align-items: center; gap: 8px; }
 .reveal-value.mcq-reveal .match-img { max-height: 40vh; border-radius: 12px; }
@@ -1225,9 +1240,14 @@ input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf
 .join-chips.missing { opacity: 0.95; }
 .join-chip.out { background: #fff; color: var(--ink-soft); border: 1px dashed var(--line-deep); }
 .join-allin { margin: 16px auto; font-weight: 800; color: var(--good); }
-/* Grayed-out taken names on the phone join screen. */
-.name-btn.taken { opacity: 0.45; cursor: not-allowed; }
+/* Taken names on the phone join screen: dimmed but still tappable, so a
+   student whose phone dropped (or who is back for the next game in the same
+   room) can re-tap their own name to reconnect. */
+.name-btn.taken { opacity: 0.45; cursor: pointer; }
+.name-btn.taken:hover { opacity: 0.7; }
 .name-btn.claiming { opacity: 0.7; }
+/* One-tap rejoin button on the Live landing screen (phone reloaded / next game). */
+.rejoin-live { margin: 2px auto 8px; display: block; }
 /* Small, quiet "disconnected" cue on the host board / leaderboard. */
 .board-row.offline { opacity: 0.55; }
 .board-row.offline .board-name { font-style: italic; }
