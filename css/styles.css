@@ -1216,9 +1216,16 @@ input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf
 .join-chips.missing { opacity: 0.95; }
 .join-chip.out { background: #fff; color: var(--ink-soft); border: 1px dashed var(--line-deep); }
 .join-allin { margin: 16px auto; font-weight: 800; color: var(--good); }
-/* Grayed-out taken names on the phone join screen. */
-.name-btn.taken { opacity: 0.45; cursor: not-allowed; }
+/* Taken names on the phone join screen: dimmed but still tappable, so a
+   student whose phone dropped (or who is back for the next game in the same
+   room) can re-tap their own name to reconnect. */
+.name-btn.taken { opacity: 0.45; cursor: pointer; }
+.name-btn.taken:hover { opacity: 0.7; }
 .name-btn.claiming { opacity: 0.7; }
+/* Host lobby note for follow-up games in the same room. */
+.rejoin-note { margin: 6px auto 0; max-width: 560px; }
+/* One-tap rejoin button on the Live landing screen (phone reloaded / next game). */
+.rejoin-live { margin: 2px auto 8px; display: block; }
 /* Small, quiet "disconnected" cue on the host board / leaderboard. */
 .board-row.offline { opacity: 0.55; }
 .board-row.offline .board-name { font-style: italic; }
