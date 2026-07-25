@@ -801,51 +801,70 @@ window.LiveMode = (function () {
       if (hostCountdown) { hostCountdown.start(); if (sess && sess.qPaused) hostCountdown.pause(); }
     }
 
-    // ---- Host: live per-student progress for the individual match game ----
-    // Build the per-student progress rows + the "N finished" count from the
-    // progress docs the live listener has delivered so far.
+    // ---- Host: the LIVE RACE board for the individual match game ----
+    // Each student races to match every pair. This turns the progress docs into a
+    // ranked leaderboard: who has matched how many, who finished (fastest first)
+    // and in what time, plus their first-try accuracy — so the competition is
+    // visible on the board as it happens (not a blank "waiting" screen).
     function matchProgress(r) {
       var total = (r.pairs || []).length || 1;
       var joinedIds = Object.keys(presentMap());
-      // Best progress per student, from the docs the live listener delivered.
+      var startedAt = sess.round && sess.round.startedAt && sess.round.startedAt.toMillis ? sess.round.startedAt.toMillis() : null;
+      // Best (most complete) progress per student, from the docs delivered so far.
       var prog = {};
       latestAnswers.forEach(function (a) {
         if (a.studentId == null) return;
-        var cur = prog[a.studentId] || { matched: 0, done: false };
+        var cur = prog[a.studentId] || { matched: 0, firstTry: 0, wrong: 0, done: false, doneTs: null };
         if ((a.matched || 0) > cur.matched) cur.matched = a.matched || 0;
-        if (a.done) cur.done = true;
+        if ((a.firstTry || 0) > cur.firstTry) cur.firstTry = a.firstTry || 0;
+        if ((a.wrong || 0) > cur.wrong) cur.wrong = a.wrong || 0;
+        if (a.done) {
+          cur.done = true;
+          var t = a.ts && a.ts.toMillis ? a.ts.toMillis() : null;
+          if (t != null && (cur.doneTs == null || t < cur.doneTs)) cur.doneTs = t;
+        }
         prog[a.studentId] = cur;
       });
-      // Show the students who joined (fall back to the full roster before anyone joins).
       var roster = sess.students || [];
-      var shown = joinedIds.length
-        ? roster.filter(function (s) { return joinedIds.indexOf(s.id) >= 0; })
-        : roster;
-      var doneCount = 0;
-      var rows = shown.map(function (stu) {
-        var p = prog[stu.id] || { matched: 0, done: false };
-        if (p.done) doneCount++;
-        var pct = Math.round(Math.min(1, p.matched / total) * 100);
-        return el("div", { class: "match-prow" + (p.done ? " done" : "") }, [
-          el("span", { class: "match-pname", text: stu.name }),
-          el("div", { class: "match-pbar" }, [
-            el("div", { class: "match-pfill", attrs: { style: "width:" + pct + "%" } })
-          ]),
-          el("span", { class: "match-pcount", text: (p.done ? "✓ " : "") + p.matched + "/" + total })
-        ]);
+      var shown = joinedIds.length ? roster.filter(function (s) { return joinedIds.indexOf(s.id) >= 0; }) : roster;
+      var pm = presentMap();
+      var items = shown.map(function (stu) {
+        var p = prog[stu.id] || { matched: 0, firstTry: 0, wrong: 0, done: false, doneTs: null };
+        var secs = (p.done && p.doneTs != null && startedAt != null) ? Math.max(1, Math.round((p.doneTs - startedAt) / 1000)) : null;
+        return { id: stu.id, name: stu.name, matched: p.matched, firstTry: p.firstTry, wrong: p.wrong, done: p.done, secs: secs, offline: !pm[stu.id] };
       });
-      return { rows: rows, doneCount: doneCount, denom: (shown.length || roster.length) };
+      // Finished first (fastest first), then racers by how many they've matched.
+      items.sort(function (a, b) {
+        if (a.done && b.done) return (a.secs || 0) - (b.secs || 0);
+        if (a.done !== b.done) return a.done ? -1 : 1;
+        return b.matched - a.matched;
+      });
+      var doneCount = items.filter(function (x) { return x.done; }).length;
+      return { items: items, total: total, doneCount: doneCount, denom: (shown.length || roster.length) };
+    }
+
+    function matchRowNode(x, rank, total) {
+      var pct = Math.round(Math.min(1, total ? x.matched / total : 0) * 100);
+      var medal = x.done ? (rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : "#" + rank) : "";
+      return el("div", { class: "match-prow" + (x.done ? " done" : "") + (x.offline ? " offline" : ""), attrs: x.offline ? { title: "Disconnected" } : {} }, [
+        el("span", { class: "match-prank", text: medal }),
+        el("span", { class: "match-pname", text: x.name + (x.offline ? "  ⚠" : "") }),
+        el("div", { class: "match-pbar" }, [el("div", { class: "match-pfill", attrs: { style: "width:" + pct + "%" } })]),
+        x.done
+          ? el("span", { class: "match-pdone", text: "✓ " + x.secs + "s · " + x.firstTry + "/" + total + " 1st-try" })
+          : el("span", { class: "match-pcount", text: x.matched + "/" + total })
+      ]);
     }
 
     function renderMatchHost(i, r) {
       var d = matchProgress(r);
       // The `.match-progress` container is ALWAYS rendered (a "waiting…" line lives
       // inside it when empty), so once the round is built we only ever refresh the
-      // bars + counter in place. Rebuilding the whole screen on every matched pair
+      // rows + counter in place. Rebuilding the whole screen on every matched pair
       // would keep destroying the "Reveal & score" button under the teacher.
       function fill(container) {
         container.innerHTML = "";
-        if (d.rows.length) d.rows.forEach(function (row) { container.appendChild(row); });
+        if (d.items.length) d.items.forEach(function (x, idx) { container.appendChild(matchRowNode(x, idx + 1, d.total)); });
         else container.appendChild(el("p", { class: "live-muted", text: "Waiting for students to join…" }));
       }
       var counter = document.querySelector(".host-answered");
@@ -860,10 +879,10 @@ window.LiveMode = (function () {
       fill(progContainer);
       show(screen("host", [
         el("div", { class: "host-topbar" }, [
-          el("div", { class: "host-q-num", text: "Round " + (i + 1) + " / " + rounds.length }),
+          el("div", { class: "host-q-num", text: "🔗 Match the Following" + (rounds.length > 1 ? "  ·  Round " + (i + 1) + " / " + rounds.length : "") }),
           el("div", { class: "host-answered", text: d.doneCount + " of " + d.denom + " finished" })
         ]),
-        el("div", { class: "match-host-tag", text: "🔗 Each student matches every pair" }),
+        el("div", { class: "match-host-tag", text: "⚡ Race to match all " + d.total + " pairs — fastest with the most first-try matches wins!" }),
         progContainer,
         el("div", { class: "host-controls" }, [
           el("button", { class: "btn primary big", text: "Reveal & score ▶", on: { click: function () { reveal(i, r); } } })
@@ -1101,21 +1120,29 @@ window.LiveMode = (function () {
       (sess.students || []).forEach(function (stu) {
         var a = best[stu.id];
         if (!a) {
-          results.push({ studentId: stu.id, name: stu.name, correct: false, points: 0, answered: false, matched: 0, total: total });
+          results.push({ studentId: stu.id, name: stu.name, correct: false, points: 0, answered: false, matched: 0, total: total, firstTry: 0, wrong: 0, secs: null });
           return;
         }
         var matched = Math.min(a.matched || 0, total);
+        var firstTry = Math.min(a.firstTry != null ? a.firstTry : 0, matched);
         var wrong = a.wrong || 0;
         var done = !!a.done || matched >= total;
         var ts = a.ts && a.ts.toMillis ? a.ts.toMillis() : null;
         var elapsed = (startedAt != null && ts != null) ? Math.max(0, ts - startedAt) : TL;
+        var secs = (startedAt != null && ts != null) ? Math.max(1, Math.round(elapsed / 1000)) : null;
         var frac = Math.max(0, 1 - elapsed / TL);
-        // Partial credit for pairs found + a speed bonus only when fully done,
-        // minus a deduction for each wrong tap. Floored at zero.
-        var pts = Math.round((matched / total) * 600) + (done ? Math.round(400 * frac) : 0) - 40 * wrong;
+        // HYBRID scoring — rewards BOTH getting pairs right first time AND speed:
+        //   first-try accuracy  → up to 400  (brute-forcing loses this)
+        //   completion          → up to 200  (matching all pairs)
+        //   speed on finishing  → up to 400  (fastest finisher earns the most)
+        // So a careful + quick student beats one who taps around until it sticks.
+        var accPts = Math.round((firstTry / total) * 400);
+        var compPts = Math.round((matched / total) * 200);
+        var speedPts = done ? Math.round(400 * frac) : 0;
+        var pts = accPts + compPts + speedPts;
         if (pts < 0) pts = 0;
         scores[stu.id] = (scores[stu.id] || 0) + pts;
-        results.push({ studentId: stu.id, name: stu.name, correct: done, points: pts, answered: matched > 0, matched: matched, total: total });
+        results.push({ studentId: stu.id, name: stu.name, correct: done, points: pts, answered: matched > 0, matched: matched, total: total, firstTry: firstTry, wrong: wrong, secs: secs });
       });
       results.sort(function (x, y) { return y.points - x.points; });
       results.forEach(function (rr, idx) { rr.rank = idx + 1; });
@@ -1138,9 +1165,22 @@ window.LiveMode = (function () {
       var ranked = results.filter(function (x) { return x.answered; }).sort(function (a, b) { return b.points - a.points; });
       var answerBlock;
       if (isMatch) {
+        // Show the answer key — the correct pairs — so the class can review. An
+        // audio side shows the German word as text (a static "tap to hear" tile
+        // would be useless here).
+        var akSide = function (side) {
+          if (side && side.type === "audio") return [el("span", { class: "match-ak-audio", text: "🔊 " + (side.value || "") })];
+          return window.MatchTiles.content(el, side);
+        };
         answerBlock = el("div", { class: "reveal-answer" }, [
-          el("div", { class: "reveal-label", text: "Round complete" }),
-          el("div", { class: "reveal-value", text: "🔗 " + mtotal + (mtotal === 1 ? " pair" : " pairs") })
+          el("div", { class: "reveal-label", text: "The correct pairs" }),
+          el("div", { class: "match-answerkey" }, (r.pairs || []).map(function (pair) {
+            return el("div", { class: "match-akrow" }, [
+              el("div", { class: "match-akside mt-" + ((pair.q || {}).type || "text") }, akSide(pair.q)),
+              el("span", { class: "match-akarrow", text: "↔" }),
+              el("div", { class: "match-akside mt-" + ((pair.a || {}).type || "text") }, akSide(pair.a))
+            ]);
+          }))
         ]);
       } else if (isBlanks) {
         // The full sentence with every gap filled + highlighted, plus the note.
@@ -1186,9 +1226,13 @@ window.LiveMode = (function () {
               var pm = presentMap();
               return ranked.slice(0, 8).map(function (x, idx) {
                 var offline = !pm[x.studentId]; // dropped mid-game — small, quiet cue
+                // Match: show first-try accuracy + finish time (that's the race).
+                var suffix = isMatch
+                  ? "  (" + (x.firstTry != null ? x.firstTry : 0) + "/" + x.total + " 1st-try" + (x.secs != null ? " · " + x.secs + "s" : "") + ")"
+                  : (isBlanks ? "  (" + x.matched + "/" + x.total + ")" : "");
                 return el("div", { class: "board-row" + (idx === 0 && x.points > 0 ? " top" : "") + (offline ? " offline" : ""), attrs: offline ? { title: "Disconnected" } : {} }, [
                   el("span", { class: "board-rank", text: (idx + 1) }),
-                  el("span", { class: "board-name", text: x.name + (showCount ? "  (" + x.matched + "/" + x.total + ")" : "") + (offline ? "  ⚠" : "") }),
+                  el("span", { class: "board-name", text: x.name + suffix + (offline ? "  ⚠" : "") }),
                   el("span", { class: "board-pts", text: x.points > 0 ? "+" + x.points : (showCount ? "0" : "✗") })
                 ]);
               });
@@ -1600,6 +1644,11 @@ window.LiveMode = (function () {
       var total = pairs.length;
       var rate = r.speed || 1;
       var matched = 0, wrong = 0, finished = false;
+      // First-try accuracy (hybrid scoring): a pair counts as "first try" only if
+      // neither of its tiles was ever part of a wrong attempt. A wrong tap smudges
+      // BOTH pairs it involved, so brute-forcing your way to a match earns the
+      // completion + speed points but loses the first-try bonus.
+      var smudged = {}, firstTry = 0;
       var startTs = Date.now();
       var MT = window.MatchTiles;
 
@@ -1619,7 +1668,7 @@ window.LiveMode = (function () {
         // silently if the host has already moved on.
         try {
           window.LiveDB.submitProgress(code, r.index, stu.id, matched, {
-            matched: matched, total: total, wrong: wrong, done: matched >= total
+            matched: matched, total: total, wrong: wrong, firstTry: firstTry, done: matched >= total
           }).catch(function () {});
         } catch (e) {}
       }
@@ -1633,6 +1682,7 @@ window.LiveMode = (function () {
         if (!sel.q || !sel.a) return;
         var q = sel.q, a = sel.a;
         if (q.idx === a.idx) {
+          if (!smudged[q.idx]) firstTry++; // matched cleanly, never guessed wrong on it
           matched++;
           counter.textContent = matched + " / " + total;
           q.btn.classList.remove("sel"); a.btn.classList.remove("sel");
@@ -1645,6 +1695,7 @@ window.LiveMode = (function () {
           if (matched >= total) return finish();
         } else {
           wrong++;
+          smudged[q.idx] = true; smudged[a.idx] = true; // both pairs guessed wrong
           busy = true;
           q.btn.classList.remove("sel"); a.btn.classList.remove("sel");
           q.btn.classList.add("wrong"); a.btn.classList.add("wrong");
@@ -1673,7 +1724,7 @@ window.LiveMode = (function () {
           el("div", { class: "player-name-tag", text: stu.name }),
           el("div", { class: "live-big-emoji", text: "🔗" }),
           el("h2", { text: "All matched! 🎉" }),
-          el("p", { class: "live-sub", text: "You matched all " + total + " pairs in " + secs + "s" }),
+          el("p", { class: "live-sub", text: "Done in " + secs + "s  ·  " + firstTry + " of " + total + " on the first try" }),
           wrong ? el("p", { class: "player-why", text: wrong + (wrong === 1 ? " wrong tap" : " wrong taps") }) : null,
           el("p", { class: "live-sub", text: "Waiting for the class…" })
         ])]));
@@ -1856,13 +1907,15 @@ window.LiveMode = (function () {
     function matchResultScreen(s) {
       var me = (s.reveal && s.reveal.results || []).filter(function (x) { return x.studentId === stu.id; })[0];
       var matched = me ? me.matched : 0, total = me ? me.total : 0, pts = me ? me.points : 0;
+      var firstTry = me && me.firstTry != null ? me.firstTry : 0;
+      var secs = me ? me.secs : null;
       var allDone = !!(me && me.correct);
       kit.beep(allDone ? "good" : "bad");
       show(screen("player live-center " + (allDone ? "res-good" : "res-bad"), [el("div", { class: "live-card" }, [
         el("div", { class: "player-name-tag", text: stu.name }),
         el("div", { class: "live-big-emoji", text: allDone ? "🔗" : (matched > 0 ? "🧩" : "⏰") }),
         el("h2", { text: allDone ? "All matched!" : (matched > 0 ? "Time's up" : "Too slow") }),
-        el("p", { class: "live-sub", text: "You matched " + matched + " of " + total + (total === 1 ? " pair" : " pairs") }),
+        el("p", { class: "live-sub", text: firstTry + " of " + total + " on the first try" + (allDone && secs != null ? "  ·  " + secs + "s" : "") }),
         el("div", { class: "player-points", text: (pts > 0 ? "+" + pts : "0") + " points" })
       ])]));
     }
