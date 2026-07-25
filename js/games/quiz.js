@@ -94,17 +94,28 @@
         const shapes = ["🔺", "🔷", "⬤", "⬛"];
         const buttons = [];
         item.options.forEach((opt, i) => {
-          const btn = el("button", { class: "quiz-opt mt-" + (opt.type || "text"), attrs: { style: `--i:${i}` } },
-            [el("span", { class: "opt-shape", text: shapes[i] })].concat(MT.content(el, opt)));
-          let armed = false;
-          btn.addEventListener("click", () => {
-            if (locked) return;
-            if (MT.isAudio(opt)) {
+          let btn;
+          if (MT.isAudio(opt)) {
+            // Audio option: playing and choosing are SEPARATE controls, so the
+            // student can replay freely; ✓ Choose unlocks after the first listen.
+            const playLbl = el("span", { class: "match-slabel", text: "Hear it" });
+            const playBtn = el("button", { class: "mcq-audio-play", attrs: { type: "button", "aria-label": `Play option ${i + 1}` } },
+              [el("span", { class: "match-ico", text: "🔊" }), playLbl]);
+            const chooseBtn = el("button", { class: "mcq-audio-choose", attrs: { type: "button", disabled: "true" }, text: "Listen first" });
+            playBtn.addEventListener("click", () => {
+              if (locked) return;
               try { MT.play(kit, opt); } catch (e) {}
-              if (!armed) { armed = true; btn.classList.add("armed"); const l = btn.querySelector(".match-slabel"); if (l) l.textContent = "Tap again to choose"; return; }
-            }
-            choose(opt, item);
-          });
+              playLbl.textContent = "Play again";
+              if (chooseBtn.disabled) { chooseBtn.disabled = false; chooseBtn.textContent = "✓ Choose"; }
+            });
+            chooseBtn.addEventListener("click", () => { if (!locked && !chooseBtn.disabled) choose(opt, item); });
+            btn = el("div", { class: "quiz-opt mt-audio split", attrs: { style: `--i:${i}` } },
+              [el("span", { class: "opt-shape", text: shapes[i] }), playBtn, chooseBtn]);
+          } else {
+            btn = el("button", { class: "quiz-opt mt-" + (opt.type || "text"), attrs: { style: `--i:${i}` } },
+              [el("span", { class: "opt-shape", text: shapes[i] })].concat(MT.content(el, opt)));
+            btn.addEventListener("click", () => { if (!locked) choose(opt, item); });
+          }
           buttons.push({ opt, btn });
           optWrap.appendChild(btn);
         });
@@ -126,7 +137,9 @@
         clearInterval(timer);
         const wasRight = !!(chosen && chosen.correct);
         (wrap.__buttons || []).forEach((b) => {
-          b.btn.disabled = true;
+          b.btn.disabled = true; // no-op on a split (div) tile…
+          // …so also lock the split tile's inner play/choose buttons.
+          Array.prototype.forEach.call(b.btn.querySelectorAll("button"), (x) => { x.disabled = true; });
           if (b.opt.correct) b.btn.classList.add("correct");
           else if (b.opt === chosen) b.btn.classList.add("wrong");
         });

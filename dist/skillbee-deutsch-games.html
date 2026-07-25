@@ -251,7 +251,23 @@ kbd {
 .opt-shape { font-size: 1.2rem; }
 .quiz-opt.correct { border-color: var(--good); background: #eafaf7; }
 .quiz-opt.wrong { border-color: var(--bad); background: #ffeef0; }
-.quiz-opt.armed { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(11, 63, 221, 0.18); }
+/* Audio MCQ options (phone + solo): playing and choosing are SEPARATE
+   controls, so a student can replay an option any number of times before
+   committing. ✓ Choose unlocks after the first listen. */
+.live-opt.split, .quiz-opt.split { cursor: default; gap: 10px; }
+.live-opt.split:active { transform: none; box-shadow: 0 6px 0 var(--lip); }
+.quiz-opt.split:active { transform: none; }
+.mcq-audio-play, .mcq-audio-choose {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.55); background: rgba(255, 255, 255, 0.14);
+  color: #fff; border-radius: 12px; font-weight: 800; font-size: 1rem;
+  padding: 12px 10px; min-height: 52px;
+}
+.mcq-audio-play { flex: 1.25; }
+.mcq-audio-play .match-slabel { flex: 0 0 auto; text-align: center; font-size: 0.95rem; }
+.mcq-audio-choose { flex: 1; }
+.mcq-audio-play:not(:disabled):active, .mcq-audio-choose:not(:disabled):active { background: rgba(255, 255, 255, 0.34); }
+.mcq-audio-choose:disabled { opacity: 0.6; border-style: dashed; font-weight: 700; font-size: 0.85rem; }
 /* Solo quiz — typed question media + typed option tiles */
 .quiz-audio { margin: 14px 0; }
 .quiz-media { display: flex; justify-content: center; margin: 8px 0 14px; }
@@ -857,7 +873,6 @@ input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf
 .live-opt.board .match-img { max-height: 130px; }
 .live-opt .match-ico { flex: 0 0 auto; font-size: 1.6rem; }
 .live-opt .match-slabel { flex: 1; text-align: left; color: rgba(255, 255, 255, 0.92); font-weight: 700; font-size: 0.9rem; }
-.live-opt.armed { outline: 4px solid #fff; outline-offset: -4px; }
 /* MCQ reveal — the winning option rendered by its type */
 .reveal-value.mcq-reveal { display: flex; justify-content: center; align-items: center; gap: 8px; }
 .reveal-value.mcq-reveal .match-img { max-height: 40vh; border-radius: 12px; }
@@ -3427,17 +3442,28 @@ document.addEventListener("DOMContentLoaded", App.init);
         const shapes = ["🔺", "🔷", "⬤", "⬛"];
         const buttons = [];
         item.options.forEach((opt, i) => {
-          const btn = el("button", { class: "quiz-opt mt-" + (opt.type || "text"), attrs: { style: `--i:${i}` } },
-            [el("span", { class: "opt-shape", text: shapes[i] })].concat(MT.content(el, opt)));
-          let armed = false;
-          btn.addEventListener("click", () => {
-            if (locked) return;
-            if (MT.isAudio(opt)) {
+          let btn;
+          if (MT.isAudio(opt)) {
+            // Audio option: playing and choosing are SEPARATE controls, so the
+            // student can replay freely; ✓ Choose unlocks after the first listen.
+            const playLbl = el("span", { class: "match-slabel", text: "Hear it" });
+            const playBtn = el("button", { class: "mcq-audio-play", attrs: { type: "button", "aria-label": `Play option ${i + 1}` } },
+              [el("span", { class: "match-ico", text: "🔊" }), playLbl]);
+            const chooseBtn = el("button", { class: "mcq-audio-choose", attrs: { type: "button", disabled: "true" }, text: "Listen first" });
+            playBtn.addEventListener("click", () => {
+              if (locked) return;
               try { MT.play(kit, opt); } catch (e) {}
-              if (!armed) { armed = true; btn.classList.add("armed"); const l = btn.querySelector(".match-slabel"); if (l) l.textContent = "Tap again to choose"; return; }
-            }
-            choose(opt, item);
-          });
+              playLbl.textContent = "Play again";
+              if (chooseBtn.disabled) { chooseBtn.disabled = false; chooseBtn.textContent = "✓ Choose"; }
+            });
+            chooseBtn.addEventListener("click", () => { if (!locked && !chooseBtn.disabled) choose(opt, item); });
+            btn = el("div", { class: "quiz-opt mt-audio split", attrs: { style: `--i:${i}` } },
+              [el("span", { class: "opt-shape", text: shapes[i] }), playBtn, chooseBtn]);
+          } else {
+            btn = el("button", { class: "quiz-opt mt-" + (opt.type || "text"), attrs: { style: `--i:${i}` } },
+              [el("span", { class: "opt-shape", text: shapes[i] })].concat(MT.content(el, opt)));
+            btn.addEventListener("click", () => { if (!locked) choose(opt, item); });
+          }
           buttons.push({ opt, btn });
           optWrap.appendChild(btn);
         });
@@ -3459,7 +3485,9 @@ document.addEventListener("DOMContentLoaded", App.init);
         clearInterval(timer);
         const wasRight = !!(chosen && chosen.correct);
         (wrap.__buttons || []).forEach((b) => {
-          b.btn.disabled = true;
+          b.btn.disabled = true; // no-op on a split (div) tile…
+          // …so also lock the split tile's inner play/choose buttons.
+          Array.prototype.forEach.call(b.btn.querySelectorAll("button"), (x) => { x.disabled = true; });
           if (b.opt.correct) b.btn.classList.add("correct");
           else if (b.opt === chosen) b.btn.classList.add("wrong");
         });
@@ -6393,22 +6421,32 @@ document.addEventListener("DOMContentLoaded", App.init);
     if (c && c.type === "text") return c.value;
     return null;
   }
-  // A phone option button rendered by type + a shape badge. Audio options play
-  // (preview) on the first tap and arm; a second tap on the armed tile submits —
-  // so a student can hear it before committing. Every other type submits on the
-  // first tap, so the fast Kahoot feel is unchanged.
+  // A phone option rendered by type + a shape badge. AUDIO options split into
+  // two SEPARATE controls — a play side that replays as often as the student
+  // likes (never submits) and a ✓ Choose side that commits. Choose unlocks
+  // after the first listen, which the old tap-twice flow also guaranteed —
+  // minus its trap of the second tap submitting when you just wanted to hear
+  // it again. Every other type submits on the first tap, so the fast Kahoot
+  // feel is unchanged.
   function mcqOptionButton(el, opt, i, submit) {
-    var armed = false;
-    var btn = el("button", { class: "live-opt phone mt-" + (opt.type || "text"), attrs: { style: "--c:" + COLORS[i] } },
-      [el("span", { class: "opt-shape", text: SHAPES[i] })].concat(window.MatchTiles.content(el, opt)));
-    btn.addEventListener("click", function () {
-      if (window.MatchTiles.isAudio(opt)) {
-        try { window.MatchTiles.play(kit(), opt); } catch (e) {}
-        if (!armed) { armed = true; btn.classList.add("armed"); var l = btn.querySelector(".match-slabel"); if (l) l.textContent = "Tap again to choose"; return; }
-      }
-      submit();
+    if (!window.MatchTiles.isAudio(opt)) {
+      var btn = el("button", { class: "live-opt phone mt-" + (opt.type || "text"), attrs: { style: "--c:" + COLORS[i] } },
+        [el("span", { class: "opt-shape", text: SHAPES[i] })].concat(window.MatchTiles.content(el, opt)));
+      btn.addEventListener("click", function () { submit(); });
+      return btn;
+    }
+    var playLbl = el("span", { class: "match-slabel", text: "Hear it" });
+    var playBtn = el("button", { class: "mcq-audio-play", attrs: { type: "button", "aria-label": "Play option " + (i + 1) } },
+      [el("span", { class: "match-ico", text: "🔊" }), playLbl]);
+    var chooseBtn = el("button", { class: "mcq-audio-choose", attrs: { type: "button", disabled: "true" }, text: "Listen first" });
+    playBtn.addEventListener("click", function () {
+      try { window.MatchTiles.play(kit(), opt); } catch (e) {}
+      playLbl.textContent = "Play again";
+      if (chooseBtn.disabled) { chooseBtn.disabled = false; chooseBtn.textContent = "✓ Choose"; }
     });
-    return btn;
+    chooseBtn.addEventListener("click", function () { if (!chooseBtn.disabled) submit(); });
+    return el("div", { class: "live-opt phone mt-audio split", attrs: { style: "--c:" + COLORS[i] } },
+      [el("span", { class: "opt-shape", text: SHAPES[i] }), playBtn, chooseBtn]);
   }
 
   function choiceAdapter(meta) {
