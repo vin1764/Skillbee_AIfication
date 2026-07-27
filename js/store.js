@@ -27,6 +27,12 @@
     } catch (e) { return "c" + Math.random().toString(36).slice(2, 10); }
   })();
 
+  // Deep snapshot of an exercises map, kept as the "last synced" cloud baseline
+  // so conflict detection can tell a genuine remote change from a re-delivery of
+  // what we already had.
+  function exSnap(ex) { try { return JSON.parse(JSON.stringify(ex || {})); } catch (e) { return {}; } }
+  function exEq(a, b) { try { return JSON.stringify(a) === JSON.stringify(b); } catch (e) { return false; } }
+
   function clone(x) {
     return JSON.parse(JSON.stringify(x));
   }
@@ -538,6 +544,8 @@
     _editedGames: null,     // { gameKey: true } — games edited since the editor opened (conflict detection)
     syncState: "local",     // local | saving | synced | offline
     editing: false,         // true while the content editor is open
+    _synced: null,          // exercises map we last knew the CLOUD to hold — the
+                            // baseline for 3-way conflict detection (base/mine/theirs)
     pendingRemote: null,    // a cloud version that arrived mid-edit (resolved via banner/exit)
     cloudUnsub: null,
     _pushTimer: null,
@@ -621,7 +629,7 @@
       if (!this._online()) { this._setState("offline"); return; }
       var self = this;
       var dirty = this._dirty ? Object.keys(this._dirty) : [];
-      var done = function () { self._dirty = {}; self._dirtyAll = false; self._setState("synced"); };
+      var done = function () { self._dirty = {}; self._dirtyAll = false; self._synced = exSnap(self.data.exercises); self._setState("synced"); };
       var fail = function () { self._setState("offline"); };
       // Full write for a wholesale change (seed / reset / restore) or when we
       // don't know which section changed; otherwise merge ONLY the changed
@@ -652,9 +660,31 @@
         } catch (e) {}
         // Ordering is server-side: per-section merges make the cloud the union
         // of every device's latest sections, so outside the editor the cloud is
-        // authoritative — adopt it. During editing, park it for the teacher to
-        // resolve (banner / exit) so we never silently overwrite their edits.
+        // authoritative — adopt it. During editing, reconcile carefully so we
+        // never silently overwrite the teacher's edits — but never cry "another
+        // device" for a change that isn't actually there.
         if (self.editing) {
+          var theirs = doc.data.exercises || {};
+          // FIRST sight of the cloud while already editing (the initial snapshot
+          // raced ahead of the teacher opening the editor) IS our baseline, not a
+          // remote change. Record it, quietly adopt games they haven't touched,
+          // keep their in-progress edits, and never banner.
+          if (self._synced == null) {
+            self._synced = exSnap(theirs);
+            var edited0 = self._editedGames || {};
+            if (!edited0["*"]) {
+              var mine0 = self.data.exercises || (self.data.exercises = {});
+              Object.keys(theirs).forEach(function (g) { if (!edited0[g]) mine0[g] = theirs[g]; });
+              self._saveLocal();
+              if (self.onSync) self.onSync();
+            }
+            return;
+          }
+          // 3-WAY: a snapshot equal to the baseline we last synced is a
+          // re-delivery / reconnect, NOT another device — even though our own
+          // unsaved edit now differs from it. Ignore it so it can't raise a false
+          // "Keep which version?" banner. Only a genuine cloud change parks.
+          if (exEq(theirs, self._synced)) return;
           self.pendingRemote = doc;
           if (self.onRemotePending) self.onRemotePending();
           return;
@@ -664,7 +694,9 @@
     },
     _adoptRemote: function (doc) {
       this.data = ensureSections(doc.data);
-      this._ts = (doc.updatedAt && doc.updatedAt.toMillis) ? doc.updatedAt.toMillis() : Date.now();
+      this._synced = exSnap(this.data.exercises); // cloud baseline now matches local
+      this._ts = (typeof doc.updatedAt === "number") ? doc.updatedAt
+               : (doc.updatedAt && doc.updatedAt.toMillis) ? doc.updatedAt.toMillis() : Date.now();
       this._saveLocal();
       this.pendingRemote = null;
       this._dirty = {}; this._dirtyAll = false;
@@ -678,11 +710,16 @@
       if (!pr || !pr.data || !pr.data.exercises) return [];
       var mine = (this.data && this.data.exercises) || {};
       var theirs = pr.data.exercises;
+      var base = this._synced || {};
       var edited = this._editedGames || {};
       var out = [];
       Object.keys(edited).forEach(function (g) {
         if (g === "*") { out.push("*"); return; }
-        if (JSON.stringify(mine[g]) !== JSON.stringify(theirs[g])) out.push(g);
+        // A real conflict needs BOTH: the cloud actually changed g since our
+        // baseline (base ≠ theirs) AND it differs from our edit (mine ≠ theirs).
+        // Without the base check, our own unsaved edit vs an unchanged cloud
+        // looked like a conflict — the bogus "Keep which version?" banner.
+        if (!exEq(base[g], theirs[g]) && !exEq(mine[g], theirs[g])) out.push(g);
       });
       return out;
     },
@@ -691,6 +728,9 @@
     // "Keep this device's version" — discard the parked remote; local edits stay
     // and are re-pushed per-section so the cloud keeps them.
     keepLocal: function () {
+      // We've acknowledged this cloud state and chosen to override it — make it
+      // our baseline so a re-delivery of the same doc can't instantly re-banner.
+      if (this.pendingRemote && this.pendingRemote.data) this._synced = exSnap(this.pendingRemote.data.exercises);
       this.pendingRemote = null;
       var edited = this._editedGames || {};
       if (!this._dirty) this._dirty = {};

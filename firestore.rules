@@ -95,8 +95,12 @@ service cloud.firestore {
     // the app); a single small document, well under Firestore's 1MB limit.
     match /content/{doc} {
       allow read: if true;
+      // updatedAt may be a millisecond NUMBER (what the app writes) or a
+      // serverTimestamp (`timestamp`) — accept both. Requiring only `is number`
+      // silently rejected every write whose updatedAt was a server timestamp,
+      // which is why content stopped syncing.
       allow write: if request.resource.data.data is map &&
-        request.resource.data.updatedAt is number &&
+        (request.resource.data.updatedAt is number || request.resource.data.updatedAt is timestamp) &&
         request.resource.data.clientId is string;
     }
 
