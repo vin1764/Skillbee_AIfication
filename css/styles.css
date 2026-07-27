@@ -442,7 +442,39 @@ kbd {
 .adm-ex-main:hover { border-color: var(--accent); }
 .adm-ex-name { font-weight: 800; }
 .adm-ex-count { color: var(--ink-soft); font-size: 0.85rem; }
+.adm-ex-warn { color: #b45309; font-weight: 800; white-space: nowrap; }
 .adm-ex-actions { display: flex; gap: 6px; }
+
+/* ---- "Check my content" panel ---- */
+.adm-check-count {
+  font-weight: 800; color: #b45309; background: #fff7ed; border: 1px solid #fed7aa;
+  border-radius: 12px; padding: 10px 14px; margin: 4px 0 14px;
+}
+.adm-check-game { margin: 0 0 18px; }
+.adm-check-gtitle { font-weight: 800; font-size: 1.05rem; margin: 0 0 8px; }
+.adm-check-ex { border: 1px solid var(--line); border-radius: 14px; padding: 8px; margin: 0 0 10px; background: var(--card); box-shadow: var(--shadow); }
+.adm-check-exhead {
+  width: 100%; text-align: left; background: transparent; border: 0; cursor: pointer;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+  padding: 6px 8px; border-radius: 10px; font: inherit;
+}
+.adm-check-exhead:hover { background: rgba(0,0,0,0.04); }
+.adm-check-exname { font-weight: 800; }
+.adm-check-exn { color: #b45309; font-weight: 700; font-size: 0.85rem; white-space: nowrap; }
+.adm-check-row {
+  display: flex; gap: 10px; align-items: baseline; padding: 6px 8px;
+  border-top: 1px dashed var(--line); font-size: 0.9rem;
+}
+.adm-check-num { color: var(--ink-soft); font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+.adm-check-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-check-reason { color: #b45309; font-weight: 700; flex: 0 1 auto; text-align: right; }
+.adm-check-clear { text-align: center; padding: 40px 16px; }
+.adm-check-clear-emoji { font-size: 3rem; }
+@media (prefers-color-scheme: dark) {
+  .adm-check-count { background: rgba(180,83,9,0.15); border-color: rgba(180,83,9,0.4); color: #fbbf24; }
+  .adm-ex-warn, .adm-check-exn, .adm-check-reason { color: #fbbf24; }
+  .adm-check-exhead:hover { background: rgba(255,255,255,0.06); }
+}
 .adm-ex-btn {
   width: 46px; background: #fff; border: 1px solid var(--line);
   border-radius: 12px; font-size: 1rem; cursor: pointer;

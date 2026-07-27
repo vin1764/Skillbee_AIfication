@@ -553,7 +553,10 @@
     },
 
     reset: function () {
-      this.data = defaults();
+      // Run defaults through the SAME normalisers as every other load path, so a
+      // Reset can't leave un-migrated content (e.g. Match-the-Following seed words
+      // that never became playable "entries", which showed as "0 pairs").
+      this.data = ensureSections(defaults());
       this._ts = Date.now();
       this._dirtyAll = true;   // wholesale replace
       this._saveLocal();

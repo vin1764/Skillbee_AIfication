@@ -93,25 +93,42 @@
       timeLimit: 20000,
       pickLabel: "Exercise",
       mcq: true,
+      // Live setup / Solo-wrapper count — the playable count (see ContentValidator).
+      getTopics: function () {
+        var store = window.ContentStore;
+        var list = (store && store.exercisesFor) ? store.exercisesFor(meta.storeKey) : [];
+        var unit = meta.autoWords ? "word" : "question";
+        return list.map(function (e) {
+          var n = window.ContentValidator.validCount(meta.storeKey, e);
+          return { id: e.id, name: e.name, emoji: meta.emoji, english: n + " " + unit + (n === 1 ? "" : "s") };
+        });
+      },
       buildRounds: function (topic) {
+        var store = window.ContentStore;
+        // The Live picker passes only { id } (getTopics strips the content), so
+        // resolve the freshest stored exercise; fall back to the passed object so
+        // any direct caller still works.
+        var src = ((store && store.exercise) ? store.exercise(meta.storeKey, topic && topic.id) : null) || topic || {};
         var rounds = [];
         // 1) Authored typed MCQ (image/audio/icon/text questions + options).
-        (topic.mcq || []).forEach(function (m) {
-          if (!m || !m.question) return;
+        (src.mcq || []).forEach(function (m) {
+          if (mcqReason(m)) return;                        // one source of truth
           var q = mcqSide(m.question, "text");
-          var opts = (m.options || []).map(function (o) { return { type: (o && o.type) || "text", value: String((o && o.value) || ""), correct: !!(o && o.correct) }; })
-            .filter(function (o) { return o.value !== ""; });
-          if (!q.value || opts.length < 2 || !opts.some(function (o) { return o.correct; })) return;
-          rounds.push({ type: "mcq", question: q, options: kit().shuffle(opts.slice(0, 4)) });
+          rounds.push({ type: "mcq", question: q, options: kit().shuffle(mcqPlayOptions(mcqNonEmptyOpts(m))) });
         });
-        // 2) Quick auto-generate from vocab → German-text question, English-text options.
-        var words = (topic.words || []).filter(function (w) { return w.de && w.en; });
-        kit().sample(words, Math.min(10, words.length)).forEach(function (w) {
-          var autoPool = words.filter(function (x) { return x.en !== w.en; }).map(function (x) { return x.en; });
-          var distract = wrongOptions(w.distractors, w.en, autoPool, 3);
-          var opts = [{ type: "text", value: w.en, correct: true }].concat(distract.map(function (d) { return { type: "text", value: d, correct: false }; }));
-          rounds.push({ type: "mcq", question: { type: "text", value: w.de }, options: kit().shuffle(opts), emoji: w.emoji || "" });
-        });
+        // 2) Quick auto-generate from vocab → German-text question, English-text
+        //    options. ONLY for games that opt in (Memory Match); Quiz-Blitz is
+        //    strictly teacher-authored, so it never auto-generates.
+        if (meta.autoWords) {
+          var words = (src.words || []).filter(function (w) { return w.de && w.en; });
+          kit().sample(words, Math.min(10, words.length)).forEach(function (w) {
+            var autoPool = words.filter(function (x) { return x.en !== w.en; }).map(function (x) { return x.en; });
+            var distract = wrongOptions(w.distractors, w.en, autoPool, 3);
+            if (!distract.length) return;                  // need ≥2 options (1 correct + ≥1 wrong)
+            var opts = [{ type: "text", value: w.en, correct: true }].concat(distract.map(function (d) { return { type: "text", value: d, correct: false }; }));
+            rounds.push({ type: "mcq", question: { type: "text", value: w.de }, options: kit().shuffle(opts), emoji: w.emoji || "" });
+          });
+        }
         return rounds.slice(0, 10);
       },
       hostContent: function (el, round) {
@@ -235,9 +252,11 @@
       var wordBank = buildWordBank(blanks.map(function (b) { return b.correct; }), s.wordBank);
       return { sentence: ensureNumbered(sentence, blanks), blanks: blanks, wordBank: wordBank, explanation: s.explanation || "" };
     }
-    // Legacy: one blank marked by "___", with a single correct article.
+    // Legacy: one blank marked by "___", with a single correct article. Use /g so
+    // a legacy sentence that happens to carry more than one ___ doesn't leave a
+    // second, unnumbered gap rendering as dead (unfillable) text.
     if (s.sentence && String(s.sentence).indexOf("___") >= 0 && s.correct) {
-      var sent = String(s.sentence).replace(/_{2,}/, "___1___");
+      var sent = String(s.sentence).replace(/_{2,}/g, "___1___");
       return {
         sentence: sent,
         blanks: [{ id: 1, correct: String(s.correct).trim() }],
@@ -281,7 +300,7 @@
       var store = window.ContentStore;
       var list = (store && store.exercisesFor) ? store.exercisesFor("cases") : [];
       return list.map(function (e) {
-        var n = (e.items || []).length || ((e.accusative || []).length + (e.dative || []).length + (e.genitive || []).length);
+        var n = window.ContentValidator.validCount("cases", e);
         return { id: e.id, name: e.name, emoji: "✏️", english: n + (n === 1 ? " sentence" : " sentences") };
       });
     },
@@ -440,7 +459,7 @@
       var store = window.ContentStore;
       var list = (store && store.exercisesFor) ? store.exercisesFor("compounds") : [];
       return list.map(function (e) {
-        var n = (e.items || []).length;
+        var n = window.ContentValidator.validCount("compounds", e);
         return { id: e.id, name: e.name, emoji: "🧟", english: n + (n === 1 ? " word" : " words") };
       });
     },
@@ -448,8 +467,9 @@
       var store = window.ContentStore;
       var e = (store && store.exercise) ? store.exercise("compounds", topic && topic.id) : null;
       var raw = (e && e.items) || window.CompoundData || [];
-      // Keep only usable rows and make sure each has a compound (parts join directly).
-      var all = raw.filter(function (c) { return c && c.partA && c.partB; }).map(function (c) {
+      // Keep only PLAYABLE rows (both parts, distinct, with a meaning or emoji clue)
+      // — the same rule the count uses — then give each a joined compound.
+      var all = raw.filter(function (c) { return compoundReason(c) === ""; }).map(function (c) {
         return {
           partA: c.partA, partB: c.partB, gender: c.gender || "der",
           meaning: c.meaning || "", emoji: c.emoji || "",
@@ -550,7 +570,7 @@
       var store = window.ContentStore;
       var list = (store && store.exercisesFor) ? store.exercisesFor("listening") : [];
       return list.map(function (e) {
-        var n = (e.items || []).length;
+        var n = window.ContentValidator.validCount("listening", e);
         return { id: e.id, name: e.name, emoji: "👂", english: n + (n === 1 ? " prompt" : " prompts") };
       });
     },
@@ -558,7 +578,7 @@
       var store = window.ContentStore;
       var e = (store && store.exercise) ? store.exercise("listening", topic && topic.id) : null;
       var all = ((e && e.items) || window.ListeningData || [])
-        .filter(function (w) { return w && w.word; });
+        .filter(function (w) { return w && trimS(w.word) !== ""; });
       var autoPool = all.map(function (w) { return w.word; });
       return kit().sample(all, Math.min(10, all.length)).map(function (w) {
         return {
@@ -711,7 +731,7 @@
       var store = window.ContentStore;
       var list = (store && store.exercisesFor) ? store.exercisesFor("hoerpaare") : [];
       return list.map(function (e) {
-        var n = (e.questions || []).filter(function (q) { return roundPairs(q).length >= 3; }).length;
+        var n = window.ContentValidator.validCount("hoerpaare", e);
         return { id: e.id, name: e.name, emoji: e.emoji || "🔗", english: n + (n === 1 ? " round" : " rounds") };
       });
     },
@@ -775,7 +795,7 @@
       var store = window.ContentStore;
       var list = (store && store.exercisesFor) ? store.exercisesFor("truefalse") : [];
       return list.map(function (e) {
-        var n = (e.questions || []).filter(function (q) { return q && q.statement && String((q.statement || {}).value || "").trim(); }).length;
+        var n = window.ContentValidator.validCount("truefalse", e);
         return { id: e.id, name: e.name, emoji: e.emoji || "⚖️", english: n + (n === 1 ? " statement" : " statements") };
       });
     },
@@ -848,11 +868,9 @@
     var c = pq.content || {};
     var base = { passage: passage };
     if (pq.format === "mcq") {
+      if (mcqReason(c)) return null;
       var q = mcqSide(c.question, "text");
-      var opts = (c.options || []).map(function (o) { return { type: (o && o.type) || "text", value: String((o && o.value) || ""), correct: !!(o && o.correct) }; })
-        .filter(function (o) { return o.value !== ""; });
-      if (!q.value || opts.length < 2 || !opts.some(function (o) { return o.correct; })) return null;
-      return Object.assign(base, { type: "mcq", fmt: "quiz", question: q, options: kit().shuffle(opts.slice(0, 4)) });
+      return Object.assign(base, { type: "mcq", fmt: "quiz", question: q, options: kit().shuffle(mcqPlayOptions(mcqNonEmptyOpts(c))) });
     }
     if (pq.format === "lucken-text") {
       var nb = normBlankEntry(c);
@@ -883,7 +901,7 @@
       var store = window.ContentStore;
       var list = (store && store.exercisesFor) ? store.exercisesFor("passage") : [];
       return list.map(function (e) {
-        var n = (e.questions || []).length;
+        var n = window.ContentValidator.validCount("passage", e);
         return { id: e.id, name: e.name, emoji: e.emoji || "📖", english: ((e.passage && e.passage.type === "audio") ? "🎧 " : "📄 ") + n + (n === 1 ? " question" : " questions") };
       });
     },
@@ -923,7 +941,7 @@
       var store = window.ContentStore;
       var list = (store && store.exercisesFor) ? store.exercisesFor("scramble") : [];
       return list.map(function (e) {
-        var n = (e.questions || []).filter(function (q) { return q && scrambleWords(q.answer).length >= 2; }).length;
+        var n = window.ContentValidator.validCount("scramble", e);
         return { id: e.id, name: e.name, emoji: e.emoji || "🧱", english: n + (n === 1 ? " sentence" : " sentences") };
       });
     },
@@ -1052,14 +1070,15 @@
       var store = window.ContentStore;
       var list = (store && store.exercisesFor) ? store.exercisesFor("hangman") : [];
       return list.map(function (e) {
-        var n = (e.items || []).filter(function (it) { return it && String(it.word || "").trim(); }).length;
+        var n = window.ContentValidator.validCount("hangman", e);
         return { id: e.id, name: e.name, emoji: e.emoji || "🔤", english: n + (n === 1 ? " word" : " words") };
       });
     },
     buildRounds: function (topic) {
       var store = window.ContentStore;
       var e = (store && store.exercise) ? store.exercise("hangman", topic && topic.id) : null;
-      var items = ((e && e.items) || []).filter(function (it) { return it && String(it.word || "").trim() !== ""; });
+      // Playable = a word to spell AND a clue (an empty clue shows nothing to go on).
+      var items = ((e && e.items) || []).filter(function (it) { return hangmanReason(it) === ""; });
       return kit().sample(items, Math.min(10, items.length)).map(function (it) {
         return {
           type: "hangman",
@@ -1142,13 +1161,145 @@
     }
   };
 
+  /* ==================================================================
+     ContentValidator — the ONE place that decides whether a single content
+     row is playable, and (for the teacher panel) why not. Every count shown
+     anywhere (editor cards, Solo picker, Live setup) AND every adapter's
+     row filter read playability from here, so "how many the editor shows"
+     always equals "how many actually play". Keys are ContentStore keys; the
+     game aliases (wortmonster→compounds, listen→listening) fold in via normKey.
+     ================================================================== */
+  function trimS(v) { return String(v == null ? "" : v).trim(); }
+
+  // ---- MCQ (Quiz-Blitz + Passage MCQ): shared validity + play-options ----
+  function mcqNonEmptyOpts(m) {
+    return (m && Array.isArray(m.options) ? m.options : []).map(function (o) {
+      return { type: (o && o.type) || "text", value: String((o && o.value) || ""), correct: !!(o && o.correct) };
+    }).filter(function (o) { return o.value.trim() !== ""; });
+  }
+  function mcqReason(m) {
+    if (!m || trimS((m.question || {}).value) === "") return "Add the question";
+    var opts = mcqNonEmptyOpts(m);
+    if (opts.length < 2) return "Add at least 2 answer options";
+    if (!opts.some(function (o) { return o.correct; })) return "Mark the correct option";
+    return "";
+  }
+  // Keep at most 4 options to play, but NEVER drop the last correct one: a sole
+  // correct option authored at position 5+ used to be sliced away, leaving an
+  // all-wrong round. `opts` is the non-empty set.
+  function mcqPlayOptions(opts) {
+    var four = opts.slice(0, 4);
+    if (!four.some(function (o) { return o.correct; })) {
+      var c = opts.filter(function (o) { return o.correct; })[0];
+      if (c) four = four.slice(0, 3).concat([c]);
+    }
+    return four;
+  }
+
+  // ---- Per-format "why not playable" (empty string = it plays) ----
+  function wordReason(w) {
+    if (!w || trimS(w.de) === "") return "Add the German word";
+    if (trimS(w.en) === "") return "Add the English meaning";
+    return "";
+  }
+  function tfReason(q) {
+    if (!q || trimS((q.statement || {}).value) === "") return "Add the statement";
+    return "";
+  }
+  function blankReason(s) {
+    if (!s) return "Empty row";
+    if (Array.isArray(s.blanks) && s.blanks.length) {
+      var sentence = String(s.sentence || "");
+      if (sentence.indexOf("___") < 0) return "Mark the gap with ___ in the sentence";
+      var filled = s.blanks.filter(function (b) { return trimS(b && b.correct) !== ""; });
+      if (!filled.length) return "Fill in the answer for the blank";
+      if (countGaps(sentence) !== filled.length) return "Each ___ gap needs exactly one answer";
+      return "";
+    }
+    if (trimS(s.sentence) === "") return "Add the sentence";
+    if (String(s.sentence).indexOf("___") < 0) return "Mark the gap with ___ in the sentence";
+    if (trimS(s.correct) === "") return "Fill in the answer for the blank";
+    return "";
+  }
+  function pairsReason(q) {
+    if (roundPairs(q).length < 3) return "Add at least 3 complete pairs (both sides filled)";
+    return "";
+  }
+  function compoundReason(c) {
+    if (!c || trimS(c.partA) === "" || trimS(c.partB) === "") return "Add both Part 1 and Part 2";
+    if (trimS(c.partA) === trimS(c.partB)) return "Part 1 and Part 2 can't be identical";
+    if (trimS(c.meaning) === "" && trimS(c.emoji) === "") return "Add a meaning or an emoji as the clue";
+    return "";
+  }
+  function listenReason(w) {
+    if (!w || trimS(w.word) === "") return "Add the word or sentence to say";
+    return "";
+  }
+  function scrambleReason(q) {
+    if (!q || trimS(q.answer) === "") return "Add the sentence";
+    if (scrambleWords(q.answer).length < 2) return "Add a sentence of at least 2 words";
+    return "";
+  }
+  function hangmanReason(it) {
+    if (!it || trimS(it.word) === "") return "Add the word to spell";
+    if (trimS((it.reference || {}).value) === "") return "Add a clue (text, picture, audio or icon)";
+    return "";
+  }
+  function passageQReason(pq) {
+    if (!pq) return "Empty question";
+    if (pq.format === "lucken-text") return blankReason(pq.content);
+    if (pq.format === "true-false") return tfReason(pq.content);
+    return mcqReason(pq.content); // mcq (default)
+  }
+
+  function normKey(key) {
+    if (key === "wortmonster") return "compounds";
+    if (key === "listen") return "listening";
+    return key;
+  }
+  // Each format: how to list its rows as { row, label } (label = a short
+  // identifier for the teacher panel) + which reason function applies.
+  var VAL = {
+    quiz:      { rows: function (e) { return (e.mcq || []).map(function (m) { return { row: m, label: trimS((m.question || {}).value) || "(no question)" }; }); }, reason: mcqReason },
+    memory:    { rows: function (e) { return (e.words || []).map(function (w) { return { row: w, label: (trimS(w.de) || "?") + " = " + (trimS(w.en) || "?") }; }); }, reason: wordReason },
+    truefalse: { rows: function (e) { return (e.questions || []).map(function (q) { return { row: q, label: trimS((q.statement || {}).value) || "(no statement)" }; }); }, reason: tfReason },
+    cases:     { rows: function (e) { return (e.items || []).map(function (s) { return { row: s, label: trimS(s.sentence) || "(no sentence)" }; }); }, reason: blankReason },
+    hoerpaare: { rows: function (e) { return (e.questions || []).map(function (q, i) { return { row: q, label: "Round " + (i + 1) + " · " + roundPairs(q).length + " pairs" }; }); }, reason: pairsReason },
+    compounds: { rows: function (e) { return (e.items || []).map(function (c) { return { row: c, label: (trimS(c.partA) || "?") + " + " + (trimS(c.partB) || "?") }; }); }, reason: compoundReason },
+    listening: { rows: function (e) { return (e.items || []).map(function (w) { return { row: w, label: trimS(w.word) || "(no word)" }; }); }, reason: listenReason },
+    scramble:  { rows: function (e) { return (e.questions || []).map(function (q) { return { row: q, label: trimS(q.answer) || "(no sentence)" }; }); }, reason: scrambleReason },
+    hangman:   { rows: function (e) { return (e.items || []).map(function (it) { return { row: it, label: trimS(it.word) || "(no word)" }; }); }, reason: hangmanReason },
+    passage:   { rows: function (e) { return (e.questions || []).map(function (pq, i) { return { row: pq, label: "Q" + (i + 1) + " · " + (pq.format || "mcq") }; }); }, reason: passageQReason }
+  };
+
+  window.ContentValidator = {
+    // "" if the row plays; otherwise a short, teacher-facing reason.
+    reason: function (key, row) { var v = VAL[normKey(key)]; return v ? v.reason(row) : ""; },
+    // [{ index, label, reason }] for every row of an exercise (reason "" = ok).
+    rows: function (key, ex) {
+      key = normKey(key); var v = VAL[key]; if (!v || !ex) return [];
+      return v.rows(ex).map(function (r, i) { return { index: i, label: r.label, reason: v.reason(r.row) }; });
+    },
+    // How many rows actually play — the ONE count every screen should show.
+    validCount: function (key, ex) {
+      return this.rows(key, ex).filter(function (r) { return !r.reason; }).length;
+    },
+    // The rows that DON'T play (for the "Check my content" panel).
+    problems: function (key, ex) {
+      return this.rows(key, ex).filter(function (r) { return !!r.reason; });
+    },
+    mcqPlayOptions: mcqPlayOptions
+  };
+
   window.LiveGames = {
-    quiz: choiceAdapter({ name: "Quiz-Blitz", emoji: "🎯", contentType: "vocab" }),
+    quiz: choiceAdapter({ name: "Quiz-Blitz", emoji: "🎯", contentType: "vocab", storeKey: "quiz" }),
     passage: passageAdapter,
     truefalse: truefalseAdapter,
     scramble: scrambleAdapter,
     hangman: hangmanAdapter,
-    memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab" }),
+    // Memory Match in Live is an MCQ built from the exercise's vocabulary words
+    // (there are no authored questions), so it auto-generates; Quiz-Blitz does NOT.
+    memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab", storeKey: "memory", autoWords: true }),
     cases: blanksAdapter,
     wortmonster: compoundAdapter,
     listen: listenAdapter,

@@ -19,36 +19,26 @@
 
       // Build the pool of canonical questions:
       //   { q:{type,value}, options:[{type,value,correct}], promptSpeak, revealDe }
+      const V = window.ContentValidator;
       const pool = [];
-      // 1) Authored typed MCQ (image/audio/icon/text) if present.
+      // Authored typed MCQ only (image/audio/icon/text). Quiz-Blitz plays ONLY the
+      // questions a teacher writes — it never auto-generates from vocabulary words.
+      // Playability (question + ≥2 options + a correct one) is decided by the shared
+      // validator, so the count on the menu always matches what actually plays.
       (topic.mcq || []).forEach((m) => {
-        if (!m || !m.question) return;
+        if (V.reason("quiz", m)) return;
         const q = { type: m.question.type || "text", value: String(m.question.value || "") };
-        const options = (m.options || [])
-          .map((o) => ({ type: (o && o.type) || "text", value: String((o && o.value) || ""), correct: !!(o && o.correct) }))
-          .filter((o) => o.value !== "");
-        if (!q.value || options.length < 2 || !options.some((o) => o.correct)) return;
-        const audioCorrect = options.filter((o) => o.correct && o.type === "audio")[0];
-        pool.push({ q, options: kit.shuffle(options.slice(0, 4)), promptSpeak: false, revealDe: q.type === "audio" ? q.value : (audioCorrect ? audioCorrect.value : null) });
-      });
-      // 2) Quick auto-generate from vocab words (both directions, as before).
-      const words = (topic.words || []).filter((w) => w.de && w.en);
-      const room = Math.max(0, 8 - pool.length);
-      const sampled = kit.sample(words, Math.min(room, words.length));
-      sampled.forEach((w, i) => {
-        const g2e = i % 2 === 0; // ask German→English, then English→German, …
-        const prompt = g2e ? w.de : w.en;
-        const answer = g2e ? w.en : w.de;
-        const others = words.filter((x) => (g2e ? x.en : x.de) !== answer);
-        const distract = kit.sample(others, 3).map((x) => (g2e ? x.en : x.de));
-        const options = kit.shuffle(
-          [{ type: "text", value: answer, correct: true }].concat(distract.map((d) => ({ type: "text", value: d, correct: false })))
+        const options = V.mcqPlayOptions(
+          (m.options || [])
+            .map((o) => ({ type: (o && o.type) || "text", value: String((o && o.value) || ""), correct: !!(o && o.correct) }))
+            .filter((o) => o.value.trim() !== "")
         );
-        pool.push({ q: { type: "text", value: prompt }, options, promptSpeak: g2e, revealDe: w.de, emoji: w.emoji || "" });
+        const audioCorrect = options.filter((o) => o.correct && o.type === "audio")[0];
+        pool.push({ q, options: kit.shuffle(options), promptSpeak: false, revealDe: q.type === "audio" ? q.value : (audioCorrect ? audioCorrect.value : null) });
       });
 
       if (!pool.length) {
-        kit.notice(stage, "No content yet", "Add words (or MCQ questions) to this topic via ⚙️ Manage content.", api);
+        kit.notice(stage, "No questions yet", "Add multiple-choice questions to this topic via ⚙️ Manage content.", api);
         return;
       }
 
