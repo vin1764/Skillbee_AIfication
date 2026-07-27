@@ -97,10 +97,9 @@
       getTopics: function () {
         var store = window.ContentStore;
         var list = (store && store.exercisesFor) ? store.exercisesFor(meta.storeKey) : [];
-        var unit = meta.autoWords ? "word" : "question";
         return list.map(function (e) {
           var n = window.ContentValidator.validCount(meta.storeKey, e);
-          return { id: e.id, name: e.name, emoji: meta.emoji, english: n + " " + unit + (n === 1 ? "" : "s") };
+          return { id: e.id, name: e.name, emoji: meta.emoji, english: n + " question" + (n === 1 ? "" : "s") };
         });
       },
       buildRounds: function (topic) {
@@ -110,25 +109,14 @@
         // any direct caller still works.
         var src = ((store && store.exercise) ? store.exercise(meta.storeKey, topic && topic.id) : null) || topic || {};
         var rounds = [];
-        // 1) Authored typed MCQ (image/audio/icon/text questions + options).
+        // Authored typed MCQ only (image/audio/icon/text question + options).
+        // Quiz-Blitz never auto-generates from vocabulary; playability is decided
+        // by the shared validator so the count always matches what plays.
         (src.mcq || []).forEach(function (m) {
-          if (mcqReason(m)) return;                        // one source of truth
+          if (mcqReason(m)) return;
           var q = mcqSide(m.question, "text");
           rounds.push({ type: "mcq", question: q, options: kit().shuffle(mcqPlayOptions(mcqNonEmptyOpts(m))) });
         });
-        // 2) Quick auto-generate from vocab → German-text question, English-text
-        //    options. ONLY for games that opt in (Memory Match); Quiz-Blitz is
-        //    strictly teacher-authored, so it never auto-generates.
-        if (meta.autoWords) {
-          var words = (src.words || []).filter(function (w) { return w.de && w.en; });
-          kit().sample(words, Math.min(10, words.length)).forEach(function (w) {
-            var autoPool = words.filter(function (x) { return x.en !== w.en; }).map(function (x) { return x.en; });
-            var distract = wrongOptions(w.distractors, w.en, autoPool, 3);
-            if (!distract.length) return;                  // need ≥2 options (1 correct + ≥1 wrong)
-            var opts = [{ type: "text", value: w.en, correct: true }].concat(distract.map(function (d) { return { type: "text", value: d, correct: false }; }));
-            rounds.push({ type: "mcq", question: { type: "text", value: w.de }, options: kit().shuffle(opts), emoji: w.emoji || "" });
-          });
-        }
         return rounds.slice(0, 10);
       },
       hostContent: function (el, round) {
@@ -1297,9 +1285,9 @@
     truefalse: truefalseAdapter,
     scramble: scrambleAdapter,
     hangman: hangmanAdapter,
-    // Memory Match in Live is an MCQ built from the exercise's vocabulary words
-    // (there are no authored questions), so it auto-generates; Quiz-Blitz does NOT.
-    memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab", storeKey: "memory", autoWords: true }),
+    // NOTE: there is deliberately no Live "Memory" game. Memory is a Solo-only
+    // card-flip game (js/games/memory.js). A Live MCQ auto-built from a word list
+    // was just Quiz-Blitz by another name, so it was removed to avoid confusion.
     cases: blanksAdapter,
     wortmonster: compoundAdapter,
     listen: listenAdapter,

@@ -31,6 +31,7 @@
   ];
 
   var chosen = loadChoice();
+  var onVoices = null; // set while the Settings modal is open, so a late voice list re-renders it
 
   function loadChoice() { try { return localStorage.getItem(KEY) || "system"; } catch (e) { return "system"; } }
   function setChoice(id) { chosen = id; try { localStorage.setItem(KEY, id); } catch (e) {} }
@@ -65,7 +66,9 @@
       window.speechSynthesis.cancel();
       var u = new SpeechSynthesisUtterance(text);
       u.lang = "de-DE";
-      u.rate = 0.95 * (rate || 1);
+      // Honour the configured rate EXACTLY, so a class never hears two speeds at
+      // once (the browser voice used to run at 0.95× while the mp3 ran at 1×).
+      u.rate = rate || 1;
       var vs = browserVoices(), pick = null;
       if (chosen && chosen.indexOf("browser:") === 0) {
         var want = chosen.slice(8);
@@ -114,7 +117,8 @@
   function speak(text, opts) {
     text = String(text == null ? "" : text).trim();
     if (!text) return;
-    stopCurrent(); // never overlap a previous clip
+    stop(); // never overlap: cancel BOTH a previous mp3 AND any browser speech
+            // (stopCurrent alone left TTS running under a new mp3 — two voices at once)
     var rate = (opts && opts.rate) || 1;
     if (chosen && chosen.indexOf("azure:") === 0) {
       if (playAzureFile(chosen, text, rate)) return; // pre-generated file
@@ -144,7 +148,7 @@
     var el = window.App && window.App.kit && window.App.kit.el;
     var overlay = document.createElement("div");
     overlay.className = "voice-overlay";
-    function close() { stop(); overlay.remove(); }
+    function close() { stop(); onVoices = null; overlay.remove(); }
     overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
 
     var card = document.createElement("div");
@@ -155,6 +159,7 @@
 
     var listWrap = document.createElement("div");
     listWrap.className = "voice-list";
+    function renderList() { listWrap.innerHTML = ""; listVoices().forEach(function (v) { listWrap.appendChild(row(v)); }); }
 
     function row(v) {
       var r = document.createElement("label");
@@ -190,7 +195,8 @@
       return r;
     }
 
-    listVoices().forEach(function (v) { listWrap.appendChild(row(v)); });
+    renderList();
+    onVoices = renderList; // OS may deliver German voices a beat late — re-render then
     card.appendChild(listWrap);
 
     if (!azureReady()) {
@@ -220,4 +226,14 @@
     hash: hash
   };
   loadManifest();
+  // Chrome populates its voice list asynchronously — on a cold load getVoices()
+  // is empty until "voiceschanged" fires. Warm it, and re-render Settings if open.
+  try {
+    if (window.speechSynthesis && window.speechSynthesis.addEventListener) {
+      window.speechSynthesis.addEventListener("voiceschanged", function () {
+        try { browserVoices(); } catch (e) {}
+        if (onVoices) { try { onVoices(); } catch (e) {} }
+      });
+    }
+  } catch (e) {}
 })();

@@ -1190,6 +1190,26 @@ window.LiveMode = (function () {
       } catch (e3) {}
     }
 
+    // Read the AUTHORITATIVE answer set at reveal time (a one-shot getAnswers),
+    // not just the last live snapshot: an answer written in the final moments
+    // before reveal — or before a Per-Question auto-reveal — may not be in the
+    // snapshot yet, which used to score that student "Too slow" (M3). Use
+    // whichever set is more complete; fall back to the snapshot (and a 1.5s
+    // timeout) so a reveal never hangs on a slow read, and bail if the room was
+    // torn down mid-read (hostPhase guard).
+    function withRevealAnswers(i, cb) {
+      var seq = (sess && sess.gameSeq) || 0;
+      var snap = latestAnswers || [];
+      var done = false;
+      function finish(arr) { if (done || hostPhase !== "reveal") return; done = true; cb(arr); }
+      var to = setTimeout(function () { finish(snap); }, 1500);
+      var p; try { p = window.LiveDB.getAnswers(code, i, seq); } catch (e) { p = null; }
+      if (p && p.then) {
+        p.then(function (fresh) { clearTimeout(to); finish((fresh && fresh.length >= snap.length) ? fresh : snap); })
+         .catch(function () { clearTimeout(to); finish(snap); });
+      } else { clearTimeout(to); finish(snap); }
+    }
+
     function reveal(i, r) {
       // Revealing is the teacher's call at ANY moment. Mark the phase first so a
       // late answer snapshot can't rebuild the question screen over this reveal.
@@ -1199,10 +1219,7 @@ window.LiveMode = (function () {
       if (ra.match) return revealMatch(i, r);
       clearTimeout(timer);
       if (answersUnsub) { answersUnsub(); answersUnsub = null; }
-      // Reuse the answers our live listener already delivered instead of
-      // re-querying Firestore — saves ~one read per student, every question.
-      var arr = latestAnswers;
-      {
+      withRevealAnswers(i, function (arr) {
         var startedAt = sess.round && sess.round.startedAt && sess.round.startedAt.toMillis ? sess.round.startedAt.toMillis() : null;
         var byStudent = {};
         arr.forEach(function (a) { byStudent[a.studentId] = a; });
@@ -1240,9 +1257,11 @@ window.LiveMode = (function () {
         safeUpdate({ status: "reveal", scores: scores, reveal: revealDoc });
         var german; try { german = ra.speakOnReveal(r); } catch (e) { german = null; }
         // Pronunciation is a nice-to-have — it must never stop the reveal screen.
-        if (german) { try { kit.speak(german); } catch (e) {} }
+        // Honour the round's chosen playback rate (a 0.75× listening class must
+        // hear the reveal at 0.75× too, not full speed) — M4.
+        if (german) { try { kit.speak(german, { rate: r.speed || 1 }); } catch (e) {} }
         safeReveal(i, r, results, scores);
-      }
+      });
     }
 
     // ---- Score the individual match round from each student's progress docs ----
@@ -1250,7 +1269,7 @@ window.LiveMode = (function () {
       hostPhase = "reveal"; // late progress docs must not rebuild over the reveal
       clearTimeout(timer);
       if (answersUnsub) { answersUnsub(); answersUnsub = null; }
-      var arr = latestAnswers;
+      withRevealAnswers(i, function (arr) {
       var total = (r.pairs || []).length || 1;
       var startedAt = sess.round && sess.round.startedAt && sess.round.startedAt.toMillis ? sess.round.startedAt.toMillis() : null;
       // Keep the most complete record per student (a "done" doc, else highest matched).
@@ -1297,6 +1316,7 @@ window.LiveMode = (function () {
         reveal: { index: i, correct: mCorrect, explanation: null, results: results, match: true }
       });
       safeReveal(i, r, results, scores);
+      });
     }
 
     function renderReveal(i, r, results) {
@@ -1339,11 +1359,21 @@ window.LiveMode = (function () {
         // Render the winning option by its type (a picture answer shows the
         // picture, an icon the icon, etc.) — not just its raw value.
         var co = (r.options || []).filter(function (o) { return o.correct; })[0];
+        var coNode;
+        if (co && co.type === "audio") {
+          // A WORKING play button so the class actually hears the correct audio
+          // (the old static "🔊 Tap to hear" chip had no handler — nobody learned
+          // which option was right) — played at the round's chosen rate. M5.
+          coNode = el("button", { class: "btn primary big reveal-audio-btn", html: "🔊 Hear the answer",
+            on: { click: function () { try { window.MatchTiles.play(kit, co, r.speed || 1); } catch (e) {} } } });
+        } else if (co && co.type && co.type !== "text") {
+          coNode = el("div", { class: "reveal-value mcq-reveal" }, window.MatchTiles.content(el, co));
+        } else {
+          coNode = el("div", { class: "reveal-value", text: ra.correctLabel(r) });
+        }
         answerBlock = el("div", { class: "reveal-answer" }, [
           el("div", { class: "reveal-label", text: "Correct answer" }),
-          (co && co.type && co.type !== "text")
-            ? el("div", { class: "reveal-value mcq-reveal" }, window.MatchTiles.content(el, co))
-            : el("div", { class: "reveal-value", text: ra.correctLabel(r) }),
+          coNode,
           r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null
         ]);
       } else {

@@ -94,7 +94,9 @@
         // phones" notes, and the host's duplicate audio button (the interactive UI
         // below already has its own).
         var host = adapter.hostContent(el, r);
-        Array.prototype.forEach.call(host.querySelectorAll(".live-q-options.board, .scr-hostnote, .hang-hostnote, .scr-host-audio"), function (n) { n.remove(); });
+        // Strip every teacher/board-only bit so the lone solo player never sees a
+        // "students tap … on their phones" note meant for the smartboard.
+        Array.prototype.forEach.call(host.querySelectorAll(".live-q-options.board, .scr-hostnote, .hang-hostnote, .scr-host-audio, .tf-hostnote, .listen-typing-note, .lt-hostnote"), function (n) { n.remove(); });
         card.appendChild(host);
       }
       var subApi = {
@@ -111,8 +113,20 @@
     function onAnswer(r, payload, elapsed) {
       var sc = adapter.score(r, payload, elapsed, TL);
       var frac = Math.max(0, 1 - elapsed / TL);
-      if (sc.correct) { correct++; streak++; api.addScore(10 + Math.round(10 * frac)); K.beep("good"); }
-      else { streak = 0; K.beep("bad"); }
+      var full = 10 + Math.round(10 * frac);
+      // Partial-credit games (Lücken-Text, Hör-gut-zu Type) return matched/total;
+      // award points PRO-RATA instead of the old all-or-nothing ✗ that threw away
+      // "2 of 3 blanks right". Non-partial games keep the plain correct/wrong path.
+      if (sc.matched != null && sc.total) {
+        var pts = Math.round((sc.matched / sc.total) * full);
+        if (pts > 0) api.addScore(pts);
+        if (sc.correct) { correct++; streak++; K.beep("good"); }
+        else { streak = 0; K.beep(sc.matched > 0 ? "good" : "bad"); }
+      } else if (sc.correct) {
+        correct++; streak++; api.addScore(full); K.beep("good");
+      } else {
+        streak = 0; K.beep("bad");
+      }
       var german = adapter.speakOnReveal(r);
       if (german) K.speak(german);
       reveal(r, sc);
@@ -124,15 +138,27 @@
         if (!b.classList.contains("back-link")) b.disabled = true;
       });
       var answerText = String(adapter.correctLabel(r));
-      // Ring the correct option, for the games that use tap-options.
+      // Ring the correct option. Text options carry their label in .opt-text
+      // (Hör-gut-zu) or .match-mtext (MCQ/match); fall back to the button's own
+      // text so plain-text tap options still light up.
+      var want = String(r.answer == null ? "" : r.answer).trim();
+      var wantLabel = answerText.trim();
       Array.prototype.forEach.call(wrap.querySelectorAll(".live-opt.phone"), function (btn) {
-        var t = (btn.querySelector(".opt-text") || {}).textContent;
-        if (t === r.answer || t === answerText) btn.classList.add("correct");
+        var lbl = btn.querySelector(".opt-text, .match-mtext");
+        var t = String((lbl ? lbl.textContent : btn.textContent) || "").trim();
+        if (t && (t === want || t === wantLabel)) btn.classList.add("correct");
       });
-      wrap.appendChild(el("div", { class: "solo-reveal " + (sc.correct ? "good" : "bad") }, [
-        el("div", { class: "solo-reveal-icon", text: sc.correct ? "✓" : "✗" }),
+      // Partial-credit reveal: a Lücken-Text where 2 of 3 blanks were right is
+      // "Almost!", not a flat ✗ — show the tally, like Live.
+      var partial = (sc.matched != null && sc.total != null && sc.total > 0);
+      var someRight = partial && sc.matched > 0 && !sc.correct;
+      var icon = sc.correct ? "✓" : someRight ? "◐" : "✗";
+      var title = sc.correct ? "Correct!" : someRight ? "Almost!" : "Not quite";
+      wrap.appendChild(el("div", { class: "solo-reveal " + (sc.correct ? "good" : someRight ? "partial" : "bad") }, [
+        el("div", { class: "solo-reveal-icon", text: icon }),
         el("div", { class: "solo-reveal-body" }, [
-          el("div", { class: "solo-reveal-title", text: sc.correct ? "Correct!" : "Not quite" }),
+          el("div", { class: "solo-reveal-title", text: title }),
+          partial ? el("div", { class: "solo-reveal-count", text: sc.matched + " of " + sc.total + " correct" }) : null,
           el("div", { class: "solo-reveal-ans", text: "Answer: " + answerText })
         ])
       ]));

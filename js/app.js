@@ -155,6 +155,7 @@ const App = (function () {
        Settings is used everywhere; falls back to plain browser speech.
        opts.rate scales the playback speed (1 = normal). */
     speak(text, opts) {
+      if (state.muted) return; // "Sound off" silences spoken German too, not just beeps
       if (window.VoiceBox) return window.VoiceBox.speak(text, opts);
       try {
         if (!("speechSynthesis" in window)) return;
@@ -310,7 +311,7 @@ const App = (function () {
           '<span class="brand-text"><b>Deutsch</b> Games</span>'
       }),
       el("div", { class: "topbar-right" }, [
-        el("div", { class: "score-badge", attrs: { title: "Points this session" } }, [
+        el("div", { class: "score-badge", attrs: { id: "score-badge", title: "Points this game" } }, [
           el("span", { class: "score-star", html: "⭐" }),
           el("span", { class: "score-value", attrs: { id: "score-value" }, text: "0" })
         ]),
@@ -339,6 +340,8 @@ const App = (function () {
             click: (e) => {
               state.muted = !state.muted;
               e.currentTarget.innerHTML = state.muted ? "🔇" : "🔊";
+              try { localStorage.setItem("skillbee_muted", state.muted ? "1" : "0"); } catch (er) {}
+              if (state.muted) kit.hush(); // turning sound off stops anything speaking right now
             }
           }
         })
@@ -353,6 +356,11 @@ const App = (function () {
   function setAdminVisible(v) {
     const b = document.getElementById("admin-btn");
     if (b) b.style.display = v ? "" : "none";
+    // The ⭐ score is a Solo feature; hide it wherever the teacher gear is hidden
+    // (the mode picker and Live Class Mode), so a stale Solo total never sits over
+    // the live leaderboard.
+    const s = document.getElementById("score-badge");
+    if (s) s.style.display = v ? "" : "none";
   }
 
   function showModeSelect() {
@@ -524,6 +532,10 @@ const App = (function () {
   function launch(game, topic) {
     endGameIfRunning(); // tear down the previous game instance (e.g. on restart)
     kit.hush();
+    // Each Solo game starts its ⭐ score fresh — different games score on
+    // different scales, so carrying a running total across them was meaningless.
+    state.score = 0;
+    const sv = document.getElementById("score-value"); if (sv) sv.textContent = "0";
     // In a game: Back goes to the exercise picker, but confirm first while a
     // round is in progress (no confirm once the result screen is showing).
     const playing = () => !document.querySelector(".result-card");
@@ -632,6 +644,9 @@ const App = (function () {
       link.href = window.SkillbeeBrand.favicon;
     }
     root.appendChild(renderTopBar());
+    // Restore the saved "Sound on/off" choice so it persists across reloads.
+    try { state.muted = localStorage.getItem("skillbee_muted") === "1"; } catch (e) {}
+    const _mb = document.getElementById("mute-btn"); if (_mb) _mb.innerHTML = state.muted ? "🔇" : "🔊";
     root.appendChild(el("main", { class: "screen", attrs: { id: "screen" } }));
     // Warm up voices list for speech synthesis.
     if ("speechSynthesis" in window) window.speechSynthesis.getVoices();

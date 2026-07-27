@@ -291,6 +291,13 @@ kbd {
 }
 .solo-reveal.good { border-color: var(--good); background: #eafaf7; }
 .solo-reveal.bad { border-color: var(--bad); background: #ffeef0; }
+.solo-reveal.partial { border-color: #f59e0b; background: #fff7ed; }
+.solo-reveal.partial .solo-reveal-icon { background: #f59e0b; }
+.solo-reveal-count { color: #b45309; font-weight: 800; font-size: 0.9rem; }
+@media (prefers-color-scheme: dark) {
+  .solo-reveal.partial { background: rgba(245,158,11,0.12); }
+  .solo-reveal-count { color: #fbbf24; }
+}
 .solo-reveal-icon {
   flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%;
   display: grid; place-items: center; font-size: 1.3rem; font-weight: 900; color: #fff;
