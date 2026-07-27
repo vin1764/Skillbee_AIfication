@@ -45,6 +45,8 @@
       const TOTAL = pool.length;
       let index = 0, correct = 0, streak = 0, timer = null, timeLeft = 0, locked = false;
       let advanceTimer = null, dead = false; // dead = the screen was torn down; stop everything
+      let clockArmed = false; // did the countdown actually run this round? audio rounds
+                              // only arm on first listen — no listen ⇒ no speed bonus
 
       const wrap = el("div", { class: "quiz" });
       stage.appendChild(wrap);
@@ -72,10 +74,11 @@
         const item = pool[index];
         // Listening needs time: when the question or any option is audio, the
         // countdown only begins at the FIRST listen (until then the bar sits
-        // full — no pressure) and then drains at half speed (~8s instead of
-        // ~4s). Plain text/image/icon rounds keep the snappy Kahoot pace.
+        // full — no pressure). Plain text/image/icon rounds start their clock
+        // straight away. Solo gets a comfortable window (Live gives 20s), not the
+        // old ~4s that timed most rounds out and spoke the failures aloud.
         const hasAudio = item.q.type === "audio" || item.options.some((o) => o.type === "audio");
-        let clockArmed = !hasAudio;
+        clockArmed = !hasAudio;
         const armClock = () => { clockArmed = true; };
 
         wrap.innerHTML = "";
@@ -128,7 +131,7 @@
         wrap.__buttons = buttons;
 
         timeLeft = 100;
-        const drain = hasAudio ? 0.75 : 1.5; // audio rounds get double the window
+        const drain = hasAudio ? 0.25 : 0.4; // ~24s for audio, ~15s for text (was ~8s / ~4s)
         const fill = document.getElementById("tfill");
         timer = setInterval(() => {
           if (!clockArmed) return; // audio round, nothing played yet — no countdown
@@ -151,7 +154,9 @@
           else if (b.opt === chosen) b.btn.classList.add("wrong");
         });
         if (wasRight) {
-          addScore(10 + Math.round(timeLeft / 10)); // faster = more
+          // faster = more; but NO speed bonus if they never listened to an audio
+          // round (clock never armed → timeLeft still 100 would be a free max).
+          addScore(10 + (clockArmed ? Math.round(timeLeft / 10) : 0));
           correct++; streak++; kit.beep("good");
         } else {
           streak = 0; kit.beep("bad");

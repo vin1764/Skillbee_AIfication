@@ -299,6 +299,13 @@ kbd {
 }
 .solo-reveal.good { border-color: var(--good); background: #eafaf7; }
 .solo-reveal.bad { border-color: var(--bad); background: #ffeef0; }
+.solo-reveal.partial { border-color: #f59e0b; background: #fff7ed; }
+.solo-reveal.partial .solo-reveal-icon { background: #f59e0b; }
+.solo-reveal-count { color: #b45309; font-weight: 800; font-size: 0.9rem; }
+@media (prefers-color-scheme: dark) {
+  .solo-reveal.partial { background: rgba(245,158,11,0.12); }
+  .solo-reveal-count { color: #fbbf24; }
+}
 .solo-reveal-icon {
   flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%;
   display: grid; place-items: center; font-size: 1.3rem; font-weight: 900; color: #fff;
@@ -2886,6 +2893,7 @@ const App = (function () {
        Settings is used everywhere; falls back to plain browser speech.
        opts.rate scales the playback speed (1 = normal). */
     speak(text, opts) {
+      if (state.muted) return; // "Sound off" silences spoken German too, not just beeps
       if (window.VoiceBox) return window.VoiceBox.speak(text, opts);
       try {
         if (!("speechSynthesis" in window)) return;
@@ -3041,7 +3049,7 @@ const App = (function () {
           '<span class="brand-text"><b>Deutsch</b> Games</span>'
       }),
       el("div", { class: "topbar-right" }, [
-        el("div", { class: "score-badge", attrs: { title: "Points this session" } }, [
+        el("div", { class: "score-badge", attrs: { id: "score-badge", title: "Points this game" } }, [
           el("span", { class: "score-star", html: "⭐" }),
           el("span", { class: "score-value", attrs: { id: "score-value" }, text: "0" })
         ]),
@@ -3070,6 +3078,8 @@ const App = (function () {
             click: (e) => {
               state.muted = !state.muted;
               e.currentTarget.innerHTML = state.muted ? "🔇" : "🔊";
+              try { localStorage.setItem("skillbee_muted", state.muted ? "1" : "0"); } catch (er) {}
+              if (state.muted) kit.hush(); // turning sound off stops anything speaking right now
             }
           }
         })
@@ -3084,6 +3094,11 @@ const App = (function () {
   function setAdminVisible(v) {
     const b = document.getElementById("admin-btn");
     if (b) b.style.display = v ? "" : "none";
+    // The ⭐ score is a Solo feature; hide it wherever the teacher gear is hidden
+    // (the mode picker and Live Class Mode), so a stale Solo total never sits over
+    // the live leaderboard.
+    const s = document.getElementById("score-badge");
+    if (s) s.style.display = v ? "" : "none";
   }
 
   function showModeSelect() {
@@ -3255,6 +3270,10 @@ const App = (function () {
   function launch(game, topic) {
     endGameIfRunning(); // tear down the previous game instance (e.g. on restart)
     kit.hush();
+    // Each Solo game starts its ⭐ score fresh — different games score on
+    // different scales, so carrying a running total across them was meaningless.
+    state.score = 0;
+    const sv = document.getElementById("score-value"); if (sv) sv.textContent = "0";
     // In a game: Back goes to the exercise picker, but confirm first while a
     // round is in progress (no confirm once the result screen is showing).
     const playing = () => !document.querySelector(".result-card");
@@ -3363,6 +3382,9 @@ const App = (function () {
       link.href = window.SkillbeeBrand.favicon;
     }
     root.appendChild(renderTopBar());
+    // Restore the saved "Sound on/off" choice so it persists across reloads.
+    try { state.muted = localStorage.getItem("skillbee_muted") === "1"; } catch (e) {}
+    const _mb = document.getElementById("mute-btn"); if (_mb) _mb.innerHTML = state.muted ? "🔇" : "🔊";
     root.appendChild(el("main", { class: "screen", attrs: { id: "screen" } }));
     // Warm up voices list for speech synthesis.
     if ("speechSynthesis" in window) window.speechSynthesis.getVoices();
@@ -3476,6 +3498,7 @@ document.addEventListener("DOMContentLoaded", App.init);
   ];
 
   var chosen = loadChoice();
+  var onVoices = null; // set while the Settings modal is open, so a late voice list re-renders it
 
   function loadChoice() { try { return localStorage.getItem(KEY) || "system"; } catch (e) { return "system"; } }
   function setChoice(id) { chosen = id; try { localStorage.setItem(KEY, id); } catch (e) {} }
@@ -3510,7 +3533,9 @@ document.addEventListener("DOMContentLoaded", App.init);
       window.speechSynthesis.cancel();
       var u = new SpeechSynthesisUtterance(text);
       u.lang = "de-DE";
-      u.rate = 0.95 * (rate || 1);
+      // Honour the configured rate EXACTLY, so a class never hears two speeds at
+      // once (the browser voice used to run at 0.95× while the mp3 ran at 1×).
+      u.rate = rate || 1;
       var vs = browserVoices(), pick = null;
       if (chosen && chosen.indexOf("browser:") === 0) {
         var want = chosen.slice(8);
@@ -3559,7 +3584,8 @@ document.addEventListener("DOMContentLoaded", App.init);
   function speak(text, opts) {
     text = String(text == null ? "" : text).trim();
     if (!text) return;
-    stopCurrent(); // never overlap a previous clip
+    stop(); // never overlap: cancel BOTH a previous mp3 AND any browser speech
+            // (stopCurrent alone left TTS running under a new mp3 — two voices at once)
     var rate = (opts && opts.rate) || 1;
     if (chosen && chosen.indexOf("azure:") === 0) {
       if (playAzureFile(chosen, text, rate)) return; // pre-generated file
@@ -3589,7 +3615,7 @@ document.addEventListener("DOMContentLoaded", App.init);
     var el = window.App && window.App.kit && window.App.kit.el;
     var overlay = document.createElement("div");
     overlay.className = "voice-overlay";
-    function close() { stop(); overlay.remove(); }
+    function close() { stop(); onVoices = null; overlay.remove(); }
     overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
 
     var card = document.createElement("div");
@@ -3600,6 +3626,7 @@ document.addEventListener("DOMContentLoaded", App.init);
 
     var listWrap = document.createElement("div");
     listWrap.className = "voice-list";
+    function renderList() { listWrap.innerHTML = ""; listVoices().forEach(function (v) { listWrap.appendChild(row(v)); }); }
 
     function row(v) {
       var r = document.createElement("label");
@@ -3635,7 +3662,8 @@ document.addEventListener("DOMContentLoaded", App.init);
       return r;
     }
 
-    listVoices().forEach(function (v) { listWrap.appendChild(row(v)); });
+    renderList();
+    onVoices = renderList; // OS may deliver German voices a beat late — re-render then
     card.appendChild(listWrap);
 
     if (!azureReady()) {
@@ -3665,6 +3693,16 @@ document.addEventListener("DOMContentLoaded", App.init);
     hash: hash
   };
   loadManifest();
+  // Chrome populates its voice list asynchronously — on a cold load getVoices()
+  // is empty until "voiceschanged" fires. Warm it, and re-render Settings if open.
+  try {
+    if (window.speechSynthesis && window.speechSynthesis.addEventListener) {
+      window.speechSynthesis.addEventListener("voiceschanged", function () {
+        try { browserVoices(); } catch (e) {}
+        if (onVoices) { try { onVoices(); } catch (e) {} }
+      });
+    }
+  } catch (e) {}
 })();
 
 
@@ -3716,6 +3754,8 @@ document.addEventListener("DOMContentLoaded", App.init);
       const TOTAL = pool.length;
       let index = 0, correct = 0, streak = 0, timer = null, timeLeft = 0, locked = false;
       let advanceTimer = null, dead = false; // dead = the screen was torn down; stop everything
+      let clockArmed = false; // did the countdown actually run this round? audio rounds
+                              // only arm on first listen — no listen ⇒ no speed bonus
 
       const wrap = el("div", { class: "quiz" });
       stage.appendChild(wrap);
@@ -3743,10 +3783,11 @@ document.addEventListener("DOMContentLoaded", App.init);
         const item = pool[index];
         // Listening needs time: when the question or any option is audio, the
         // countdown only begins at the FIRST listen (until then the bar sits
-        // full — no pressure) and then drains at half speed (~8s instead of
-        // ~4s). Plain text/image/icon rounds keep the snappy Kahoot pace.
+        // full — no pressure). Plain text/image/icon rounds start their clock
+        // straight away. Solo gets a comfortable window (Live gives 20s), not the
+        // old ~4s that timed most rounds out and spoke the failures aloud.
         const hasAudio = item.q.type === "audio" || item.options.some((o) => o.type === "audio");
-        let clockArmed = !hasAudio;
+        clockArmed = !hasAudio;
         const armClock = () => { clockArmed = true; };
 
         wrap.innerHTML = "";
@@ -3799,7 +3840,7 @@ document.addEventListener("DOMContentLoaded", App.init);
         wrap.__buttons = buttons;
 
         timeLeft = 100;
-        const drain = hasAudio ? 0.75 : 1.5; // audio rounds get double the window
+        const drain = hasAudio ? 0.25 : 0.4; // ~24s for audio, ~15s for text (was ~8s / ~4s)
         const fill = document.getElementById("tfill");
         timer = setInterval(() => {
           if (!clockArmed) return; // audio round, nothing played yet — no countdown
@@ -3822,7 +3863,9 @@ document.addEventListener("DOMContentLoaded", App.init);
           else if (b.opt === chosen) b.btn.classList.add("wrong");
         });
         if (wasRight) {
-          addScore(10 + Math.round(timeLeft / 10)); // faster = more
+          // faster = more; but NO speed bonus if they never listened to an audio
+          // round (clock never armed → timeLeft still 100 would be a free max).
+          addScore(10 + (clockArmed ? Math.round(timeLeft / 10) : 0));
           correct++; streak++; kit.beep("good");
         } else {
           streak = 0; kit.beep("bad");
@@ -6990,10 +7033,9 @@ document.addEventListener("DOMContentLoaded", App.init);
       getTopics: function () {
         var store = window.ContentStore;
         var list = (store && store.exercisesFor) ? store.exercisesFor(meta.storeKey) : [];
-        var unit = meta.autoWords ? "word" : "question";
         return list.map(function (e) {
           var n = window.ContentValidator.validCount(meta.storeKey, e);
-          return { id: e.id, name: e.name, emoji: meta.emoji, english: n + " " + unit + (n === 1 ? "" : "s") };
+          return { id: e.id, name: e.name, emoji: meta.emoji, english: n + " question" + (n === 1 ? "" : "s") };
         });
       },
       buildRounds: function (topic) {
@@ -7003,25 +7045,14 @@ document.addEventListener("DOMContentLoaded", App.init);
         // any direct caller still works.
         var src = ((store && store.exercise) ? store.exercise(meta.storeKey, topic && topic.id) : null) || topic || {};
         var rounds = [];
-        // 1) Authored typed MCQ (image/audio/icon/text questions + options).
+        // Authored typed MCQ only (image/audio/icon/text question + options).
+        // Quiz-Blitz never auto-generates from vocabulary; playability is decided
+        // by the shared validator so the count always matches what plays.
         (src.mcq || []).forEach(function (m) {
-          if (mcqReason(m)) return;                        // one source of truth
+          if (mcqReason(m)) return;
           var q = mcqSide(m.question, "text");
           rounds.push({ type: "mcq", question: q, options: kit().shuffle(mcqPlayOptions(mcqNonEmptyOpts(m))) });
         });
-        // 2) Quick auto-generate from vocab → German-text question, English-text
-        //    options. ONLY for games that opt in (Memory Match); Quiz-Blitz is
-        //    strictly teacher-authored, so it never auto-generates.
-        if (meta.autoWords) {
-          var words = (src.words || []).filter(function (w) { return w.de && w.en; });
-          kit().sample(words, Math.min(10, words.length)).forEach(function (w) {
-            var autoPool = words.filter(function (x) { return x.en !== w.en; }).map(function (x) { return x.en; });
-            var distract = wrongOptions(w.distractors, w.en, autoPool, 3);
-            if (!distract.length) return;                  // need ≥2 options (1 correct + ≥1 wrong)
-            var opts = [{ type: "text", value: w.en, correct: true }].concat(distract.map(function (d) { return { type: "text", value: d, correct: false }; }));
-            rounds.push({ type: "mcq", question: { type: "text", value: w.de }, options: kit().shuffle(opts), emoji: w.emoji || "" });
-          });
-        }
         return rounds.slice(0, 10);
       },
       hostContent: function (el, round) {
@@ -8190,9 +8221,9 @@ document.addEventListener("DOMContentLoaded", App.init);
     truefalse: truefalseAdapter,
     scramble: scrambleAdapter,
     hangman: hangmanAdapter,
-    // Memory Match in Live is an MCQ built from the exercise's vocabulary words
-    // (there are no authored questions), so it auto-generates; Quiz-Blitz does NOT.
-    memory: choiceAdapter({ name: "Memory Match", emoji: "🧩", contentType: "vocab", storeKey: "memory", autoWords: true }),
+    // NOTE: there is deliberately no Live "Memory" game. Memory is a Solo-only
+    // card-flip game (js/games/memory.js). A Live MCQ auto-built from a word list
+    // was just Quiz-Blitz by another name, so it was removed to avoid confusion.
     cases: blanksAdapter,
     wortmonster: compoundAdapter,
     listen: listenAdapter,
@@ -9394,6 +9425,26 @@ window.LiveMode = (function () {
       } catch (e3) {}
     }
 
+    // Read the AUTHORITATIVE answer set at reveal time (a one-shot getAnswers),
+    // not just the last live snapshot: an answer written in the final moments
+    // before reveal — or before a Per-Question auto-reveal — may not be in the
+    // snapshot yet, which used to score that student "Too slow" (M3). Use
+    // whichever set is more complete; fall back to the snapshot (and a 1.5s
+    // timeout) so a reveal never hangs on a slow read, and bail if the room was
+    // torn down mid-read (hostPhase guard).
+    function withRevealAnswers(i, cb) {
+      var seq = (sess && sess.gameSeq) || 0;
+      var snap = latestAnswers || [];
+      var done = false;
+      function finish(arr) { if (done || hostPhase !== "reveal") return; done = true; cb(arr); }
+      var to = setTimeout(function () { finish(snap); }, 1500);
+      var p; try { p = window.LiveDB.getAnswers(code, i, seq); } catch (e) { p = null; }
+      if (p && p.then) {
+        p.then(function (fresh) { clearTimeout(to); finish((fresh && fresh.length >= snap.length) ? fresh : snap); })
+         .catch(function () { clearTimeout(to); finish(snap); });
+      } else { clearTimeout(to); finish(snap); }
+    }
+
     function reveal(i, r) {
       // Revealing is the teacher's call at ANY moment. Mark the phase first so a
       // late answer snapshot can't rebuild the question screen over this reveal.
@@ -9403,10 +9454,7 @@ window.LiveMode = (function () {
       if (ra.match) return revealMatch(i, r);
       clearTimeout(timer);
       if (answersUnsub) { answersUnsub(); answersUnsub = null; }
-      // Reuse the answers our live listener already delivered instead of
-      // re-querying Firestore — saves ~one read per student, every question.
-      var arr = latestAnswers;
-      {
+      withRevealAnswers(i, function (arr) {
         var startedAt = sess.round && sess.round.startedAt && sess.round.startedAt.toMillis ? sess.round.startedAt.toMillis() : null;
         var byStudent = {};
         arr.forEach(function (a) { byStudent[a.studentId] = a; });
@@ -9444,9 +9492,11 @@ window.LiveMode = (function () {
         safeUpdate({ status: "reveal", scores: scores, reveal: revealDoc });
         var german; try { german = ra.speakOnReveal(r); } catch (e) { german = null; }
         // Pronunciation is a nice-to-have — it must never stop the reveal screen.
-        if (german) { try { kit.speak(german); } catch (e) {} }
+        // Honour the round's chosen playback rate (a 0.75× listening class must
+        // hear the reveal at 0.75× too, not full speed) — M4.
+        if (german) { try { kit.speak(german, { rate: r.speed || 1 }); } catch (e) {} }
         safeReveal(i, r, results, scores);
-      }
+      });
     }
 
     // ---- Score the individual match round from each student's progress docs ----
@@ -9454,7 +9504,7 @@ window.LiveMode = (function () {
       hostPhase = "reveal"; // late progress docs must not rebuild over the reveal
       clearTimeout(timer);
       if (answersUnsub) { answersUnsub(); answersUnsub = null; }
-      var arr = latestAnswers;
+      withRevealAnswers(i, function (arr) {
       var total = (r.pairs || []).length || 1;
       var startedAt = sess.round && sess.round.startedAt && sess.round.startedAt.toMillis ? sess.round.startedAt.toMillis() : null;
       // Keep the most complete record per student (a "done" doc, else highest matched).
@@ -9501,6 +9551,7 @@ window.LiveMode = (function () {
         reveal: { index: i, correct: mCorrect, explanation: null, results: results, match: true }
       });
       safeReveal(i, r, results, scores);
+      });
     }
 
     function renderReveal(i, r, results) {
@@ -9543,11 +9594,21 @@ window.LiveMode = (function () {
         // Render the winning option by its type (a picture answer shows the
         // picture, an icon the icon, etc.) — not just its raw value.
         var co = (r.options || []).filter(function (o) { return o.correct; })[0];
+        var coNode;
+        if (co && co.type === "audio") {
+          // A WORKING play button so the class actually hears the correct audio
+          // (the old static "🔊 Tap to hear" chip had no handler — nobody learned
+          // which option was right) — played at the round's chosen rate. M5.
+          coNode = el("button", { class: "btn primary big reveal-audio-btn", html: "🔊 Hear the answer",
+            on: { click: function () { try { window.MatchTiles.play(kit, co, r.speed || 1); } catch (e) {} } } });
+        } else if (co && co.type && co.type !== "text") {
+          coNode = el("div", { class: "reveal-value mcq-reveal" }, window.MatchTiles.content(el, co));
+        } else {
+          coNode = el("div", { class: "reveal-value", text: ra.correctLabel(r) });
+        }
         answerBlock = el("div", { class: "reveal-answer" }, [
           el("div", { class: "reveal-label", text: "Correct answer" }),
-          (co && co.type && co.type !== "text")
-            ? el("div", { class: "reveal-value mcq-reveal" }, window.MatchTiles.content(el, co))
-            : el("div", { class: "reveal-value", text: ra.correctLabel(r) }),
+          coNode,
           r.emoji ? el("div", { class: "reveal-emoji", text: r.emoji }) : null
         ]);
       } else {
@@ -10515,7 +10576,9 @@ window.LiveMode = (function () {
         // phones" notes, and the host's duplicate audio button (the interactive UI
         // below already has its own).
         var host = adapter.hostContent(el, r);
-        Array.prototype.forEach.call(host.querySelectorAll(".live-q-options.board, .scr-hostnote, .hang-hostnote, .scr-host-audio"), function (n) { n.remove(); });
+        // Strip every teacher/board-only bit so the lone solo player never sees a
+        // "students tap … on their phones" note meant for the smartboard.
+        Array.prototype.forEach.call(host.querySelectorAll(".live-q-options.board, .scr-hostnote, .hang-hostnote, .scr-host-audio, .tf-hostnote, .listen-typing-note, .lt-hostnote"), function (n) { n.remove(); });
         card.appendChild(host);
       }
       var subApi = {
@@ -10532,8 +10595,20 @@ window.LiveMode = (function () {
     function onAnswer(r, payload, elapsed) {
       var sc = adapter.score(r, payload, elapsed, TL);
       var frac = Math.max(0, 1 - elapsed / TL);
-      if (sc.correct) { correct++; streak++; api.addScore(10 + Math.round(10 * frac)); K.beep("good"); }
-      else { streak = 0; K.beep("bad"); }
+      var full = 10 + Math.round(10 * frac);
+      // Partial-credit games (Lücken-Text, Hör-gut-zu Type) return matched/total;
+      // award points PRO-RATA instead of the old all-or-nothing ✗ that threw away
+      // "2 of 3 blanks right". Non-partial games keep the plain correct/wrong path.
+      if (sc.matched != null && sc.total) {
+        var pts = Math.round((sc.matched / sc.total) * full);
+        if (pts > 0) api.addScore(pts);
+        if (sc.correct) { correct++; streak++; K.beep("good"); }
+        else { streak = 0; K.beep(sc.matched > 0 ? "good" : "bad"); }
+      } else if (sc.correct) {
+        correct++; streak++; api.addScore(full); K.beep("good");
+      } else {
+        streak = 0; K.beep("bad");
+      }
       var german = adapter.speakOnReveal(r);
       if (german) K.speak(german);
       reveal(r, sc);
@@ -10545,15 +10620,27 @@ window.LiveMode = (function () {
         if (!b.classList.contains("back-link")) b.disabled = true;
       });
       var answerText = String(adapter.correctLabel(r));
-      // Ring the correct option, for the games that use tap-options.
+      // Ring the correct option. Text options carry their label in .opt-text
+      // (Hör-gut-zu) or .match-mtext (MCQ/match); fall back to the button's own
+      // text so plain-text tap options still light up.
+      var want = String(r.answer == null ? "" : r.answer).trim();
+      var wantLabel = answerText.trim();
       Array.prototype.forEach.call(wrap.querySelectorAll(".live-opt.phone"), function (btn) {
-        var t = (btn.querySelector(".opt-text") || {}).textContent;
-        if (t === r.answer || t === answerText) btn.classList.add("correct");
+        var lbl = btn.querySelector(".opt-text, .match-mtext");
+        var t = String((lbl ? lbl.textContent : btn.textContent) || "").trim();
+        if (t && (t === want || t === wantLabel)) btn.classList.add("correct");
       });
-      wrap.appendChild(el("div", { class: "solo-reveal " + (sc.correct ? "good" : "bad") }, [
-        el("div", { class: "solo-reveal-icon", text: sc.correct ? "✓" : "✗" }),
+      // Partial-credit reveal: a Lücken-Text where 2 of 3 blanks were right is
+      // "Almost!", not a flat ✗ — show the tally, like Live.
+      var partial = (sc.matched != null && sc.total != null && sc.total > 0);
+      var someRight = partial && sc.matched > 0 && !sc.correct;
+      var icon = sc.correct ? "✓" : someRight ? "◐" : "✗";
+      var title = sc.correct ? "Correct!" : someRight ? "Almost!" : "Not quite";
+      wrap.appendChild(el("div", { class: "solo-reveal " + (sc.correct ? "good" : someRight ? "partial" : "bad") }, [
+        el("div", { class: "solo-reveal-icon", text: icon }),
         el("div", { class: "solo-reveal-body" }, [
-          el("div", { class: "solo-reveal-title", text: sc.correct ? "Correct!" : "Not quite" }),
+          el("div", { class: "solo-reveal-title", text: title }),
+          partial ? el("div", { class: "solo-reveal-count", text: sc.matched + " of " + sc.total + " correct" }) : null,
           el("div", { class: "solo-reveal-ans", text: "Answer: " + answerText })
         ])
       ]));
