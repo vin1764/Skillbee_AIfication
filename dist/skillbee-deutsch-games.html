@@ -1256,8 +1256,20 @@ input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf
 .name-btn.claiming { opacity: 0.7; }
 /* One-tap rejoin button on the Live landing screen (phone reloaded / next game). */
 .rejoin-live { margin: 2px auto 8px; display: block; }
-/* "Update ready" pill: a passive, fixed refresh offer when the served version
-   is newer than the one this tab is running. */
+/* Update popup: shown over whatever screen is up when a newer version of the
+   app goes live. "Later" collapses it to the corner pill below. */
+.update-overlay {
+  position: fixed; inset: 0; z-index: 9998; display: flex; align-items: center; justify-content: center;
+  background: rgba(31, 42, 68, 0.55); backdrop-filter: blur(4px); padding: 16px; animation: fadeIn 0.2s ease;
+}
+.update-card {
+  background: var(--card); border-radius: 22px; padding: 26px 22px; width: 100%; max-width: 380px;
+  text-align: center; box-shadow: var(--shadow-lg);
+}
+.update-big { font-size: 3rem; line-height: 1; margin-bottom: 6px; }
+.update-sub { color: var(--ink-soft); margin: 10px 0 18px; line-height: 1.45; }
+.update-actions { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+/* "Update ready" pill: the passive fallback after "Later". */
 .update-pill {
   position: fixed; right: 14px; bottom: 14px; z-index: 9999;
   background: var(--skb); color: #fff; font-weight: 800; font-size: 0.95rem;
@@ -3151,24 +3163,46 @@ const App = (function () {
     } catch (e) {}
     if (!current) return; // offline bundle (no stamps) — nothing to compare
     let shown = false;
+    // The popup appears over WHATEVER screen is showing (lobby, a live
+    // question, the podium…). "Later" swaps it for a small corner pill so a
+    // mid-round class is never forced to reload on the spot.
+    function showUpdatePopup() {
+      const pill = () =>
+        document.body.appendChild(
+          el("button", {
+            class: "update-pill",
+            html: "🔄 Update ready — tap to refresh",
+            attrs: { title: "A newer version of the games is live. Finish the current round, then tap to reload." },
+            on: { click: () => window.location.reload() }
+          })
+        );
+      const overlay = el("div", { class: "update-overlay" }, [
+        el("div", { class: "update-card" }, [
+          el("div", { class: "update-big", text: "🔄" }),
+          el("h2", { text: "Update ready" }),
+          el("p", { class: "update-sub", text: "A newer version of the games just went live. Refresh to get the latest fixes — you can rejoin your room with one tap afterwards." }),
+          el("div", { class: "update-actions" }, [
+            el("button", { class: "btn primary big", text: "Refresh now", on: { click: () => window.location.reload() } }),
+            el("button", { class: "btn ghost", text: "Later", on: { click: () => { overlay.remove(); pill(); } } })
+          ])
+        ])
+      ]);
+      document.body.appendChild(overlay);
+    }
+    let checking = false; // two ticks can overlap (async fetch) — never stack popups
     async function check() {
-      if (shown) return;
+      if (shown || checking) return;
+      checking = true;
       try {
         const res = await fetch(window.location.pathname, { cache: "no-store" });
         if (!res.ok) return;
         const m = /js\/app\.js\?v=([a-f0-9]+)/.exec(await res.text());
-        if (m && m[1] !== current) {
+        if (m && m[1] !== current && !shown) {
           shown = true;
-          document.body.appendChild(
-            el("button", {
-              class: "update-pill",
-              html: "🔄 Update ready — tap to refresh",
-              attrs: { title: "A newer version of the games is live. Finish the current round, then tap to reload." },
-              on: { click: () => window.location.reload() }
-            })
-          );
+          showUpdatePopup();
         }
       } catch (e) { /* offline / transient — try again next tick */ }
+      finally { checking = false; }
     }
     const every = window.__UPDATE_CHECK_MS__ || 4 * 60 * 1000; // test hook
     setInterval(check, every);
