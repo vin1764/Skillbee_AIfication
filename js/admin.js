@@ -15,6 +15,7 @@
 
       var currentGame = null; // gameId when configuring one content game
       var currentExercise = null; // exercise id when editing one exercise
+      var checking = false;   // true while the "Check my content" panel is open
       var syncChipEl = null;
 
       var GAME_LABELS = {
@@ -326,8 +327,10 @@
         // menu depending on how deep we are.
         var inExercise = currentGame && currentExercise;
         var inGame = !!currentGame;
-        var backHtml = inExercise ? "← Exercises" : inGame ? "← Games" : "← Menu";
-        var backFn = inExercise
+        var backHtml = checking ? "← Done" : inExercise ? "← Exercises" : inGame ? "← Games" : "← Menu";
+        var backFn = checking
+          ? function () { checking = false; render(); }
+          : inExercise
           ? function () { currentExercise = null; render(); }
           : inGame
             ? function () { currentGame = null; currentExercise = null; render(); }
@@ -339,6 +342,7 @@
             el("h2", { class: "adm-title", html: "🛠️ Manage content" }),
             el("div", { class: "adm-tools" }, [
               syncChipEl,
+              el("button", { class: "btn small ghost adm-check-btn", html: "🔎 Check content", attrs: { title: "Find rows that won't play in class (and why)" }, on: { click: function () { checking = true; render(); } } }),
               el("button", { class: "btn small ghost", html: "⬇ Backup", attrs: { title: "Download a copy (optional safety backup)" }, on: { click: doExport } }),
               el("button", { class: "btn small ghost", html: "⬆ Restore", attrs: { title: "Load content from a backup file" }, on: { click: doImport } }),
               (window.TeacherGate && window.TeacherGate.gated())
@@ -352,7 +356,60 @@
 
         var body = el("div", { class: "adm-body" });
         container.appendChild(body);
-        renderGames(body);
+        if (checking) renderCheck(body); else renderGames(body);
+      }
+
+      /* ---- "Check my content": every row that WON'T play in class, and why.
+             Reads playability from the shared ContentValidator (the same source
+             the counts use), grouped game → exercise, each problem clickable to
+             jump straight to that exercise's editor. */
+      function renderCheck(body) {
+        body.appendChild(el("p", { class: "adm-hint", html: "Rows listed here <b>won't play in class</b> until they're fixed — everything else is ready. Tap a problem to jump to its editor. This checks every game and exercise." }));
+        var all = allGames();
+        var totalProblems = 0;
+        var groups = el("div", { class: "adm-checkwrap" });
+        all.forEach(function (game) {
+          if (!window.ContentValidator) return;
+          var exRows = [];
+          store.exercisesFor(game.id).forEach(function (ex) {
+            var probs = window.ContentValidator.problems(game.id, ex);
+            if (!probs.length) return;
+            totalProblems += probs.length;
+            var exId = ex.id;
+            var exBox = el("div", { class: "adm-check-ex" }, [
+              el("button", {
+                class: "adm-check-exhead",
+                attrs: { title: "Open this exercise" },
+                on: { click: function () { checking = false; currentGame = game.id; currentExercise = exId; render(); } }
+              }, [
+                el("span", { class: "adm-check-exname", text: (ex.emoji ? ex.emoji + " " : "") + (ex.name || "Exercise") }),
+                el("span", { class: "adm-check-exn", text: probs.length + (probs.length === 1 ? " needs fixing" : " need fixing") })
+              ])
+            ]);
+            probs.forEach(function (p) {
+              exBox.appendChild(el("div", { class: "adm-check-row" }, [
+                el("span", { class: "adm-check-num", text: "#" + (p.index + 1) }),
+                el("span", { class: "adm-check-label", text: p.label }),
+                el("span", { class: "adm-check-reason", text: p.reason })
+              ]));
+            });
+            exRows.push(exBox);
+          });
+          if (!exRows.length) return;
+          groups.appendChild(el("div", { class: "adm-check-game" }, [
+            el("div", { class: "adm-check-gtitle", text: game.emoji + " " + game.name })
+          ].concat(exRows)));
+        });
+        if (!totalProblems) {
+          body.appendChild(el("div", { class: "adm-check-clear" }, [
+            el("div", { class: "adm-check-clear-emoji", text: "✅" }),
+            el("h3", { text: "Everything's ready to play" }),
+            el("p", { class: "adm-hint", text: "Every row in every exercise will play in class. Nothing to fix." })
+          ]));
+          return;
+        }
+        body.insertBefore(el("div", { class: "adm-check-count", text: totalProblems + (totalProblems === 1 ? " row" : " rows") + " won't play until fixed" }), body.children[1] || null);
+        body.appendChild(groups);
       }
 
       /* ---- Lücken-Text: fill-in sentences (one or many blanks) ---- */
@@ -626,7 +683,7 @@
           var srcGame = gameById(srcId);
           listWrap.appendChild(el("div", { class: "adm-copy-group", text: srcGame.emoji + " " + srcGame.name }));
           store.exercisesFor(srcId).forEach(function (e) {
-            var count = exerciseItemCount("words", e);
+            var count = exerciseItemCount(srcId, e);
             listWrap.appendChild(el("button", {
               class: "adm-copy-row",
               on: { click: function () {
@@ -645,19 +702,14 @@
         overlay.appendChild(card);
         document.body.appendChild(overlay);
       }
-      // Count the content rows inside a single exercise, given the game's kind
-      // (and its id, for games that don't count by kind alone).
-      function exerciseItemCount(kind, ex, id) {
+      // The PLAYABLE row count for an exercise — the single figure every screen
+      // shows, decided by the shared ContentValidator so the editor card, the
+      // Solo picker and the Live setup can never disagree with what actually
+      // plays. Falls back to a raw length only if the validator isn't loaded.
+      function exerciseItemCount(gameId, ex) {
         if (!ex) return 0;
-        if (kind === "cases") return (ex.items || []).length || ((ex.accusative || []).length + (ex.dative || []).length + (ex.genitive || []).length);
-        // Quiz-Blitz is MCQ now: count QUESTIONS = authored MCQ + any vocab words
-        // (each word auto-generates one question). Both play; both count.
-        if (id === "quiz") return (ex.mcq || []).length + (ex.words || []).length;
-        if (kind === "words") return (ex.words || []).length;
-        if (kind === "sentences") return (ex.sentences || []).length;
-        if (kind === "hangman") return (ex.items || []).length;
-        if (kind === "pairs" || kind === "truefalse" || kind === "passage" || kind === "scramble") return (ex.questions || []).length;
-        return (ex.items || []).length;
+        if (window.ContentValidator) return window.ContentValidator.validCount(gameId, ex);
+        return (ex.mcq || ex.words || ex.sentences || ex.questions || ex.items || []).length;
       }
       // The content unit for a game, as a SINGULAR base word — kept in sync with
       // each game's picker label so the admin list and the game menu always agree.
@@ -691,7 +743,8 @@
         var list = store.exercisesFor(game.id);
         var wrap = el("div", { class: "adm-ex-list" });
         list.forEach(function (e) {
-          var count = exerciseItemCount(game.kind, e, game.id);
+          var count = exerciseItemCount(game.id, e);
+          var badN = window.ContentValidator ? window.ContentValidator.problems(game.id, e).length : 0;
           var card = el("div", { class: "adm-ex-card" });
           card.appendChild(el("button", {
             class: "adm-ex-main",
@@ -699,7 +752,10 @@
             on: { click: function () { currentExercise = e.id; render(); } }
           }, [
             el("div", { class: "adm-ex-name", text: (e.emoji ? e.emoji + " " : "") + e.name }),
-            el("div", { class: "adm-ex-count", text: unitLabel(count, game.id, game.kind) })
+            el("div", { class: "adm-ex-count" }, [
+              document.createTextNode(unitLabel(count, game.id, game.kind)),
+              badN ? el("span", { class: "adm-ex-warn", attrs: { title: badN + " row" + (badN === 1 ? "" : "s") + " won't play — open 🔎 Check content" }, text: " · ⚠ " + badN }) : null
+            ])
           ]));
           card.appendChild(el("div", { class: "adm-ex-actions" }, [
             el("button", {

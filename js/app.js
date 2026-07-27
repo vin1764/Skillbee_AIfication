@@ -476,10 +476,15 @@ const App = (function () {
       const isQuiz = game.id === "quiz"; // Quiz-Blitz counts multiple-choice questions
       topics = window.ContentStore.exercisesFor(game.id);
       makeCard = (ex) => {
-        let count, unit;
-        if (usesSentences) { count = (ex.sentences || []).length; unit = "sentence"; }
-        else if (isQuiz) { count = (ex.mcq || []).length + (ex.words || []).length; unit = "question"; }
-        else { count = (ex.words || []).length; unit = "word"; }
+        const unit = usesSentences ? "sentence" : isQuiz ? "question" : "word";
+        // Playable count from the shared validator (so the menu never promises
+        // more than plays). Quiz-Blitz counts only real MCQ questions now.
+        let count;
+        if (window.ContentValidator && (game.id === "quiz" || game.id === "memory")) {
+          count = window.ContentValidator.validCount(game.id, ex);
+        } else {
+          count = usesSentences ? (ex.sentences || []).length : (ex.words || []).length;
+        }
         return el("button", { class: "topic-card", on: { click: () => launch(game, ex) } }, [
           el("div", { class: "topic-emoji", text: ex.emoji || (usesSentences ? "🗣️" : "📚") }),
           el("div", { class: "topic-name", text: ex.name }),
