@@ -5160,8 +5160,11 @@ document.addEventListener("DOMContentLoaded", App.init);
       // each tagged with the "kind" that selects its editor.
       function allGames() {
         var out = games.map(function (g) {
+          // A Solo word/sentence game also runs in Live Class Mode when it has a
+          // live adapter (Quiz-Blitz and Memory both do), so tag it accordingly.
           return { id: g.id, name: g.name, emoji: g.emoji, color: g.color,
-                   kind: g.contentType === "sentences" ? "sentences" : "words", live: false };
+                   kind: g.contentType === "sentences" ? "sentences" : "words",
+                   live: !!(window.LiveGames && window.LiveGames[g.id]) };
         });
         LIVE_GAMES.forEach(function (g) {
           out.push({ id: g.id, name: g.name, emoji: g.emoji, color: g.color, kind: liveKind(g.id), live: true });
