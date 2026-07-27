@@ -1158,6 +1158,7 @@ input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf
 .pin-key.empty { visibility: hidden; box-shadow: none; }
 .pin-cancel { margin-top: 14px; background: none; border: 0; color: var(--ink-soft); font-weight: 700; padding: 8px; }
 .pin-cancel:hover { color: var(--ink); }
+.pin-notice-actions { display: flex; gap: 10px; justify-content: center; margin-top: 16px; }
 
 /* ---------- confetti ---------- */
 .confetti-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 50; }

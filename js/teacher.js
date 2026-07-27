@@ -23,15 +23,31 @@ window.TeacherGate = (function () {
   function unlock() { try { sessionStorage.setItem(UNLOCK_KEY, "1"); } catch (e) {} }
   function lock() { try { sessionStorage.removeItem(UNLOCK_KEY); } catch (e) {} }
 
+  function cachedHash() { try { return localStorage.getItem(PIN_CACHE) || null; } catch (e) { return null; } }
+
+  // Resolve the PIN to a TRI-STATE, because "I couldn't read the PIN" and
+  // "there is no PIN" must never be confused — conflating them let a student on
+  // a flaky connection be offered "Create a teacher PIN" and overwrite the real
+  // one. Resolves to:
+  //   { state: "set", hash }  — a PIN exists (from the server, or the local
+  //                             cache when the server is unreachable)
+  //   { state: "unset" }      — the server CONFIRMED there is no PIN doc
+  //   { state: "unknown" }    — the read failed and there is no cache; callers
+  //                             must NOT assume "unset" here
   function loadStoredHash() {
     if (gated()) {
       return window.LiveDB.getConfig().then(function (c) {
         var h = c && c.pin ? c.pin : null;
-        try { if (h) localStorage.setItem(PIN_CACHE, h); } catch (e) {}
-        return h;
-      }).catch(function () { try { return localStorage.getItem(PIN_CACHE) || null; } catch (e) { return null; } });
+        if (h) { try { localStorage.setItem(PIN_CACHE, h); } catch (e) {} return { state: "set", hash: h }; }
+        try { localStorage.removeItem(PIN_CACHE); } catch (e) {} // server is authoritative: no PIN
+        return { state: "unset" };
+      }).catch(function () {
+        var h = cachedHash();
+        return h ? { state: "set", hash: h } : { state: "unknown" };
+      });
     }
-    try { return Promise.resolve(localStorage.getItem(PIN_CACHE) || null); } catch (e) { return Promise.resolve(null); }
+    var c = cachedHash();
+    return Promise.resolve(c ? { state: "set", hash: c } : { state: "unset" });
   }
   function saveHash(h) {
     try { localStorage.setItem(PIN_CACHE, h); } catch (e) {}
@@ -80,6 +96,22 @@ window.TeacherGate = (function () {
     return api;
   }
 
+  // A small non-keypad modal for errors that must NOT offer a way past the gate
+  // (e.g. "couldn't read the PIN") — only Try again / Cancel.
+  function noticeModal(title, sub, onRetry) {
+    var overlay = document.createElement("div"); overlay.className = "pin-overlay";
+    var card = document.createElement("div"); card.className = "pin-card";
+    var t = document.createElement("div"); t.className = "pin-title"; t.textContent = title; card.appendChild(t);
+    var s = document.createElement("div"); s.className = "pin-sub"; s.textContent = sub || ""; card.appendChild(s);
+    var row = document.createElement("div"); row.className = "pin-notice-actions";
+    function close() { overlay.remove(); }
+    if (onRetry) { var r = document.createElement("button"); r.className = "btn primary"; r.textContent = "Try again"; r.onclick = function () { close(); onRetry(); }; row.appendChild(r); }
+    var c = document.createElement("button"); c.className = "btn ghost"; c.textContent = "Cancel"; c.onclick = close; row.appendChild(c);
+    card.appendChild(row);
+    overlay.appendChild(card); document.body.appendChild(overlay);
+    return { close: close };
+  }
+
   function createFlow(onOk) {
     var first = null;
     modal({
@@ -87,7 +119,10 @@ window.TeacherGate = (function () {
       sub: "Set a 4-digit PIN. Students won't know it.",
       onPin: function (pin, a) {
         if (first === null) { first = pin; a.reset(); a.setTitle("Re-enter to confirm"); a.setSub(""); }
-        else if (pin === first) { saveHash(hashPin(pin)).then(function () { unlock(); a.close(); onOk(); }); }
+        else if (pin === first) {
+          saveHash(hashPin(pin)).then(function () { unlock(); a.close(); onOk(); })
+            .catch(function () { first = null; a.setTitle("Create a teacher PIN"); a.setSub("Set a 4-digit PIN. Students won't know it."); a.error("Couldn't save the PIN — check your connection"); });
+        }
         else { first = null; a.setTitle("Create a teacher PIN"); a.error("PINs didn't match — start again"); }
       }
     });
@@ -96,8 +131,14 @@ window.TeacherGate = (function () {
   function require(onOk) {
     if (!gated()) return onOk();       // offline: no gate
     if (isUnlocked()) return onOk();
-    loadStoredHash().then(function (stored) {
-      if (!stored) return createFlow(onOk);
+    loadStoredHash().then(function (r) {
+      if (r.state === "unknown") {
+        // Couldn't read the PIN. Do NOT offer to create one (that path let a
+        // student overwrite the teacher's PIN). Ask them to retry.
+        return noticeModal("Couldn't check the teacher PIN", "Check your internet connection and try again.", function () { require(onOk); });
+      }
+      if (r.state === "unset") return createFlow(onOk); // confirmed first-time setup
+      var stored = r.hash;
       modal({
         title: "Enter teacher PIN",
         sub: "Ask your teacher if you don't know it.",
@@ -114,11 +155,17 @@ window.TeacherGate = (function () {
   // so the teacher must re-enter their PIN each time. Cancelling just does nothing.
   function verify(onOk) {
     if (!gated()) return onOk();               // offline: no PIN system
-    loadStoredHash().then(function (stored) {
-      if (!stored) return onOk();              // no PIN configured — nothing to check
+    loadStoredHash().then(function (r) {
+      if (r.state === "unknown") {
+        // Fail SAFE: never run a destructive action (Reset / Restore) when we
+        // can't confirm the PIN.
+        return noticeModal("Couldn't check the teacher PIN", "This action needs your PIN, but the connection failed. Try again when you're back online.", function () { verify(onOk); });
+      }
+      if (r.state === "unset") return onOk();  // no PIN configured — nothing to check
+      var stored = r.hash;
       modal({
         title: "Enter teacher PIN",
-        sub: "Confirm it's you before resetting.",
+        sub: "Confirm it's you before continuing.",
         onPin: function (pin, a) {
           if (hashPin(pin) === stored) { a.close(); onOk(); }
           else a.error("Wrong PIN");
@@ -134,7 +181,10 @@ window.TeacherGate = (function () {
       sub: "Enter a new 4-digit PIN",
       onPin: function (pin, a) {
         if (first === null) { first = pin; a.reset(); a.setTitle("Confirm new PIN"); a.setSub(""); }
-        else if (pin === first) { saveHash(hashPin(pin)).then(function () { unlock(); a.close(); }); }
+        else if (pin === first) {
+          saveHash(hashPin(pin)).then(function () { unlock(); a.close(); })
+            .catch(function () { first = null; a.setTitle("New teacher PIN"); a.error("Couldn't save the PIN — check your connection"); });
+        }
         else { first = null; a.setTitle("New teacher PIN"); a.error("PINs didn't match"); }
       }
     });
