@@ -351,7 +351,7 @@ const App = (function () {
       el("button", { class: "mode-card live", on: { click: () => showLive() } }, [
         el("div", { class: "mode-emoji", text: "📡" }),
         el("div", { class: "mode-name", text: "Live Class Mode" }),
-        el("div", { class: "mode-desc", text: "Teacher hosts on the smartboard, students play on their phones — room code, live scoring, leaderboard." })
+        el("div", { class: "mode-desc", text: "Teacher hosts on the smartboard, students play on their phones — room code, live scoring, a podium." })
       ])
     );
     main.appendChild(modeGrid);

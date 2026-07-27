@@ -190,6 +190,17 @@
         .set({ heartbeat: serverTs() }, { merge: true })
         .catch(function (e) { if (LiveDB._isDenied(e)) LiveDB._joinLegacy = true; });
     },
+    // Delete EVERY claimed-slot doc for a room — used when a room ends, so no
+    // student names linger in the sessions/{code}/joined subcollection. (Rules
+    // allow deleting joined docs.)
+    clearJoined: function (code) {
+      if (LiveDB._joinLegacy) return Promise.resolve(); // legacy mode uses the session-doc map, wiped by the caller
+      return db.collection("sessions").doc(code).collection("joined").get().then(function (snap) {
+        var dels = [];
+        snap.forEach(function (d) { dels.push(d.ref.delete().catch(function () {})); });
+        return Promise.all(dels);
+      }).catch(function () {});
+    },
     // Explicitly give up a slot (tab close / leave) so the name frees instantly.
     leaveSession: function (code, studentId) {
       function legacyLeave() {
@@ -362,36 +373,11 @@
       );
     },
 
-    /* ---------------- cumulative (term) leaderboards ---------------- */
-    getLeaderboard: function (rosterId) {
-      return db.collection("leaderboards").doc(rosterId).get().then(function (d) {
-        return d.exists ? d.data() : { scores: {} };
-      });
-    },
-    // Term leaderboards are ONLY EVER ADDED TO — never overwritten. Each call
-    // atomically increments the given students' totals by the points they just
-    // earned (a per-round delta), so an interrupted class keeps everything
-    // earned so far and two rooms can't clobber the running totals.
-    addToLeaderboard: function (rosterId, deltas) {
-      var FV = firebase.firestore.FieldValue;
-      var inc = {};
-      Object.keys(deltas || {}).forEach(function (k) {
-        var v = Number(deltas[k]) || 0;
-        if (v) inc[k] = FV.increment(v);
-      });
-      if (!Object.keys(inc).length) return Promise.resolve();
-      return db.collection("leaderboards").doc(rosterId).set(
-        { scores: inc, updatedAt: serverTs() },
-        { merge: true }
-      );
-    },
-    // Kept for backup/compat; the game flow uses addToLeaderboard (additive).
-    saveLeaderboard: function (rosterId, scores) {
-      return db.collection("leaderboards").doc(rosterId).set(
-        { scores: scores, updatedAt: serverTs() },
-        { merge: true }
-      );
-    }
+    // NOTE: there is deliberately NO cross-session / term leaderboard. Student
+    // performance is never persisted across rooms — a room shows its own live
+    // scores and podium, and those are wiped when the room ends (see
+    // clearJoined + the closeRoom wipe in live.js). The old getLeaderboard /
+    // saveLeaderboard / addToLeaderboard methods were removed with the feature.
   };
 
   window.LiveDB = LiveDB;

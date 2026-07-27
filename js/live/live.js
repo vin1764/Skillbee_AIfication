@@ -382,12 +382,19 @@ window.LiveMode = (function () {
           ]));
           n++;
         }
-        step.appendChild(el("div", { class: "live-label", text: n + " · Scoreboard" }));
-        var modeRow = el("div", { class: "setup-modes" }, [
-          modeBtn("fresh", "Start fresh", opts.freshSub || "Leaderboard resets to zero"),
-          modeBtn("continue", opts.continueLabel || "Continue", opts.continueSub || "Add to this class's running scores")
-        ]);
-        step.appendChild(modeRow);
+        // Scoreboard choice is only meaningful for "Play another game" in an
+        // existing room (carry this room's running total, or reset it for the
+        // next game). The FIRST game of a room is always a clean start, and
+        // there is no cross-session leaderboard, so the first-game picker hides
+        // this step entirely. opts.showScoreboard is set only by playAnother.
+        if (opts.showScoreboard) {
+          step.appendChild(el("div", { class: "live-label", text: n + " · Scoreboard" }));
+          var modeRow = el("div", { class: "setup-modes" }, [
+            modeBtn("fresh", "Start fresh", opts.freshSub || "Everyone starts this game at zero"),
+            modeBtn("continue", opts.continueLabel || "Keep scores", opts.continueSub || "Add to this room's running totals")
+          ]);
+          step.appendChild(modeRow);
+        }
         step.appendChild(el("button", { class: "btn primary big", text: opts.startLabel || "Start room ▶", on: { click: doStart } }));
       }
 
@@ -516,34 +523,18 @@ window.LiveMode = (function () {
       startLabel: "Start room ▶",
       back: hostRosters,
       onStart: function (sel) {
-        // "Continue" here means: this room CONTRIBUTES to the class's term-long
-        // leaderboard. Its display is seeded from the stored term totals so the
-        // podium shows cumulative standings; each round then ADDS its points to
-        // the term board (incrementally — see commitTerm). "Start fresh" rooms
-        // never touch the term board.
-        var term = (sel.persistMode === "continue");
-        var seed = { scores: {} };
-        var afterSeed = function () {
-          window.LiveDB.createSession({
-            rosterId: roster.id, rosterName: roster.name, students: roster.students,
-            gameId: sel.gameId, gameName: sel.adapter.meta.name, topicName: sel.topic.name,
-            status: "lobby", questionIndex: -1, totalQuestions: sel.rounds.length,
-            round: null, reveal: null, scores: seed.scores, persistMode: sel.persistMode,
-            termLeaderboard: term,
-            answerMode: sel.answerMode, gameSeq: 0,
-            timerMode: sel.timerMode, perQuestionSecs: sel.perQuestionSecs, speedSecs: sel.speedSecs
-          }).then(function (code) {
-            hostRun(code, sel.adapter, sel.rounds, roster);
-          }).catch(function (e) { alert("Could not start: " + e.message); });
-        };
-        if (term) {
-          // Seed the display from the term board. A FAILED read must surface a
-          // real error, not leave "Start room" silently dead (the teacher can
-          // fix their connection and tap Start again).
-          window.LiveDB.getLeaderboard(roster.id)
-            .then(function (lb) { seed.scores = (lb && lb.scores) || {}; afterSeed(); })
-            .catch(function () { alert("Couldn't load this class's saved scores — check your internet connection and tap Start again."); });
-        } else afterSeed();
+        // Every room starts fresh — no cross-session leaderboard. Nothing about a
+        // student's performance is carried over from any previous session.
+        window.LiveDB.createSession({
+          rosterId: roster.id, rosterName: roster.name, students: roster.students,
+          gameId: sel.gameId, gameName: sel.adapter.meta.name, topicName: sel.topic.name,
+          status: "lobby", questionIndex: -1, totalQuestions: sel.rounds.length,
+          round: null, reveal: null, scores: {}, persistMode: "fresh",
+          answerMode: sel.answerMode, gameSeq: 0,
+          timerMode: sel.timerMode, perQuestionSecs: sel.perQuestionSecs, speedSecs: sel.speedSecs
+        }).then(function (code) {
+          hostRun(code, sel.adapter, sel.rounds, roster);
+        }).catch(function (e) { alert("Could not start: " + e.message); });
       }
     });
   }
@@ -600,23 +591,6 @@ window.LiveMode = (function () {
       } catch (e) {}
     }
 
-    // Term-leaderboard commits are ADDITIVE and INCREMENTAL: as each round is
-    // scored we add that round's per-student points to the class's long-term
-    // board (via FieldValue.increment). This (a) never overwrites the term
-    // totals — the M2 corruption where "Keep scores" wrote a room total over the
-    // term board — and (b) means an interrupted class keeps everything earned so
-    // far (no more "lost if the room closes before the podium"). `key`
-    // (gameSeq:index) guards against committing the same round twice.
-    var termCommitted = {};
-    function commitTerm(deltas, key) {
-      if (!sess || !sess.termLeaderboard || !sess.rosterId) return;
-      if (termCommitted[key]) return;
-      termCommitted[key] = true;
-      var any = false, d = {};
-      Object.keys(deltas || {}).forEach(function (id) { var v = Number(deltas[id]) || 0; if (v) { d[id] = v; any = true; } });
-      if (!any) return;
-      try { if (window.LiveDB.addToLeaderboard) window.LiveDB.addToLeaderboard(sess.rosterId, d).catch(function () {}); } catch (e) {}
-    }
 
     // The Passage game sequences DIFFERENT formats — each round carries `fmt` (the
     // format's LiveGames key). Every per-round render/score call resolves the
@@ -1157,7 +1131,6 @@ window.LiveMode = (function () {
       if (hostSpeedCountdown) { hostSpeedCountdown.stop(); }
       if (speedAnswersUnsub) { speedAnswersUnsub(); speedAnswersUnsub = null; }
       var scores = Object.assign({}, sess.scores || {});
-      var deltas = {};   // per-student points earned this whole Speed set → term board
       var counted = {};
       (latestAnswers || []).forEach(function (a) {
         if (a.studentId == null) return;
@@ -1169,11 +1142,9 @@ window.LiveMode = (function () {
         var ra = adapterForRound(r);
         var sc; try { sc = ra.score(r, a, 0, TL) || {}; } catch (e) { sc = { points: 0 }; }
         scores[a.studentId] = (scores[a.studentId] || 0) + (sc.points || 0);
-        deltas[a.studentId] = (deltas[a.studentId] || 0) + (sc.points || 0);
       });
       sess.scores = scores;       // so podium()/renderPodium read the final tally
       safeUpdate({ scores: scores });
-      commitTerm(deltas, (sess.gameSeq || 0) + ":speed");
       podium();
     }
 
@@ -1215,7 +1186,6 @@ window.LiveMode = (function () {
         var byStudent = {};
         arr.forEach(function (a) { byStudent[a.studentId] = a; });
         var scores = Object.assign({}, sess.scores || {});
-        var deltas = {};   // per-student points earned THIS round → term board
         var results = [];
         (sess.students || []).forEach(function (stu) {
           var a = byStudent[stu.id];
@@ -1225,7 +1195,6 @@ window.LiveMode = (function () {
           // A bad answer payload must never brick the reveal — score defensively.
           var sc; try { sc = ra.score(r, a, elapsed, TL) || {}; } catch (e) { sc = { correct: false, points: 0 }; }
           scores[stu.id] = (scores[stu.id] || 0) + (sc.points || 0);
-          deltas[stu.id] = (sc.points || 0);
           var row = { studentId: stu.id, name: stu.name, correct: !!sc.correct, points: sc.points || 0, answered: true };
           // Only the partial-credit scorers (Lücken-Text, type mode) return
           // matched/total. Writing them as `undefined` for every other game
@@ -1248,7 +1217,6 @@ window.LiveMode = (function () {
         // be rendered at reveal, not just its text value.
         if (ra.mcq) { revealDoc.correctOption = (r.options || []).filter(function (o) { return o.correct; })[0] || null; }
         safeUpdate({ status: "reveal", scores: scores, reveal: revealDoc });
-        commitTerm(deltas, (sess.gameSeq || 0) + ":" + i);
         var german; try { german = ra.speakOnReveal(r); } catch (e) { german = null; }
         // Pronunciation is a nice-to-have — it must never stop the reveal screen.
         if (german) { try { kit.speak(german); } catch (e) {} }
@@ -1272,7 +1240,6 @@ window.LiveMode = (function () {
         if (!cur || a.done || (a.matched || 0) > (cur.matched || 0)) best[a.studentId] = a;
       });
       var scores = Object.assign({}, sess.scores || {});
-      var deltas = {};   // per-student points earned THIS round → term board
       var results = [];
       (sess.students || []).forEach(function (stu) {
         var a = best[stu.id];
@@ -1299,7 +1266,6 @@ window.LiveMode = (function () {
         var pts = accPts + compPts + speedPts;
         if (pts < 0) pts = 0;
         scores[stu.id] = (scores[stu.id] || 0) + pts;
-        deltas[stu.id] = pts;
         results.push({ studentId: stu.id, name: stu.name, correct: done, points: pts, answered: matched > 0, matched: matched, total: total, firstTry: firstTry, wrong: wrong, secs: secs });
       });
       results.sort(function (x, y) { return y.points - x.points; });
@@ -1309,7 +1275,6 @@ window.LiveMode = (function () {
         status: "reveal", scores: scores,
         reveal: { index: i, correct: mCorrect, explanation: null, results: results, match: true }
       });
-      commitTerm(deltas, (sess.gameSeq || 0) + ":" + i);
       safeReveal(i, r, results, scores);
     }
 
@@ -1406,10 +1371,9 @@ window.LiveMode = (function () {
 
     function podium() {
       hostPhase = "podium";
-      // Transition into the final screen (once), then render it. The term
-      // leaderboard is NOT written here any more — it's committed additively,
-      // round by round, in commitTerm() (so an interrupted class keeps its
-      // points and "Keep scores" can never overwrite the term totals). M2.
+      // Transition into the final screen (once), then render it. Nothing is
+      // persisted anywhere — the podium shows THIS room's results only; there is
+      // no cross-session leaderboard.
       safeUpdate({ status: "podium", speedActive: false });
       try { kit.confetti(); kit.beep("win"); } catch (e) {}
       renderPodium();
@@ -1470,17 +1434,16 @@ window.LiveMode = (function () {
         title: "Play another game",
         sub: "Same room · code " + code + " · same players. Pick the next game.",
         startLabel: "Start game ▶",
+        showScoreboard: true, // the ONLY place the scoreboard choice appears
         continueLabel: "Keep scores",
         continueSub: "Add to this room's running totals",
         freshSub: "Everyone starts this game at zero",
         back: renderPodium,
         onStart: function (sel) {
-          // "Keep scores" here means carry THIS ROOM's running totals into the
-          // next game — an in-room display choice ONLY. It deliberately does NOT
-          // touch `termLeaderboard`: whether this room feeds the class's term
-          // board was decided once, at room creation, and is preserved across
-          // every game (the updateSession merge leaves it untouched). This is
-          // the M2 fix — "Keep scores" can no longer overwrite the term board.
+          // "Keep scores" carries THIS ROOM's running totals into the next game —
+          // an in-room, this-session display choice only. It is never saved
+          // anywhere and vanishes when the room ends. There is no cross-session
+          // leaderboard.
           var seedScores = sel.persistMode === "continue" ? carried : {};
           window.LiveDB.updateSession(code, {
             gameId: sel.gameId, gameName: sel.adapter.meta.name, topicName: sel.topic.name,
@@ -1497,7 +1460,14 @@ window.LiveMode = (function () {
     }
 
     function closeRoom() {
-      safeUpdate({ status: "ended" });
+      // Ending a room WIPES the student names and scores it held, so no
+      // performance data lingers in the database afterward. We clear every
+      // field of the session doc that carries a name or a score, and delete the
+      // per-student presence docs. (Answer docs are write-once by the security
+      // rules and can't be deleted client-side; they hold answer choices keyed
+      // by a name-slug id, never display names.)
+      safeUpdate({ status: "ended", scores: {}, students: [], joined: {}, round: null, reveal: null, speedRounds: null });
+      try { if (window.LiveDB.clearJoined) window.LiveDB.clearJoined(code); } catch (e) {}
       stop();
       landing();
     }

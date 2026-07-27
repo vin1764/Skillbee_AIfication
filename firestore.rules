@@ -107,10 +107,9 @@ service cloud.firestore {
         request.resource.data.pin is string && request.resource.data.pin.size() <= 64;
     }
 
-    // ---- Cumulative leaderboards (only touched in "continue" mode) ----
-    match /leaderboards/{rosterId} {
-      allow read: if true;
-      allow write: if request.resource.data.scores is map;
-    }
+    // (The cross-session "term leaderboard" feature was removed — student
+    // performance is never persisted across rooms — so the /leaderboards
+    // collection is no longer used or allowed. Re-publish these rules to drop
+    // access to it entirely; leaving it has no effect since nothing reads it.)
   }
 }
