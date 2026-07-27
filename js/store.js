@@ -60,6 +60,34 @@
   function wordsExercise(name, words) {
     return { id: exId(), name: name || "Exercise 1", emoji: "📚", english: "", words: Array.isArray(words) ? clone(words) : [] };
   }
+  // Quiz-Blitz is authored multiple-choice: a words-shaped exercise carrying an
+  // `mcq` list (never auto-generated from vocabulary — see js/games/quiz.js).
+  function quizExercise(name, mcq) {
+    return { id: exId(), name: name || "Exercise 1", emoji: "🎯", english: "", words: [], mcq: Array.isArray(mcq) ? clone(mcq) : [] };
+  }
+  // A ready-made Quiz-Blitz set so the game is playable out of the box — most
+  // importantly in the offline single-file bundle, which has no cloud content to
+  // fall back on. Each question ships four options with exactly one correct.
+  function defaultQuizMcq() {
+    var Q = function (q, correct, a, b, c) {
+      return { question: { type: "text", value: q }, options: [
+        { type: "text", value: correct, correct: true },
+        { type: "text", value: a, correct: false },
+        { type: "text", value: b, correct: false },
+        { type: "text", value: c, correct: false }
+      ] };
+    };
+    return [
+      Q("What is 'der Hund'?", "the dog", "the cat", "the horse", "the bird"),
+      Q("What is 'die Katze'?", "the cat", "the dog", "the mouse", "the fish"),
+      Q("What colour is 'rot'?", "red", "blue", "green", "yellow"),
+      Q("What colour is 'blau'?", "blue", "red", "black", "white"),
+      Q("What is 'das Haus'?", "the house", "the tree", "the car", "the school"),
+      Q("What is 'die Sonne'?", "the sun", "the moon", "the rain", "the cloud"),
+      Q("How do you say 'three' in German?", "drei", "zwei", "vier", "fünf"),
+      Q("What is 'das Wasser'?", "water", "bread", "milk", "the apple")
+    ];
+  }
   function sentencesExercise(name, sentences) {
     return { id: exId(), name: name || "Exercise 1", emoji: "🗣️", english: "", sentences: Array.isArray(sentences) ? clone(sentences) : [] };
   }
@@ -422,7 +450,7 @@
       return chosen.map(function (t) { return topicToExercise(t, "words"); });
     };
     return {
-      quiz: [wordsExercise("Exercise 1", [])], // Quiz-Blitz: authored MCQ, starts empty
+      quiz: [quizExercise("Exercise 1", defaultQuizMcq())], // Quiz-Blitz: ready-made authored MCQ
       memory: pickWords(["tiere", "essen", "farben", "familie"]),
       hangman: [hangmanExercise("Exercise 1", defaultHangmanItems())],
       scramble: [scrambleExercise("Exercise 1", defaultScrambleQuestions())],
