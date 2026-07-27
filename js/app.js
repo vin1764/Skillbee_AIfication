@@ -585,7 +585,48 @@ const App = (function () {
     // Start cloud content sync now that Firebase (if present) has loaded.
     if (window.ContentStore && window.ContentStore.initCloud) window.ContentStore.initCloud();
     window.AppNav.init(); // capture the browser Back button (keeps students in the app)
+    watchForUpdates();
     showModeSelect();
+  }
+
+  /* ---- Update watcher -------------------------------------------------
+     Open tabs (the smartboard, phones parked in a room) never pick up a
+     deploy on their own — they run stale code until someone reloads, which
+     has repeatedly looked like "the fix didn't work". Compare this tab's
+     own asset stamp (?v=…) with the one the server currently puts in
+     index.html, and offer a one-tap refresh when they differ. Passive: the
+     teacher taps between games; students any time (rejoin recovers them). */
+  function watchForUpdates() {
+    let current = null;
+    try {
+      const s = document.querySelector('script[src*="js/app.js"]');
+      const m = s && /[?&]v=([a-f0-9]+)/.exec(s.getAttribute("src"));
+      current = m ? m[1] : null;
+    } catch (e) {}
+    if (!current) return; // offline bundle (no stamps) — nothing to compare
+    let shown = false;
+    async function check() {
+      if (shown) return;
+      try {
+        const res = await fetch(window.location.pathname, { cache: "no-store" });
+        if (!res.ok) return;
+        const m = /js\/app\.js\?v=([a-f0-9]+)/.exec(await res.text());
+        if (m && m[1] !== current) {
+          shown = true;
+          document.body.appendChild(
+            el("button", {
+              class: "update-pill",
+              html: "🔄 Update ready — tap to refresh",
+              attrs: { title: "A newer version of the games is live. Finish the current round, then tap to reload." },
+              on: { click: () => window.location.reload() }
+            })
+          );
+        }
+      } catch (e) { /* offline / transient — try again next tick */ }
+    }
+    const every = window.__UPDATE_CHECK_MS__ || 4 * 60 * 1000; // test hook
+    setInterval(check, every);
+    setTimeout(check, Math.min(every, 15000)); // first look shortly after load
   }
 
   return { register, init, kit, state, addScore, showHome, showAdmin, showModeSelect, showLive, setAdminVisible };

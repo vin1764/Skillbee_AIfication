@@ -1248,6 +1248,14 @@ input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf
 .name-btn.claiming { opacity: 0.7; }
 /* One-tap rejoin button on the Live landing screen (phone reloaded / next game). */
 .rejoin-live { margin: 2px auto 8px; display: block; }
+/* "Update ready" pill: a passive, fixed refresh offer when the served version
+   is newer than the one this tab is running. */
+.update-pill {
+  position: fixed; right: 14px; bottom: 14px; z-index: 9999;
+  background: var(--skb); color: #fff; font-weight: 800; font-size: 0.95rem;
+  border: 0; border-radius: 999px; padding: 12px 18px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+.update-pill:active { transform: translateY(2px); }
 /* Speed Challenge phone prompts — the question rides on the phone itself. */
 .speed-prompt, .speed-prompt-text { margin: 0 auto 12px; max-width: 560px; }
 .speed-prompt-text { font-size: clamp(1.2rem, 4.5vw, 1.7rem); font-weight: 800; text-align: center; overflow-wrap: anywhere; }
