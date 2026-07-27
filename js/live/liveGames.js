@@ -140,6 +140,16 @@
           return mcqOptionButton(el, opt, i, function () { api.submit({ choice: i }); });
         }));
       },
+      // Speed Challenge is self-paced, so the QUESTION rides on the phone (the
+      // board can't show everyone's current question). Rendered above the options.
+      phonePrompt: function (el, round) {
+        var q = round.question;
+        if (!q || !q.value) return null;
+        if (q.type === "audio") return tfBlockNode(el, q, "prompt", "Audio", round.speed);
+        if (q.type === "image") return el("div", { class: "speed-prompt" }, [el("img", { class: "mcq-q-img", attrs: { src: q.value, alt: "" } })]);
+        if (q.type === "icon") return el("div", { class: "speed-prompt" }, [el("span", { class: "mcq-q-icon", text: q.value })]);
+        return el("div", { class: "speed-prompt-text", text: q.value });
+      },
       score: function (round, payload, elapsedMs, timeLimit) {
         var opt = (round.options || [])[payload && payload.choice];
         if (!opt || !opt.correct) return { correct: false, points: 0 };
@@ -603,7 +613,13 @@
       return { correct: true, points: Math.round(500 + 500 * frac) };
     },
     correctLabel: function (round) { return round.correct; },
-    speakOnReveal: function (round) { return round.correct; }
+    speakOnReveal: function (round) { return round.correct; },
+    // Speed Challenge: the audio must play on the PHONE (self-paced — the board
+    // can't play everyone's current word). promptAudio ships only in speed sets.
+    phonePrompt: function (el, round) {
+      if (!round.promptAudio) return null;
+      return tfBlockNode(el, { type: "audio", value: round.promptAudio }, "prompt", "Audio", round.speed);
+    }
   };
 
   /* ---- Match the Following (was Hör-Paare): tap one tile from each side ----
@@ -735,12 +751,12 @@
   // screen; an audio block becomes a labelled, replayable play button. Because
   // VoiceBox.stop()s any playing clip before starting a new one, two audio
   // blocks can never sound at once — the teacher plays context, then statement.
-  function tfBlockNode(el, block, cls, label) {
+  function tfBlockNode(el, block, cls, label, rate) {
     if (!block) return null;
     if (block.type === "audio") {
       var btn = el("button", {
         class: "btn primary big tf-audio-btn",
-        on: { click: function () { try { window.MatchTiles.play(kit(), block, 1); } catch (e) {} } }
+        on: { click: function () { try { window.MatchTiles.play(kit(), block, rate || 1); } catch (e) {} } }
       }, [el("span", { class: "tf-audio-ico", text: "🔊" }), el("span", { text: "Play the " + label.toLowerCase() })]);
       return el("div", { class: "tf-block tf-" + cls }, [el("div", { class: "tf-block-lbl", text: label }), btn]);
     }
@@ -807,7 +823,15 @@
     // Nothing plays at reveal: the statement was already heard/read during the
     // question, and replaying it over the Wahr/Falsch verdict was noise (both
     // the Live host and the Solo wrapper route their reveal audio through here).
-    speakOnReveal: function () { return null; }
+    speakOnReveal: function () { return null; },
+    // Speed Challenge: context + statement ride on the phone (self-paced).
+    // The blocks never contain the true/false answer, so nothing can leak.
+    phonePrompt: function (el, round) {
+      var kids = [];
+      var c = tfBlockNode(el, round.context, "context", "Context", round.speed); if (c) kids.push(c);
+      var st = tfBlockNode(el, round.statement, "statement", "Statement", round.speed); if (st) kids.push(st);
+      return kids.length ? el("div", { class: "speed-prompt" }, kids) : null;
+    }
   };
 
   /* ---- Passage (Lese & Hör): an ORCHESTRATOR, not a new question engine ------
@@ -998,7 +1022,14 @@
       return { correct: true, points: Math.round(500 + 500 * frac) };
     },
     correctLabel: function (round) { return round.answer; },
-    speakOnReveal: function (round) { return round.answer; }
+    speakOnReveal: function (round) { return round.answer; },
+    // Speed Challenge: the hint block rides on the phone. Listen-unscramble
+    // needs no extra prompt node — playerContent already shows the play button
+    // whenever targetAudio is present (it ships only in speed sets for Live).
+    phonePrompt: function (el, round) {
+      if (round.mode === "listen-unscramble") return null;
+      return tfBlockNode(el, round.context, "context", round.mode === "question-answer" ? "Question" : "Meaning", round.speed);
+    }
   };
 
   /* ---- Hangman (Galgenmännchen) — spell the word a REFERENCE block describes ----
@@ -1104,7 +1135,11 @@
       return { correct: true, points: Math.round(400 + 300 * heartsFrac + 300 * frac) };
     },
     correctLabel: function (round) { return round.word; },
-    speakOnReveal: function (round) { return round.word; }
+    speakOnReveal: function (round) { return round.word; },
+    // Speed Challenge: the clue block rides on the phone (self-paced).
+    phonePrompt: function (el, round) {
+      return tfBlockNode(el, round.reference, "reference", "Clue", round.speed);
+    }
   };
 
   window.LiveGames = {

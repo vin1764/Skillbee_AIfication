@@ -1248,6 +1248,11 @@ input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf
 .name-btn.claiming { opacity: 0.7; }
 /* One-tap rejoin button on the Live landing screen (phone reloaded / next game). */
 .rejoin-live { margin: 2px auto 8px; display: block; }
+/* Speed Challenge phone prompts — the question rides on the phone itself. */
+.speed-prompt, .speed-prompt-text { margin: 0 auto 12px; max-width: 560px; }
+.speed-prompt-text { font-size: clamp(1.2rem, 4.5vw, 1.7rem); font-weight: 800; text-align: center; overflow-wrap: anywhere; }
+.speed-prompt .mcq-q-img { max-height: 32vh; border-radius: 12px; display: block; margin: 0 auto; }
+.speed-prompt .mcq-q-icon { font-size: 3.4rem; display: block; text-align: center; }
 /* Small, quiet "disconnected" cue on the host board / leaderboard. */
 .board-row.offline { opacity: 0.55; }
 .board-row.offline .board-name { font-style: italic; }

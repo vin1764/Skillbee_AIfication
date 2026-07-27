@@ -290,7 +290,13 @@ window.LiveMode = (function () {
         var meta = window.LiveGames[id].meta;
         gg.appendChild(el("button", {
           class: "setup-card" + (gameId === id ? " sel" : ""),
-          on: { click: function () { gameId = id; topic = null; renderStep(); } }
+          on: { click: function () {
+            gameId = id; topic = null;
+            // Speed Challenge isn't offered for the match game — don't carry a
+            // now-invisible selection over from a previously picked game.
+            if (window.LiveGames[id].match && timerMode === "speed") timerMode = "manual";
+            renderStep();
+          } }
         }, [el("div", { class: "setup-emoji", text: meta.emoji }), el("div", { text: meta.name })]));
       });
       step.appendChild(gg);
@@ -319,26 +325,23 @@ window.LiveMode = (function () {
       if (gameId && topic) {
         var gAdapter3 = window.LiveGames[gameId];
         var n = 3;
-        // Timer Mode — shown for every game EXCEPT Match the Following, which is
-        // inherently self-paced (each phone works the whole board at its own pace)
-        // and always runs its own flow.
-        var supportsTimer = !gAdapter3.match;
-        if (supportsTimer) {
-          step.appendChild(el("div", { class: "live-label", text: n + " · Timer mode" }));
-          step.appendChild(el("div", { class: "setup-modes" }, [
-            timerPill("manual", "Manual reveal", "Teacher reveals each answer"),
-            timerPill("per_question", "Per-question timer", "A countdown on every question"),
-            timerPill("speed", "Speed Challenge", "One clock — students race the whole set")
-          ]));
-          if (timerMode === "per_question") {
-            step.appendChild(secondsSlider("Seconds per question", perQuestionSecs, PQ_MIN, PQ_MAX, 1, secsLabel, function (v) { perQuestionSecs = v; }));
-          } else if (timerMode === "speed") {
-            step.appendChild(secondsSlider("Total time for the whole set", speedSecs, SPEED_MIN, SPEED_MAX, 5, minsLabel, function (v) { speedSecs = v; }));
-          }
-          n++;
-        } else {
-          timerMode = "manual";
+        // Timer Mode. Match the Following is self-paced per ROUND (each phone
+        // races the whole board), so its countdown applies to the round — and
+        // Speed Challenge is hidden there: its up-front question set can't
+        // drive the stateful match board.
+        var isMatchGame = !!gAdapter3.match;
+        step.appendChild(el("div", { class: "live-label", text: n + " · Timer mode" }));
+        step.appendChild(el("div", { class: "setup-modes" }, [
+          timerPill("manual", "Manual reveal", isMatchGame ? "Teacher ends each round" : "Teacher reveals each answer"),
+          timerPill("per_question", isMatchGame ? "Per-round timer" : "Per-question timer", isMatchGame ? "A countdown on every round" : "A countdown on every question"),
+          isMatchGame ? null : timerPill("speed", "Speed Challenge", "One clock — students race the whole set")
+        ]));
+        if (timerMode === "per_question") {
+          step.appendChild(secondsSlider(isMatchGame ? "Seconds per round" : "Seconds per question", perQuestionSecs, PQ_MIN, PQ_MAX, 1, secsLabel, function (v) { perQuestionSecs = v; }));
+        } else if (timerMode === "speed" && !isMatchGame) {
+          step.appendChild(secondsSlider("Total time for the whole set", speedSecs, SPEED_MIN, SPEED_MAX, 5, minsLabel, function (v) { speedSecs = v; }));
         }
+        n++;
         if (gAdapter3.supportsTyping) {
           var tl = gAdapter3.typeLabels || { options: ["Tap the article", "Multiple choice — faster"], type: ["Type the article", "Free recall — harder"] };
           step.appendChild(el("div", { class: "live-label", text: n + " · How students answer" }));
@@ -494,7 +497,9 @@ window.LiveMode = (function () {
       var rounds = adapter.buildRounds(topic);
       if (!rounds.length) { alert("This topic has no usable content."); return; }
       if (adapter.audioSpeed) rounds.forEach(function (r) { r.speed = speed; });
-      var tm = adapter.match ? "manual" : timerMode; // match runs its own self-paced flow
+      // Match supports Manual and the per-round countdown; only Speed (whose
+      // up-front question set can't drive the match board) is clamped away.
+      var tm = (adapter.match && timerMode === "speed") ? "manual" : timerMode;
       var am = (tm === "speed" && adapter.supportsTyping) ? "options" : answerMode;
       opts.onStart({
         gameId: gameId, topic: topic, answerMode: am, persistMode: persistMode,
@@ -749,8 +754,8 @@ window.LiveMode = (function () {
     // shared question doc (Manual / Per-Question) and the up-front Speed Challenge
     // set. `startedAt` / `deadlineSecs` are stamped by the caller.
     // NOTE: r.passage is deliberately NEVER included — the passage is host-only.
-    function playerSafeRound(r, ra, idx, answerMode) {
-      return {
+    function playerSafeRound(r, ra, idx, answerMode, forSpeed) {
+      var doc = {
         index: idx, type: r.type, fmt: r.fmt || null, de: r.de || null, emoji: r.emoji || null,
         // MCQ: send the typed question + options WITHOUT the `correct` flag.
         question: (ra.mcq && r.question) ? r.question : null,
@@ -776,6 +781,20 @@ window.LiveMode = (function () {
         // Type mode needs the answer on the phone (to diff on submit) — tap hides it.
         correct: (ra.typeResult && answerMode === "type") ? (r.correct || r.word || null) : null
       };
+      // Speed Challenge is fully SELF-PACED: the board can't show "the current
+      // question" (everyone's on a different one), so each round's PROMPT must
+      // ride on the phone — rendered by the adapter's phonePrompt hook. These
+      // fields ship ONLY in speed sets; shared-pacing modes keep prompts on the
+      // board. None of them contains a scoreable answer, with one deliberate
+      // trade-off: Hör gut zu!'s prompt audio (and listen-unscramble's) IS the
+      // answer text, the same exposure type mode / Hangman's word already accept.
+      if (forSpeed) {
+        if (ra.truefalse) { doc.context = r.context || null; doc.statement = r.statement || null; }
+        if (ra.hangman) doc.reference = r.reference || null;
+        if (ra.scramble) { doc.context = r.context || null; doc.targetAudio = r.targetAudio || null; }
+        if (ra.typeResult) doc.promptAudio = r.word || null; // Hör gut zu! (the only typeResult adapter)
+      }
+      return doc;
     }
 
     function nextQuestion() {
@@ -953,6 +972,14 @@ window.LiveMode = (function () {
         return;
       }
       hostRenderedQ = i;
+      // Per-round timer: a countdown on the board; at zero the round auto-scores
+      // (revealMatch gives partial credit for pairs matched so far).
+      if (hostCountdown) { hostCountdown.stop(); hostCountdown = null; }
+      var timerNode = null;
+      if (timerMode() === "per_question") {
+        hostCountdown = makeCountdown(perQSecs(), function () { if (hostPhase === "question") reveal(i, r); });
+        timerNode = hostCountdown.node;
+      }
       var progContainer = el("div", { class: "match-progress" });
       fill(progContainer);
       show(screen("host", [
@@ -960,6 +987,7 @@ window.LiveMode = (function () {
           el("div", { class: "host-q-num", text: "🔗 Match the Following" + (rounds.length > 1 ? "  ·  Round " + (i + 1) + " / " + rounds.length : "") }),
           el("div", { class: "host-answered", text: d.doneCount + " of " + d.denom + " finished" })
         ]),
+        timerNode,
         el("div", { class: "match-host-tag", text: "⚡ Race to match all " + d.total + " pairs — fastest with the most first-try matches wins!" }),
         matchBoardDisplay(r),
         el("div", { class: "match-progress-label", text: "Live progress" }),
@@ -968,6 +996,7 @@ window.LiveMode = (function () {
           el("button", { class: "btn primary big", text: "Reveal & score ▶", on: { click: function () { reveal(i, r); } } })
         ])
       ]));
+      if (hostCountdown) { hostCountdown.start(); if (sess && sess.qPaused) hostCountdown.pause(); }
     }
 
     /* ============================================================
@@ -982,11 +1011,13 @@ window.LiveMode = (function () {
       speedFinished = false;
       var am = sess.answerMode || "options";
       // Ship the WHOLE set to the phones up front, answers stripped (playerSafeRound
-      // masks them), so each phone can walk it locally without peeking.
+      // masks them), so each phone can walk it locally without peeking. forSpeed
+      // adds each round's PROMPT (question/statement/clue/audio) — self-paced
+      // phones render the question themselves; the board can't show it for them.
       var safeRounds = rounds.map(function (r, idx) {
         var ra = adapterForRound(r);
         r.answerMode = am;
-        return playerSafeRound(r, ra, idx, am);
+        return playerSafeRound(r, ra, idx, am, true);
       });
       safeUpdate({
         status: "speed", questionIndex: -1, round: null, reveal: null, qPaused: false,
@@ -1747,7 +1778,14 @@ window.LiveMode = (function () {
           }
         };
         qWrap.innerHTML = "";
-        try { qWrap.appendChild(adapter.playerContent(el, r, api)); }
+        try {
+          // Self-paced: the phone shows the QUESTION itself — the board can't
+          // (everyone is on a different one). Formats whose player widget is
+          // already self-contained (Lücken-Text, Wortmonster) have no hook.
+          var prompt = adapter.phonePrompt ? adapter.phonePrompt(el, r) : null;
+          if (prompt) qWrap.appendChild(prompt);
+          qWrap.appendChild(adapter.playerContent(el, r, api));
+        }
         catch (e) { qWrap.appendChild(el("p", { class: "live-muted", text: "Skipping…" })); pos++; renderPos(); }
       }
       renderPos();
@@ -1841,6 +1879,7 @@ window.LiveMode = (function () {
       function finish() {
         if (finished) return;
         finished = true;
+        if (curCountdown) { curCountdown.stop(); curCountdown = null; } // done before the clock
         answeredIndex = r.index; // lock this round for this phone
         var secs = Math.max(1, Math.round((Date.now() - startTs) / 1000));
         show(screen("player live-center res-good", [el("div", { class: "live-card" }, [
@@ -1864,15 +1903,36 @@ window.LiveMode = (function () {
         rightCol.appendChild(btn);
       });
 
+      // Per-round timer: the same countdown the board runs. At zero the board
+      // freezes (partial progress is already reported per matched pair) and the
+      // host's auto-reveal flips this screen to the scored result moments later.
+      if (curCountdown) { curCountdown.stop(); curCountdown = null; }
+      var timerNode = null;
+      if (r.deadlineSecs) {
+        curCountdown = makeCountdown(r.deadlineSecs, function () {
+          if (finished) return; // already on the "All matched!" screen
+          busy = true;          // no more taps count
+          show(screen("player live-center", [el("div", { class: "live-card" }, [
+            el("div", { class: "player-name-tag", text: stu.name }),
+            el("div", { class: "live-big-emoji", text: "⏰" }),
+            el("h2", { text: "Time's up!" }),
+            el("p", { class: "live-sub", text: "You matched " + matched + " of " + total + (total === 1 ? " pair" : " pairs") }),
+            el("p", { class: "live-sub", text: "Waiting for the scores…" })
+          ])]));
+        });
+        timerNode = curCountdown.node;
+      }
       var anyAudio = pairs.some(function (p) { return MT.isAudio(p.q) || MT.isAudio(p.a); });
       show(screen("player", [
         el("div", { class: "player-topbar" }, [
           el("div", { class: "player-name-tag", text: stu.name }),
           el("div", { class: "match-count", text: "Matched " }, [counter])
         ]),
+        timerNode,
         el("div", { class: "player-prompt-hint", text: anyAudio ? "Tap 🔊 to hear it, then match each pair 👇" : "Tap one tile on each side to match them 👇" }),
         el("div", { class: "match-board" }, [leftCol, rightCol])
       ]));
+      if (curCountdown) { curCountdown.start(); if (s.qPaused) curCountdown.pause(); }
     }
 
     /* ---- Hör gut zu! TYPE mode: type it, then see your own word-by-word diff ----
