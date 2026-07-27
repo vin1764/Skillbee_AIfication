@@ -314,6 +314,17 @@ const App = (function () {
           el("span", { class: "score-star", html: "⭐" }),
           el("span", { class: "score-value", attrs: { id: "score-value" }, text: "0" })
         ]),
+        // Teacher-only "Manage content" gear. It lives in the persistent top bar
+        // (shown in Solo, hidden on the mode picker and in Live where students
+        // are on their phones — setAdminVisible toggles it). Opening the editor
+        // needs no internet: content is authored against local storage and syncs
+        // to the cloud later if/when it's available.
+        el("button", {
+          class: "icon-btn",
+          attrs: { id: "admin-btn", title: "Manage content (teacher)", style: "display:none" },
+          html: "⚙️",
+          on: { click: () => showAdmin() }
+        }),
         el("button", {
           class: "icon-btn",
           attrs: { id: "voice-btn", title: "Voice settings" },
