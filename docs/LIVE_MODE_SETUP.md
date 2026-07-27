@@ -84,8 +84,21 @@ students can't reach them.
 - Once you enter it, your device stays unlocked for that browser session.
 - **Change it** anytime from the content editor's toolbar (**🔒 PIN**).
 
-It's a light gate, not a bank vault — but combined with the fact that student edits only ever
-affect their own phone, it's plenty for a classroom.
+**Forgot the PIN?** You can clear it yourself and set a new one — no code required:
+
+1. Open the [Firebase console](https://console.firebase.google.com/) → your project → **Firestore Database**.
+2. In the **Data** tab, open the **`config`** collection and click the **`teacher`** document.
+3. **Delete that document** (the ⋮ menu → *Delete document*).
+4. Back in the app, Host a class or open the editor — it will offer **Create a teacher PIN** again.
+
+It's a light gate, not a bank vault. Two things are worth knowing honestly:
+
+- The PIN protects the *buttons* (Host, edit content) as a deterrent for curious students on their
+  own phones. It is **not** account security — the app has no sign-in, so a technically-minded
+  person could still bypass it. If you ever need a real lock (so nobody but you can change the
+  shared content), that requires adding teacher sign-in; ask and it can be set up.
+- Because there's no sign-in, keep the PIN to yourself and treat the shared content bank as
+  "trusted classroom" data. Use **⬇ Backup** regularly so a bad edit is always recoverable.
 
 ## 4. A note on the Firebase key in the code
 

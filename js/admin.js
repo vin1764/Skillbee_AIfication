@@ -1329,7 +1329,11 @@
         }
       }
 
-      function doImport() {
+      // Restore REPLACES the whole content bank (on every synced device) with a
+      // backup file — every bit as destructive as Reset, so it gets the same
+      // guard: a typed confirmation that says exactly what's overwritten, then a
+      // fresh PIN, and only THEN the file picker.
+      function pickAndRestore() {
         var inp = document.createElement("input");
         inp.type = "file";
         inp.accept = "application/json,.json";
@@ -1343,14 +1347,52 @@
               currentGame = null;
               currentExercise = null;
               render();
-              toast("Content imported ✓");
+              toast("Content restored ✓");
             } catch (e) {
-              alert("Import failed: " + e.message);
+              alert("Restore failed: " + e.message);
             }
           };
           reader.readAsText(file);
         };
         inp.click();
+      }
+
+      function doImport() {
+        var overlay = el("div", { class: "adm-overlay" });
+        function close() { overlay.remove(); }
+        overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
+
+        var input = el("input", {
+          class: "adm-input",
+          attrs: { type: "text", placeholder: "Type RESTORE", autocapitalize: "characters", autocomplete: "off", spellcheck: "false" }
+        });
+        var goBtn = el("button", { class: "btn danger", text: "Choose backup & restore", attrs: { disabled: "true" } });
+        function matches() { return input.value.trim().toUpperCase() === "RESTORE"; }
+        input.addEventListener("input", function () { goBtn.disabled = !matches(); });
+        input.addEventListener("keydown", function (e) { if (e.key === "Enter" && matches()) goBtn.click(); });
+        goBtn.addEventListener("click", function () {
+          if (!matches()) return;
+          close(); // close this modal first, so the PIN keypad shows on its own
+          // Require the teacher PIN (fresh, every time) before overwriting.
+          if (window.TeacherGate && window.TeacherGate.verify) window.TeacherGate.verify(pickAndRestore);
+          else pickAndRestore();
+        });
+
+        overlay.appendChild(el("div", { class: "adm-modal" }, [
+          el("div", { class: "adm-modal-title", text: "⚠️ Restore from a backup?" }),
+          el("p", {
+            class: "adm-hint",
+            html: "This <b>replaces all current content</b> — every exercise and word you've added, across all games and <b>on every synced device</b> — with whatever is in the backup file. <b>It can't be undone.</b> Consider clicking <b>⬇ Backup</b> first."
+          }),
+          el("label", { class: "live-label", text: "Type RESTORE to confirm" }),
+          input,
+          el("div", { class: "adm-modal-actions" }, [
+            el("button", { class: "btn ghost", text: "Cancel", on: { click: close } }),
+            goBtn
+          ])
+        ]));
+        document.body.appendChild(overlay);
+        setTimeout(function () { try { input.focus(); } catch (e) {} }, 50);
       }
 
       // Reset wipes ALL content back to defaults — irreversible. Gate it behind a
