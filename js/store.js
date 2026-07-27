@@ -13,8 +13,19 @@
 (function () {
   var KEY = "skillbee_deutsch_content_v1";
   var TS_KEY = "skillbee_deutsch_content_ts_v1";
-  // A per-tab id so a device ignores the echo of its own cloud writes.
-  var CLIENT_ID = "c" + Math.random().toString(36).slice(2, 10);
+  var CLIENT_KEY = "skillbee_deutsch_client_id";
+  // A STABLE per-browser id so this device ignores the echo of its OWN cloud
+  // writes — from any tab, and across reloads. It used to be random per page
+  // load, so a second tab (or a refresh, or a push still echoing back after a
+  // reload) looked like a different device and falsely raised the "Another
+  // device also changed … Keep which version?" banner on the teacher's own edits.
+  var CLIENT_ID = (function () {
+    try {
+      var v = localStorage.getItem(CLIENT_KEY);
+      if (!v) { v = "c" + Math.random().toString(36).slice(2, 10); localStorage.setItem(CLIENT_KEY, v); }
+      return v;
+    } catch (e) { return "c" + Math.random().toString(36).slice(2, 10); }
+  })();
 
   function clone(x) {
     return JSON.parse(JSON.stringify(x));
@@ -632,6 +643,13 @@
         if (!doc) { self._dirtyAll = true; self._pushCloud(); return; } // empty cloud → seed (full)
         if (doc.clientId === CLIENT_ID) return;            // our own write, echoed back
         if (!doc.data) return;
+        // Defence in depth: a snapshot that doesn't change what we already hold
+        // is never a conflict — ignore it. Covers an own write echoed under a
+        // different id (localStorage cleared, or another browser that saved
+        // identical content), so it can't raise a false "another device" banner.
+        try {
+          if (JSON.stringify(doc.data.exercises) === JSON.stringify(self.data && self.data.exercises)) return;
+        } catch (e) {}
         // Ordering is server-side: per-section merges make the cloud the union
         // of every device's latest sections, so outside the editor the cloud is
         // authoritative — adopt it. During editing, park it for the teacher to
