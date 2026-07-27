@@ -2687,32 +2687,43 @@ window.TeacherGate = (function () {
    On-screen "back" buttons call AppNav.leave(cb) to get the same guard.
    ===================================================================== */
 window.AppNav = (function () {
-  var backFn = null, guardFn = null, navigatingBack = false, ready = false, confirming = false;
+  var backFn = null, guardFn = null, ready = false, confirming = false, armed = false;
 
-  function seed() { try { history.pushState({ skb: 1 }, ""); } catch (e) {} }
+  // Keep EXACTLY ONE spare history entry (the "sentinel") on the stack, so the
+  // next browser Back is captured as an in-app "go back" instead of leaving the
+  // app. The old code pushed a fresh entry on EVERY screen change; across a
+  // lesson (many games, topic switches, answers) that piled up thousands of
+  // entries and tripped Safari's pushState rate-limit — once throttled, the
+  // re-arm silently failed and the next Back escaped a live game. Maintaining a
+  // single sentinel, re-armed only when a Back actually consumes it, keeps us to
+  // ~one pushState per Back press — far under any throttle.
+  function arm() {
+    if (armed) return;
+    try { history.pushState({ skb: 1 }, ""); armed = true; } catch (e) {}
+  }
 
   function init() {
     if (ready) return;
     ready = true;
-    seed(); // one spare entry so the first Back is captured, not an exit
+    arm(); // one spare entry so the first Back is captured, not an exit
     window.addEventListener("popstate", function () {
-      seed();          // immediately re-arm so Back can never fall off the app
+      armed = false;   // the sentinel we pushed was just consumed by this Back
+      arm();           // immediately re-arm so Back can never fall off the app
       requestBack();   // treat the Back press as an in-app "go back"
     });
   }
 
-  // Called by each screen as it renders.
+  // Called by each screen as it renders. arm() is idempotent, so this just
+  // guarantees a sentinel exists — it never stacks a second one.
   function set(fn, guard) {
     backFn = fn || null;
     guardFn = guard || null;
-    if (ready && !navigatingBack) seed(); // a forward move adds a history entry
+    if (ready) arm();
   }
 
   function doBack() {
     if (!backFn) return; // top of the app — nothing to go back to
-    navigatingBack = true;
     try { backFn(); } catch (e) {}
-    navigatingBack = false;
   }
 
   function requestBack() {
@@ -2765,6 +2776,14 @@ const App = (function () {
   let adminTeardown = null;
   function endAdminIfOpen() {
     if (adminTeardown) { try { adminTeardown(); } catch (e) {} adminTeardown = null; }
+  }
+  // A running Solo game's cleanup (timers/intervals it started), set via
+  // api.onCleanup. Run on EVERY navigation away — Back, the logo, "play again",
+  // any screen swap — so a game left mid-round can't keep beeping, speaking,
+  // advancing, or throwing confetti over the next screen.
+  let gameTeardown = null;
+  function endGameIfRunning() {
+    if (gameTeardown) { try { gameTeardown(); } catch (e) {} gameTeardown = null; }
   }
 
   /* ---- tiny helpers to build HTML elements ------------------------- */
@@ -2994,7 +3013,7 @@ const App = (function () {
   }
 
   function showModeSelect() {
-    endAdminIfOpen();
+    endAdminIfOpen(); endGameIfRunning();
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(false);
     kit.hush();
@@ -3026,7 +3045,7 @@ const App = (function () {
   }
 
   function showLive() {
-    endAdminIfOpen();
+    endAdminIfOpen(); endGameIfRunning();
     kit.hush();
     setAdminVisible(false);
     window.AppNav.set(function () { showModeSelect(); }, null); // Live sub-screens override this
@@ -3038,7 +3057,7 @@ const App = (function () {
   }
 
   function showHome() {
-    endAdminIfOpen();
+    endAdminIfOpen(); endGameIfRunning();
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(true);
     kit.hush();
@@ -3095,6 +3114,7 @@ const App = (function () {
 
   /* ---- exercise picker (shown before a game starts) ---------------- */
   function openTopicPicker(game) {
+    endGameIfRunning();
     kit.hush();
     window.AppNav.set(function () { showHome(); }, null);
     const main = document.getElementById("screen");
@@ -3154,6 +3174,7 @@ const App = (function () {
 
   /* ---- launch a game with a chosen topic --------------------------- */
   function launch(game, topic) {
+    endGameIfRunning(); // tear down the previous game instance (e.g. on restart)
     kit.hush();
     // In a game: Back goes to the exercise picker, but confirm first while a
     // round is in progress (no confirm once the result screen is showing).
@@ -3172,7 +3193,10 @@ const App = (function () {
       // The games' own "← Menu" / "Other exercise" buttons get the same guard.
       exit: () => window.AppNav.leave(() => showHome()),
       restart: () => launch(game, topic),
-      backToTopics: () => window.AppNav.leave(() => openTopicPicker(game))
+      backToTopics: () => window.AppNav.leave(() => openTopicPicker(game)),
+      // A game registers a cleanup for the timers/intervals it starts; the app
+      // runs it on ANY navigation away (Back, logo, restart, screen swap).
+      onCleanup: (fn) => { gameTeardown = typeof fn === "function" ? fn : null; }
     };
     game.mount(stage, api);
   }
@@ -3185,7 +3209,7 @@ const App = (function () {
   }
 
   function openAdmin(onExit) {
-    endAdminIfOpen();
+    endAdminIfOpen(); endGameIfRunning();
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(false);
     kit.hush();
@@ -3622,9 +3646,15 @@ document.addEventListener("DOMContentLoaded", App.init);
 
       const TOTAL = pool.length;
       let index = 0, correct = 0, streak = 0, timer = null, timeLeft = 0, locked = false;
+      let advanceTimer = null, dead = false; // dead = the screen was torn down; stop everything
 
       const wrap = el("div", { class: "quiz" });
       stage.appendChild(wrap);
+
+      // Leaving the game (Back, ← Menu, restart, any navigation) tears the round
+      // down: kill the countdown AND the pending "next question" timeout so the
+      // detached game can't beep, speak, re-render, or throw confetti afterward.
+      if (api.onCleanup) api.onCleanup(function () { dead = true; clearInterval(timer); clearTimeout(advanceTimer); });
 
       function questionNode(q, promptSpeak, onListen) {
         if (q.type === "text") {
@@ -3638,6 +3668,7 @@ document.addEventListener("DOMContentLoaded", App.init);
       }
 
       function render() {
+        if (dead) return; // torn down — never rebuild on a detached stage
         clearInterval(timer);
         locked = false;
         const item = pool[index];
@@ -3710,7 +3741,7 @@ document.addEventListener("DOMContentLoaded", App.init);
       }
 
       function choose(chosen, item) {
-        if (locked) return;
+        if (locked || dead) return;
         locked = true;
         clearInterval(timer);
         const wasRight = !!(chosen && chosen.correct);
@@ -3728,7 +3759,7 @@ document.addEventListener("DOMContentLoaded", App.init);
           streak = 0; kit.beep("bad");
           if (item.revealDe) { try { kit.speak(item.revealDe); } catch (e) {} } // hear the German
         }
-        setTimeout(() => { index++; if (index < TOTAL) render(); else finish(); }, 1200);
+        advanceTimer = setTimeout(() => { if (dead) return; index++; if (index < TOTAL) render(); else finish(); }, 1200);
       }
 
       function finish() {
@@ -3780,6 +3811,13 @@ document.addEventListener("DOMContentLoaded", App.init);
       }
       const PAIRS = Math.min(6, topic.words.length);
       const chosen = kit.sample(topic.words, PAIRS);
+
+      // Leaving the game must stop its pending flip/finish timers so a detached
+      // board can't score, beep, speak, or throw confetti over the next screen.
+      let dead = false;
+      const timers = [];
+      const later = (fn, ms) => { const id = setTimeout(() => { if (!dead) fn(); }, ms); timers.push(id); return id; };
+      if (api.onCleanup) api.onCleanup(function () { dead = true; timers.forEach(clearTimeout); });
 
       // Build two cards per word: a German side and an English (+emoji) side.
       let cards = [];
@@ -3840,7 +3878,7 @@ document.addEventListener("DOMContentLoaded", App.init);
           if (cards[a].pair === cards[b].pair) {
             kit.beep("good");
             kit.speak(cards[a].speak);
-            setTimeout(() => {
+            later(() => {
               cards[a].node.classList.add("done");
               cards[b].node.classList.add("done");
               flipped = [];
@@ -3851,7 +3889,7 @@ document.addEventListener("DOMContentLoaded", App.init);
             }, 550);
           } else {
             kit.beep("bad");
-            setTimeout(() => {
+            later(() => {
               cards[a].node.classList.remove("flipped");
               cards[b].node.classList.remove("flipped");
               flipped = [];
@@ -3867,7 +3905,7 @@ document.addEventListener("DOMContentLoaded", App.init);
         if (bonus > 0) addScore(bonus);
         kit.confetti();
         kit.beep("win");
-        setTimeout(() => {
+        later(() => {
           wrap.innerHTML = "";
           wrap.appendChild(
             el("div", { class: "result-card" }, [
@@ -8461,6 +8499,27 @@ window.LiveMode = (function () {
     var speedRenderedOnce = false; // Speed board built once, then refreshed in place.
     var speedFinished = false;     // finishSpeed() is idempotent (clock / all-done / button).
 
+    // ---- Host teardown (single source of truth for stop()) ------------------
+    // Everything the host creates that can outlive a single render — the answers
+    // listener, either countdown, the vestigial advance timer, the passage
+    // overlay pinned to <body> — MUST die when the Live screen is torn down
+    // (✕ Close room, Back, or navigating anywhere else). Left running, a late
+    // answer snapshot repaints the question over the Live menu, and a leaked
+    // Per-Question countdown fires reveal() — flipping an already-"ended" room
+    // back to "reveal" and dragging every phone back into the closed game.
+    // Setting hostPhase first makes any in-flight snapshot bail (renderQuestion /
+    // onPresence only act while phase === "question"/"speed"). Registered once;
+    // idempotent, so overlapping per-round cleanups can't double-fire.
+    track(function () {
+      hostPhase = "ended";
+      if (answersUnsub) { try { answersUnsub(); } catch (e) {} answersUnsub = null; }
+      if (speedAnswersUnsub) { try { speedAnswersUnsub(); } catch (e) {} speedAnswersUnsub = null; }
+      if (hostCountdown) { try { hostCountdown.stop(); } catch (e) {} hostCountdown = null; }
+      if (hostSpeedCountdown) { try { hostSpeedCountdown.stop(); } catch (e) {} hostSpeedCountdown = null; }
+      clearTimeout(timer);
+      if (passageOverlay) { try { passageOverlay.remove(); } catch (e) {} passageOverlay = null; }
+    });
+
     // Timer Mode config — read from the session doc (written at setup). The board
     // is the single authority on advancement in every mode, so these just choose
     // WHICH pacing the shared flow uses.
@@ -9356,7 +9415,9 @@ window.LiveMode = (function () {
       // per-student presence docs. (Answer docs are write-once by the security
       // rules and can't be deleted client-side; they hold answer choices keyed
       // by a name-slug id, never display names.)
-      safeUpdate({ status: "ended", scores: {}, students: [], joined: {}, round: null, reveal: null, speedRounds: null });
+      // qPaused: false — if the room is closed while the "Show passage" overlay
+      // is up (which pauses the clock), clear the flag so it can't persist stale.
+      safeUpdate({ status: "ended", scores: {}, students: [], joined: {}, round: null, reveal: null, speedRounds: null, qPaused: false });
       try { if (window.LiveDB.clearJoined) window.LiveDB.clearJoined(code); } catch (e) {}
       stop();
       landing();
@@ -9521,6 +9582,12 @@ window.LiveMode = (function () {
     var blanksState = { qi: -1, answers: null }; // this phone's submitted blanks
     var curCountdown = null;  // the phone's active countdown (Per-Question / Speed)
     var speedStarted = false; // Speed Challenge: the self-paced screen is built once
+
+    // Leaving the player screen (Back out of a question, room closes, navigating
+    // away) must stop this phone's countdown. Untracked, its interval keeps
+    // ticking and later paints a "⏰ Time's up!" card over whatever screen the
+    // student moved on to.
+    track(function () { if (curCountdown) { try { curCountdown.stop(); } catch (e) {} curCountdown = null; } });
 
     track(window.LiveDB.listenSession(code, function (s) {
       if (!s) { forgetRoom(); show(screen("player live-center", [el("div", { class: "live-card" }, [el("h2", { text: "Room closed" })])])); return; }
@@ -10146,7 +10213,14 @@ window.LiveMode = (function () {
     var wrap = el("div", { class: "solo-live" });
     stage.appendChild(wrap);
 
+    // Leaving mid-round must stop the pending advance timer so a detached game
+    // can't render, beep, speak, or throw confetti over the next screen.
+    var dead = false, timers = [];
+    function later(fn, ms) { var id = setTimeout(function () { if (!dead) fn(); }, ms); timers.push(id); return id; }
+    if (api.onCleanup) api.onCleanup(function () { dead = true; timers.forEach(clearTimeout); });
+
     function render() {
+      if (dead) return;
       var r = rounds[idx];
       var startedAt = Date.now();
       var answered = false;
@@ -10207,10 +10281,10 @@ window.LiveMode = (function () {
           el("div", { class: "solo-reveal-ans", text: "Answer: " + answerText })
         ])
       ]));
-      setTimeout(next, sc.correct ? 1100 : 1900);
+      later(next, sc.correct ? 1100 : 1900);
     }
 
-    function next() { idx++; if (idx < TOTAL) render(); else finish(); }
+    function next() { if (dead) return; idx++; if (idx < TOTAL) render(); else finish(); }
 
     function finish() {
       var pct = Math.round((correct / TOTAL) * 100);
@@ -10244,7 +10318,13 @@ window.LiveMode = (function () {
     var wrap = el("div", { class: "solo-live" });
     stage.appendChild(wrap);
 
+    // Same teardown guard as runSolo — see there.
+    var dead = false, timers = [];
+    function later(fn, ms) { var id = setTimeout(function () { if (!dead) fn(); }, ms); timers.push(id); return id; }
+    if (api.onCleanup) api.onCleanup(function () { dead = true; timers.forEach(clearTimeout); });
+
     function render() {
+      if (dead) return;
       var r = rounds[idx];
       var pairs = (r.pairs || []).slice();
       var n = pairs.length;
@@ -10288,7 +10368,7 @@ window.LiveMode = (function () {
           q.btn.classList.add("wrong"); a.btn.classList.add("wrong");
           try { K.beep("bad"); } catch (e) {}
           var x = q.btn, y = a.btn; sel.q = null; sel.a = null;
-          setTimeout(function () { x.classList.remove("wrong"); y.classList.remove("wrong"); busy = false; }, 500);
+          later(function () { x.classList.remove("wrong"); y.classList.remove("wrong"); busy = false; }, 500);
         }
       }
       function onTile(col, it, btn) {
@@ -10318,7 +10398,7 @@ window.LiveMode = (function () {
         api.addScore(Math.max(3, 5 + matched * 2 - wrong * 2));
         var secs = Math.max(1, Math.round((Date.now() - startTs) / 1000));
         var last = (idx + 1) >= TOTAL;
-        setTimeout(function () {
+        later(function () {
           wrap.appendChild(el("div", { class: "solo-reveal good" }, [
             el("div", { class: "solo-reveal-icon", text: "🔗" }),
             el("div", { class: "solo-reveal-body" }, [
@@ -10326,7 +10406,7 @@ window.LiveMode = (function () {
               el("div", { class: "solo-reveal-ans", text: secs + "s" + (wrong ? " · " + wrong + " wrong tap" + (wrong === 1 ? "" : "s") : "") })
             ])
           ]));
-          setTimeout(function () { idx++; if (last) finishAll(); else render(); }, 950);
+          later(function () { idx++; if (last) finishAll(); else render(); }, 950);
         }, 300);
       }
     }

@@ -54,9 +54,15 @@
 
       const TOTAL = pool.length;
       let index = 0, correct = 0, streak = 0, timer = null, timeLeft = 0, locked = false;
+      let advanceTimer = null, dead = false; // dead = the screen was torn down; stop everything
 
       const wrap = el("div", { class: "quiz" });
       stage.appendChild(wrap);
+
+      // Leaving the game (Back, ← Menu, restart, any navigation) tears the round
+      // down: kill the countdown AND the pending "next question" timeout so the
+      // detached game can't beep, speak, re-render, or throw confetti afterward.
+      if (api.onCleanup) api.onCleanup(function () { dead = true; clearInterval(timer); clearTimeout(advanceTimer); });
 
       function questionNode(q, promptSpeak, onListen) {
         if (q.type === "text") {
@@ -70,6 +76,7 @@
       }
 
       function render() {
+        if (dead) return; // torn down — never rebuild on a detached stage
         clearInterval(timer);
         locked = false;
         const item = pool[index];
@@ -142,7 +149,7 @@
       }
 
       function choose(chosen, item) {
-        if (locked) return;
+        if (locked || dead) return;
         locked = true;
         clearInterval(timer);
         const wasRight = !!(chosen && chosen.correct);
@@ -160,7 +167,7 @@
           streak = 0; kit.beep("bad");
           if (item.revealDe) { try { kit.speak(item.revealDe); } catch (e) {} } // hear the German
         }
-        setTimeout(() => { index++; if (index < TOTAL) render(); else finish(); }, 1200);
+        advanceTimer = setTimeout(() => { if (dead) return; index++; if (index < TOTAL) render(); else finish(); }, 1200);
       }
 
       function finish() {

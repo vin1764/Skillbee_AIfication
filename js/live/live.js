@@ -571,6 +571,27 @@ window.LiveMode = (function () {
     var speedRenderedOnce = false; // Speed board built once, then refreshed in place.
     var speedFinished = false;     // finishSpeed() is idempotent (clock / all-done / button).
 
+    // ---- Host teardown (single source of truth for stop()) ------------------
+    // Everything the host creates that can outlive a single render — the answers
+    // listener, either countdown, the vestigial advance timer, the passage
+    // overlay pinned to <body> — MUST die when the Live screen is torn down
+    // (✕ Close room, Back, or navigating anywhere else). Left running, a late
+    // answer snapshot repaints the question over the Live menu, and a leaked
+    // Per-Question countdown fires reveal() — flipping an already-"ended" room
+    // back to "reveal" and dragging every phone back into the closed game.
+    // Setting hostPhase first makes any in-flight snapshot bail (renderQuestion /
+    // onPresence only act while phase === "question"/"speed"). Registered once;
+    // idempotent, so overlapping per-round cleanups can't double-fire.
+    track(function () {
+      hostPhase = "ended";
+      if (answersUnsub) { try { answersUnsub(); } catch (e) {} answersUnsub = null; }
+      if (speedAnswersUnsub) { try { speedAnswersUnsub(); } catch (e) {} speedAnswersUnsub = null; }
+      if (hostCountdown) { try { hostCountdown.stop(); } catch (e) {} hostCountdown = null; }
+      if (hostSpeedCountdown) { try { hostSpeedCountdown.stop(); } catch (e) {} hostSpeedCountdown = null; }
+      clearTimeout(timer);
+      if (passageOverlay) { try { passageOverlay.remove(); } catch (e) {} passageOverlay = null; }
+    });
+
     // Timer Mode config — read from the session doc (written at setup). The board
     // is the single authority on advancement in every mode, so these just choose
     // WHICH pacing the shared flow uses.
@@ -1466,7 +1487,9 @@ window.LiveMode = (function () {
       // per-student presence docs. (Answer docs are write-once by the security
       // rules and can't be deleted client-side; they hold answer choices keyed
       // by a name-slug id, never display names.)
-      safeUpdate({ status: "ended", scores: {}, students: [], joined: {}, round: null, reveal: null, speedRounds: null });
+      // qPaused: false — if the room is closed while the "Show passage" overlay
+      // is up (which pauses the clock), clear the flag so it can't persist stale.
+      safeUpdate({ status: "ended", scores: {}, students: [], joined: {}, round: null, reveal: null, speedRounds: null, qPaused: false });
       try { if (window.LiveDB.clearJoined) window.LiveDB.clearJoined(code); } catch (e) {}
       stop();
       landing();
@@ -1631,6 +1654,12 @@ window.LiveMode = (function () {
     var blanksState = { qi: -1, answers: null }; // this phone's submitted blanks
     var curCountdown = null;  // the phone's active countdown (Per-Question / Speed)
     var speedStarted = false; // Speed Challenge: the self-paced screen is built once
+
+    // Leaving the player screen (Back out of a question, room closes, navigating
+    // away) must stop this phone's countdown. Untracked, its interval keeps
+    // ticking and later paints a "⏰ Time's up!" card over whatever screen the
+    // student moved on to.
+    track(function () { if (curCountdown) { try { curCountdown.stop(); } catch (e) {} curCountdown = null; } });
 
     track(window.LiveDB.listenSession(code, function (s) {
       if (!s) { forgetRoom(); show(screen("player live-center", [el("div", { class: "live-card" }, [el("h2", { text: "Room closed" })])])); return; }

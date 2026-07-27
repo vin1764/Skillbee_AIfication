@@ -19,32 +19,43 @@
    On-screen "back" buttons call AppNav.leave(cb) to get the same guard.
    ===================================================================== */
 window.AppNav = (function () {
-  var backFn = null, guardFn = null, navigatingBack = false, ready = false, confirming = false;
+  var backFn = null, guardFn = null, ready = false, confirming = false, armed = false;
 
-  function seed() { try { history.pushState({ skb: 1 }, ""); } catch (e) {} }
+  // Keep EXACTLY ONE spare history entry (the "sentinel") on the stack, so the
+  // next browser Back is captured as an in-app "go back" instead of leaving the
+  // app. The old code pushed a fresh entry on EVERY screen change; across a
+  // lesson (many games, topic switches, answers) that piled up thousands of
+  // entries and tripped Safari's pushState rate-limit — once throttled, the
+  // re-arm silently failed and the next Back escaped a live game. Maintaining a
+  // single sentinel, re-armed only when a Back actually consumes it, keeps us to
+  // ~one pushState per Back press — far under any throttle.
+  function arm() {
+    if (armed) return;
+    try { history.pushState({ skb: 1 }, ""); armed = true; } catch (e) {}
+  }
 
   function init() {
     if (ready) return;
     ready = true;
-    seed(); // one spare entry so the first Back is captured, not an exit
+    arm(); // one spare entry so the first Back is captured, not an exit
     window.addEventListener("popstate", function () {
-      seed();          // immediately re-arm so Back can never fall off the app
+      armed = false;   // the sentinel we pushed was just consumed by this Back
+      arm();           // immediately re-arm so Back can never fall off the app
       requestBack();   // treat the Back press as an in-app "go back"
     });
   }
 
-  // Called by each screen as it renders.
+  // Called by each screen as it renders. arm() is idempotent, so this just
+  // guarantees a sentinel exists — it never stacks a second one.
   function set(fn, guard) {
     backFn = fn || null;
     guardFn = guard || null;
-    if (ready && !navigatingBack) seed(); // a forward move adds a history entry
+    if (ready) arm();
   }
 
   function doBack() {
     if (!backFn) return; // top of the app — nothing to go back to
-    navigatingBack = true;
     try { backFn(); } catch (e) {}
-    navigatingBack = false;
   }
 
   function requestBack() {
@@ -97,6 +108,14 @@ const App = (function () {
   let adminTeardown = null;
   function endAdminIfOpen() {
     if (adminTeardown) { try { adminTeardown(); } catch (e) {} adminTeardown = null; }
+  }
+  // A running Solo game's cleanup (timers/intervals it started), set via
+  // api.onCleanup. Run on EVERY navigation away — Back, the logo, "play again",
+  // any screen swap — so a game left mid-round can't keep beeping, speaking,
+  // advancing, or throwing confetti over the next screen.
+  let gameTeardown = null;
+  function endGameIfRunning() {
+    if (gameTeardown) { try { gameTeardown(); } catch (e) {} gameTeardown = null; }
   }
 
   /* ---- tiny helpers to build HTML elements ------------------------- */
@@ -326,7 +345,7 @@ const App = (function () {
   }
 
   function showModeSelect() {
-    endAdminIfOpen();
+    endAdminIfOpen(); endGameIfRunning();
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(false);
     kit.hush();
@@ -358,7 +377,7 @@ const App = (function () {
   }
 
   function showLive() {
-    endAdminIfOpen();
+    endAdminIfOpen(); endGameIfRunning();
     kit.hush();
     setAdminVisible(false);
     window.AppNav.set(function () { showModeSelect(); }, null); // Live sub-screens override this
@@ -370,7 +389,7 @@ const App = (function () {
   }
 
   function showHome() {
-    endAdminIfOpen();
+    endAdminIfOpen(); endGameIfRunning();
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(true);
     kit.hush();
@@ -427,6 +446,7 @@ const App = (function () {
 
   /* ---- exercise picker (shown before a game starts) ---------------- */
   function openTopicPicker(game) {
+    endGameIfRunning();
     kit.hush();
     window.AppNav.set(function () { showHome(); }, null);
     const main = document.getElementById("screen");
@@ -486,6 +506,7 @@ const App = (function () {
 
   /* ---- launch a game with a chosen topic --------------------------- */
   function launch(game, topic) {
+    endGameIfRunning(); // tear down the previous game instance (e.g. on restart)
     kit.hush();
     // In a game: Back goes to the exercise picker, but confirm first while a
     // round is in progress (no confirm once the result screen is showing).
@@ -504,7 +525,10 @@ const App = (function () {
       // The games' own "← Menu" / "Other exercise" buttons get the same guard.
       exit: () => window.AppNav.leave(() => showHome()),
       restart: () => launch(game, topic),
-      backToTopics: () => window.AppNav.leave(() => openTopicPicker(game))
+      backToTopics: () => window.AppNav.leave(() => openTopicPicker(game)),
+      // A game registers a cleanup for the timers/intervals it starts; the app
+      // runs it on ANY navigation away (Back, logo, restart, screen swap).
+      onCleanup: (fn) => { gameTeardown = typeof fn === "function" ? fn : null; }
     };
     game.mount(stage, api);
   }
@@ -517,7 +541,7 @@ const App = (function () {
   }
 
   function openAdmin(onExit) {
-    endAdminIfOpen();
+    endAdminIfOpen(); endGameIfRunning();
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(false);
     kit.hush();
