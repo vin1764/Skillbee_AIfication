@@ -68,7 +68,14 @@
     var wrap = el("div", { class: "solo-live" });
     stage.appendChild(wrap);
 
+    // Leaving mid-round must stop the pending advance timer so a detached game
+    // can't render, beep, speak, or throw confetti over the next screen.
+    var dead = false, timers = [];
+    function later(fn, ms) { var id = setTimeout(function () { if (!dead) fn(); }, ms); timers.push(id); return id; }
+    if (api.onCleanup) api.onCleanup(function () { dead = true; timers.forEach(clearTimeout); });
+
     function render() {
+      if (dead) return;
       var r = rounds[idx];
       var startedAt = Date.now();
       var answered = false;
@@ -129,10 +136,10 @@
           el("div", { class: "solo-reveal-ans", text: "Answer: " + answerText })
         ])
       ]));
-      setTimeout(next, sc.correct ? 1100 : 1900);
+      later(next, sc.correct ? 1100 : 1900);
     }
 
-    function next() { idx++; if (idx < TOTAL) render(); else finish(); }
+    function next() { if (dead) return; idx++; if (idx < TOTAL) render(); else finish(); }
 
     function finish() {
       var pct = Math.round((correct / TOTAL) * 100);
@@ -166,7 +173,13 @@
     var wrap = el("div", { class: "solo-live" });
     stage.appendChild(wrap);
 
+    // Same teardown guard as runSolo — see there.
+    var dead = false, timers = [];
+    function later(fn, ms) { var id = setTimeout(function () { if (!dead) fn(); }, ms); timers.push(id); return id; }
+    if (api.onCleanup) api.onCleanup(function () { dead = true; timers.forEach(clearTimeout); });
+
     function render() {
+      if (dead) return;
       var r = rounds[idx];
       var pairs = (r.pairs || []).slice();
       var n = pairs.length;
@@ -210,7 +223,7 @@
           q.btn.classList.add("wrong"); a.btn.classList.add("wrong");
           try { K.beep("bad"); } catch (e) {}
           var x = q.btn, y = a.btn; sel.q = null; sel.a = null;
-          setTimeout(function () { x.classList.remove("wrong"); y.classList.remove("wrong"); busy = false; }, 500);
+          later(function () { x.classList.remove("wrong"); y.classList.remove("wrong"); busy = false; }, 500);
         }
       }
       function onTile(col, it, btn) {
@@ -240,7 +253,7 @@
         api.addScore(Math.max(3, 5 + matched * 2 - wrong * 2));
         var secs = Math.max(1, Math.round((Date.now() - startTs) / 1000));
         var last = (idx + 1) >= TOTAL;
-        setTimeout(function () {
+        later(function () {
           wrap.appendChild(el("div", { class: "solo-reveal good" }, [
             el("div", { class: "solo-reveal-icon", text: "🔗" }),
             el("div", { class: "solo-reveal-body" }, [
@@ -248,7 +261,7 @@
               el("div", { class: "solo-reveal-ans", text: secs + "s" + (wrong ? " · " + wrong + " wrong tap" + (wrong === 1 ? "" : "s") : "") })
             ])
           ]));
-          setTimeout(function () { idx++; if (last) finishAll(); else render(); }, 950);
+          later(function () { idx++; if (last) finishAll(); else render(); }, 950);
         }, 300);
       }
     }

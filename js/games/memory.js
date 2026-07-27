@@ -21,6 +21,13 @@
       const PAIRS = Math.min(6, topic.words.length);
       const chosen = kit.sample(topic.words, PAIRS);
 
+      // Leaving the game must stop its pending flip/finish timers so a detached
+      // board can't score, beep, speak, or throw confetti over the next screen.
+      let dead = false;
+      const timers = [];
+      const later = (fn, ms) => { const id = setTimeout(() => { if (!dead) fn(); }, ms); timers.push(id); return id; };
+      if (api.onCleanup) api.onCleanup(function () { dead = true; timers.forEach(clearTimeout); });
+
       // Build two cards per word: a German side and an English (+emoji) side.
       let cards = [];
       chosen.forEach((w, i) => {
@@ -80,7 +87,7 @@
           if (cards[a].pair === cards[b].pair) {
             kit.beep("good");
             kit.speak(cards[a].speak);
-            setTimeout(() => {
+            later(() => {
               cards[a].node.classList.add("done");
               cards[b].node.classList.add("done");
               flipped = [];
@@ -91,7 +98,7 @@
             }, 550);
           } else {
             kit.beep("bad");
-            setTimeout(() => {
+            later(() => {
               cards[a].node.classList.remove("flipped");
               cards[b].node.classList.remove("flipped");
               flipped = [];
@@ -107,7 +114,7 @@
         if (bonus > 0) addScore(bonus);
         kit.confetti();
         kit.beep("win");
-        setTimeout(() => {
+        later(() => {
           wrap.innerHTML = "";
           wrap.appendChild(
             el("div", { class: "result-card" }, [
