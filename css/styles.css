@@ -387,10 +387,11 @@ kbd {
 .adm-sync.busy { color: #8a6d00; background: #fff7e0; border-color: #f0e0a0; }
 .adm-sync.off { color: var(--ink-soft); background: #f2f4f8; }
 .adm-remote-banner {
-  display: flex; align-items: center; gap: 12px; justify-content: center;
+  display: flex; align-items: center; gap: 12px; justify-content: center; flex-wrap: wrap;
   background: #fff3cf; border: 1px solid #f0d98a; color: var(--brand-ink);
   padding: 10px 14px; border-radius: 12px; margin-bottom: 12px; font-weight: 700;
 }
+.adm-remote-actions { display: flex; gap: 8px; flex: 0 0 auto; }
 .adm-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
 .adm-tab {
   background: #fff; border: 1px solid var(--line); border-radius: 999px;

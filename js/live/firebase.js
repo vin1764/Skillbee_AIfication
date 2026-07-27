@@ -338,9 +338,22 @@
         return d.exists ? d.data() : null;
       });
     },
+    // FULL write — seeds an empty cloud, and Reset/Restore (a deliberate
+    // wholesale replace). Stamps a SERVER timestamp so ordering never depends
+    // on a device's (possibly wrong) clock.
     setContent: function (payload) {
-      // Full overwrite — the whole content bank is written each time.
-      return db.collection("content").doc("bank").set(payload);
+      var body = Object.assign({}, payload, { updatedAt: serverTs() });
+      return db.collection("content").doc("bank").set(body);
+    },
+    // INCREMENTAL write — merges ONLY the changed game sections, so two
+    // teachers editing DIFFERENT games can't clobber each other (Firestore
+    // deep-merges the nested `data.exercises` map; each game's array is
+    // replaced independently). `sections` = { gameKey: [exercises…] }.
+    mergeContent: function (sections, clientId) {
+      return db.collection("content").doc("bank").set(
+        { data: { exercises: sections }, clientId: clientId, updatedAt: serverTs() },
+        { merge: true }
+      );
     },
     listenContent: function (cb) {
       return db.collection("content").doc("bank").onSnapshot(
@@ -349,12 +362,30 @@
       );
     },
 
-    /* ---------------- cumulative leaderboards ---------------- */
+    /* ---------------- cumulative (term) leaderboards ---------------- */
     getLeaderboard: function (rosterId) {
       return db.collection("leaderboards").doc(rosterId).get().then(function (d) {
         return d.exists ? d.data() : { scores: {} };
       });
     },
+    // Term leaderboards are ONLY EVER ADDED TO — never overwritten. Each call
+    // atomically increments the given students' totals by the points they just
+    // earned (a per-round delta), so an interrupted class keeps everything
+    // earned so far and two rooms can't clobber the running totals.
+    addToLeaderboard: function (rosterId, deltas) {
+      var FV = firebase.firestore.FieldValue;
+      var inc = {};
+      Object.keys(deltas || {}).forEach(function (k) {
+        var v = Number(deltas[k]) || 0;
+        if (v) inc[k] = FV.increment(v);
+      });
+      if (!Object.keys(inc).length) return Promise.resolve();
+      return db.collection("leaderboards").doc(rosterId).set(
+        { scores: inc, updatedAt: serverTs() },
+        { merge: true }
+      );
+    },
+    // Kept for backup/compat; the game flow uses addToLeaderboard (additive).
     saveLeaderboard: function (rosterId, scores) {
       return db.collection("leaderboards").doc(rosterId).set(
         { scores: scores, updatedAt: serverTs() },

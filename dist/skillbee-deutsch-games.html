@@ -395,10 +395,11 @@ kbd {
 .adm-sync.busy { color: #8a6d00; background: #fff7e0; border-color: #f0e0a0; }
 .adm-sync.off { color: var(--ink-soft); background: #f2f4f8; }
 .adm-remote-banner {
-  display: flex; align-items: center; gap: 12px; justify-content: center;
+  display: flex; align-items: center; gap: 12px; justify-content: center; flex-wrap: wrap;
   background: #fff3cf; border: 1px solid #f0d98a; color: var(--brand-ink);
   padding: 10px 14px; border-radius: 12px; margin-bottom: 12px; font-weight: 700;
 }
+.adm-remote-actions { display: flex; gap: 8px; flex: 0 0 auto; }
 .adm-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
 .adm-tab {
   background: #fff; border: 1px solid var(--line); border-radius: 999px;
@@ -2192,15 +2193,19 @@ window.SkillbeeBrand = {
 
   var store = {
     data: null,
-    _ts: 0,                 // last-change timestamp (ms) used to order edits
+    _ts: 0,                 // last-change timestamp (ms), local bookkeeping only
+    _dirty: null,           // { gameKey: true } — sections changed since last push
+    _dirtyAll: false,       // true → next push writes the WHOLE bank (seed/reset/import)
+    _activeGame: null,      // the game the editor is currently editing (so save() knows the section)
+    _editedGames: null,     // { gameKey: true } — games edited since the editor opened (conflict detection)
     syncState: "local",     // local | saving | synced | offline
     editing: false,         // true while the content editor is open
-    pendingRemote: null,    // a newer cloud version that arrived mid-edit
+    pendingRemote: null,    // a cloud version that arrived mid-edit (resolved via banner/exit)
     cloudUnsub: null,
     _pushTimer: null,
     onSync: null,           // called after cloud content is adopted (re-render)
     onSyncState: null,      // called when syncState changes (update the chip)
-    onRemotePending: null,  // called when a newer cloud version arrives mid-edit
+    onRemotePending: null,  // called when a cloud version arrives mid-edit
 
     load: function () {
       try {
@@ -2231,8 +2236,18 @@ window.SkillbeeBrand = {
     },
 
     // Called on every edit: save on this device, then sync to the cloud.
-    save: function () {
+    // `gameKey` (or the editor's _activeGame) marks WHICH game changed, so the
+    // push merges only that section and can't clobber another device's edits to
+    // a different game. No key → a whole-bank change (fall back to a full push).
+    save: function (gameKey) {
       this._ts = Date.now();
+      var key = gameKey || this._activeGame;
+      if (!this._dirty) this._dirty = {};
+      if (key) this._dirty[key] = true; else this._dirtyAll = true;
+      if (this.editing) {
+        if (!this._editedGames) this._editedGames = {};
+        this._editedGames[key || "*"] = true;
+      }
       var ok = this._saveLocal();
       this._scheduleCloudPush();
       return ok;
@@ -2241,6 +2256,7 @@ window.SkillbeeBrand = {
     reset: function () {
       this.data = defaults();
       this._ts = Date.now();
+      this._dirtyAll = true;   // wholesale replace
       this._saveLocal();
       this._scheduleCloudPush();
     },
@@ -2263,9 +2279,19 @@ window.SkillbeeBrand = {
     _pushCloud: function () {
       if (!this._online()) { this._setState("offline"); return; }
       var self = this;
-      window.LiveDB.setContent({ data: this.data, updatedAt: this._ts, clientId: CLIENT_ID })
-        .then(function () { self._setState("synced"); })
-        .catch(function () { self._setState("offline"); });
+      var dirty = this._dirty ? Object.keys(this._dirty) : [];
+      var done = function () { self._dirty = {}; self._dirtyAll = false; self._setState("synced"); };
+      var fail = function () { self._setState("offline"); };
+      // Full write for a wholesale change (seed / reset / restore) or when we
+      // don't know which section changed; otherwise merge ONLY the changed
+      // sections so a different device's other-game edits survive.
+      if (this._dirtyAll || !dirty.length || !window.LiveDB.mergeContent) {
+        window.LiveDB.setContent({ data: this.data, clientId: CLIENT_ID }).then(done).catch(fail);
+      } else {
+        var sections = {};
+        dirty.forEach(function (g) { sections[g] = self.data.exercises[g]; });
+        window.LiveDB.mergeContent(sections, CLIENT_ID).then(done).catch(fail);
+      }
     },
     // Start listening once Firebase is ready (called from App.init).
     initCloud: function () {
@@ -2273,10 +2299,14 @@ window.SkillbeeBrand = {
       var self = this;
       this._setState("synced");
       this.cloudUnsub = window.LiveDB.listenContent(function (doc) {
-        if (!doc) { self._pushCloud(); return; }          // empty cloud → seed it
-        if (doc.clientId === CLIENT_ID) return;            // our own write, echoed
-        if (!doc.data || (doc.updatedAt || 0) <= self._ts) return; // not newer
-        if (self.editing) {                                // don't clobber active edits
+        if (!doc) { self._dirtyAll = true; self._pushCloud(); return; } // empty cloud → seed (full)
+        if (doc.clientId === CLIENT_ID) return;            // our own write, echoed back
+        if (!doc.data) return;
+        // Ordering is server-side: per-section merges make the cloud the union
+        // of every device's latest sections, so outside the editor the cloud is
+        // authoritative — adopt it. During editing, park it for the teacher to
+        // resolve (banner / exit) so we never silently overwrite their edits.
+        if (self.editing) {
           self.pendingRemote = doc;
           if (self.onRemotePending) self.onRemotePending();
           return;
@@ -2286,15 +2316,43 @@ window.SkillbeeBrand = {
     },
     _adoptRemote: function (doc) {
       this.data = ensureSections(doc.data);
-      this._ts = doc.updatedAt || Date.now();
+      this._ts = (doc.updatedAt && doc.updatedAt.toMillis) ? doc.updatedAt.toMillis() : Date.now();
       this._saveLocal();
       this.pendingRemote = null;
+      this._dirty = {}; this._dirtyAll = false;
       this._setState("synced");
       if (this.onSync) this.onSync();
     },
-    applyPendingRemote: function () {
-      if (this.pendingRemote) this._adoptRemote(this.pendingRemote);
+    // Games edited since the editor opened whose content now DIFFERS from the
+    // parked remote — the only genuine conflicts worth asking the teacher about.
+    pendingConflictGames: function () {
+      var pr = this.pendingRemote;
+      if (!pr || !pr.data || !pr.data.exercises) return [];
+      var mine = (this.data && this.data.exercises) || {};
+      var theirs = pr.data.exercises;
+      var edited = this._editedGames || {};
+      var out = [];
+      Object.keys(edited).forEach(function (g) {
+        if (g === "*") { out.push("*"); return; }
+        if (JSON.stringify(mine[g]) !== JSON.stringify(theirs[g])) out.push(g);
+      });
+      return out;
     },
+    // "Use the other device's version" — adopt the parked remote wholesale.
+    adoptPending: function () { if (this.pendingRemote) this._adoptRemote(this.pendingRemote); },
+    // "Keep this device's version" — discard the parked remote; local edits stay
+    // and are re-pushed per-section so the cloud keeps them.
+    keepLocal: function () {
+      this.pendingRemote = null;
+      var edited = this._editedGames || {};
+      if (!this._dirty) this._dirty = {};
+      var d = this._dirty;
+      Object.keys(edited).forEach(function (g) { if (g !== "*") d[g] = true; });
+      if (edited["*"]) this._dirtyAll = true;
+      this._scheduleCloudPush();
+    },
+    // Back-compat alias (old callers) → adopt the parked remote.
+    applyPendingRemote: function () { this.adoptPending(); },
 
     isCustomized: function () {
       try {
@@ -2333,7 +2391,7 @@ window.SkillbeeBrand = {
       var arr = this.exercisesFor(gameKey);
       var e = this._blankExercise(gameKey, name || "Exercise " + (arr.length + 1));
       arr.push(e);
-      this.save();
+      this.save(gameKey);
       return e;
     },
     duplicateExercise: function (gameKey, id) {
@@ -2343,18 +2401,18 @@ window.SkillbeeBrand = {
       copy.id = exId();
       copy.name = (src.name || "Exercise") + " (copy)";
       this.exercisesFor(gameKey).push(copy);
-      this.save();
+      this.save(gameKey);
       return copy;
     },
     renameExercise: function (gameKey, id, name) {
       var e = this.exercise(gameKey, id);
-      if (e) { e.name = String(name || "").trim() || e.name; this.save(); }
+      if (e) { e.name = String(name || "").trim() || e.name; this.save(gameKey); }
     },
     deleteExercise: function (gameKey, id) {
       var arr = this.exercisesFor(gameKey);
       for (var i = 0; i < arr.length; i++) if (arr[i].id === id) { arr.splice(i, 1); break; }
       if (!arr.length) arr.push(this._blankExercise(gameKey, "Exercise 1")); // keep at least one
-      this.save();
+      this.save(gameKey);
     },
     // Copy an exercise from another content-compatible game into this one.
     copyExerciseFrom: function (destKey, srcKey, srcId) {
@@ -2364,7 +2422,7 @@ window.SkillbeeBrand = {
       var copy = clone(src);
       copy.id = exId();
       this.exercisesFor(destKey).push(copy);
-      this.save();
+      this.save(destKey);
       return copy;
     },
 
@@ -2399,6 +2457,7 @@ window.SkillbeeBrand = {
       }
       this.data = ensureSections(parsed);
       this._ts = Date.now();
+      this._dirtyAll = true;   // wholesale replace
       this._saveLocal();
       this._scheduleCloudPush();
     }
@@ -2700,6 +2759,13 @@ window.AppNav = (function () {
 const App = (function () {
   const games = [];
   let root = null;
+  // The content editor's teardown, set while it's open. Run on EVERY exit path
+  // (Back, the logo, navigating elsewhere) so its edit-lock / cloud-sync state
+  // is always released — never left frozen while the chip still says "Synced".
+  let adminTeardown = null;
+  function endAdminIfOpen() {
+    if (adminTeardown) { try { adminTeardown(); } catch (e) {} adminTeardown = null; }
+  }
 
   /* ---- tiny helpers to build HTML elements ------------------------- */
   function el(tag, opts = {}, children = []) {
@@ -2928,6 +2994,7 @@ const App = (function () {
   }
 
   function showModeSelect() {
+    endAdminIfOpen();
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(false);
     kit.hush();
@@ -2959,6 +3026,7 @@ const App = (function () {
   }
 
   function showLive() {
+    endAdminIfOpen();
     kit.hush();
     setAdminVisible(false);
     window.AppNav.set(function () { showModeSelect(); }, null); // Live sub-screens override this
@@ -2970,6 +3038,7 @@ const App = (function () {
   }
 
   function showHome() {
+    endAdminIfOpen();
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(true);
     kit.hush();
@@ -3116,16 +3185,18 @@ const App = (function () {
   }
 
   function openAdmin(onExit) {
+    endAdminIfOpen();
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(false);
     kit.hush();
-    window.AppNav.set(function () { (typeof onExit === "function" ? onExit : showHome)(); }, null);
+    // Browser Back / the trapped hardware Back must tear the editor down too.
+    window.AppNav.set(function () { endAdminIfOpen(); (typeof onExit === "function" ? onExit : showHome)(); }, null);
     const main = document.getElementById("screen");
     main.innerHTML = "";
     const container = el("div", { class: "admin" });
     main.appendChild(container);
     if (window.AdminUI) {
-      window.AdminUI.mount(container, {
+      const mounted = window.AdminUI.mount(container, {
         el,
         kit,
         store: window.ContentStore,
@@ -3134,6 +3205,7 @@ const App = (function () {
         games: games.filter((g) => !g.liveWrapped).map((g) => ({ id: g.id, name: g.name, emoji: g.emoji, color: g.color, contentType: g.contentType })),
         onExit: typeof onExit === "function" ? onExit : () => showHome()
       });
+      adminTeardown = (mounted && mounted.teardown) || null;
     }
   }
 
@@ -4781,18 +4853,31 @@ document.addEventListener("DOMContentLoaded", App.init);
       var currentExercise = null; // exercise id when editing one exercise
       var syncChipEl = null;
 
+      var GAME_LABELS = {
+        quiz: "Quiz-Blitz", memory: "Memory", cases: "Lücken-Text", compounds: "Wortmonster",
+        listening: "Hör gut zu!", hoerpaare: "Match the Following", truefalse: "Wahr oder Falsch?",
+        scramble: "Sentence Scramble", hangman: "Hangman", passage: "Lese & Hör", "*": "content"
+      };
+      function labelFor(g) { return GAME_LABELS[g] || g; }
+
       /* ---- cloud sync hooks ---- */
-      // Mark the editor open so incoming cloud updates don't clobber active edits.
+      // Mark the editor open so incoming cloud updates don't clobber active edits,
+      // and start a fresh "edited this session" record for conflict detection.
       store.editing = true;
+      store._editedGames = {};
       store.onSyncState = function (s) { updateSyncChip(s); };
       store.onSync = function () { render(); };
       store.onRemotePending = function () { showRemoteBanner(); };
 
       function updateSyncChip(s) {
         if (!syncChipEl) return;
+        // Never claim "Synced" while a remote change is parked — sync is actually
+        // waiting on the teacher to resolve it.
+        if (store.pendingRemote && s === "synced") s = "pending";
         var map = {
           synced: ["☁️ Synced", "ok"],
           saving: ["☁️ Saving…", "busy"],
+          pending: ["📥 Needs review", "busy"],
           offline: ["💾 This device", "off"],
           local: ["💾 This device", "off"]
         };
@@ -4801,27 +4886,64 @@ document.addEventListener("DOMContentLoaded", App.init);
         syncChipEl.className = "adm-sync " + m[1];
       }
 
+      function removeBanner() { var b = container.querySelector(".adm-remote-banner"); if (b) b.remove(); }
+
+      // A cloud change arrived mid-edit. If it touches a game the teacher has
+      // NOT edited this session, there's nothing to lose — offer a simple "Load
+      // it". If it collides with a game they DID edit, make them choose, and say
+      // which games differ. Nothing is ever adopted without an explicit tap.
       function showRemoteBanner() {
-        if (container.querySelector(".adm-remote-banner")) return;
+        removeBanner();
+        if (!store.pendingRemote) return;
+        var conflicts = store.pendingConflictGames ? store.pendingConflictGames() : [];
+        var names = conflicts.map(labelFor).join(", ");
+        var actions;
+        if (conflicts.length) {
+          actions = el("div", { class: "adm-remote-actions" }, [
+            el("button", { class: "btn small", text: "Keep mine", on: { click: function () { store.keepLocal(); removeBanner(); updateSyncChip(store.syncState); } } }),
+            el("button", { class: "btn small ghost", text: "Use theirs", on: { click: function () {
+              if (window.confirm("Replace this device's changes to " + names + " with the other device's version? This can't be undone.")) { store.adoptPending(); removeBanner(); render(); }
+            } } })
+          ]);
+        } else {
+          actions = el("div", { class: "adm-remote-actions" }, [
+            el("button", { class: "btn small", text: "Load it", on: { click: function () { store.adoptPending(); removeBanner(); render(); } } }),
+            el("button", { class: "btn small ghost", text: "Dismiss", on: { click: function () { removeBanner(); } } })
+          ]);
+        }
         container.insertBefore(
           el("div", { class: "adm-remote-banner" }, [
-            el("span", { text: "📥 Another device updated the content." }),
-            el("button", { class: "btn small", text: "Load it", on: { click: function () { store.applyPendingRemote(); render(); } } })
+            el("span", { text: conflicts.length
+              ? ("📥 Another device also changed: " + names + ". Keep which version?")
+              : "📥 Another device updated the content." }),
+            actions
           ]),
           container.firstChild
         );
+        updateSyncChip(store.syncState); // reflect "needs review", never a false "Synced"
       }
 
-      // Leaving the editor: release the edit lock and pick up anything that
-      // arrived while we were editing.
-      function exitAdmin() {
+      // Release the edit lock and reconcile any parked remote — WITHOUT ever
+      // silently discarding local edits. Runs on EVERY way out of the editor
+      // (the ← Menu button, browser Back, the logo — app.js calls teardown()).
+      var released = false;
+      function releaseAndReconcile() {
+        if (released) return;
+        released = true;
         store.editing = false;
         store.onSync = null;
         store.onSyncState = null;
         store.onRemotePending = null;
-        if (store.applyPendingRemote) store.applyPendingRemote();
-        api.onExit();
+        store._activeGame = null;
+        if (store.pendingRemote) {
+          var conflicts = store.pendingConflictGames ? store.pendingConflictGames() : [];
+          // Conflict → keep this device's edits (already pushed per-section, so
+          // the cloud has them). No conflict → take the newer cloud content.
+          if (conflicts.length) store.keepLocal(); else store.adoptPending();
+        }
+        store._editedGames = null;
       }
+      function exitAdmin() { releaseAndReconcile(); api.onExit(); }
 
       /* A text input bound two-way to obj[field]; saves on every keystroke. */
       function input(obj, field, placeholder, cls, maxlen) {
@@ -5032,6 +5154,9 @@ document.addEventListener("DOMContentLoaded", App.init);
       /* ---------------- top-level render ---------------- */
       function render() {
         container.innerHTML = "";
+        // Tell the store which game is being edited, so save() merges just that
+        // section (and can't clobber another device's edits to a different game).
+        store._activeGame = currentGame;
 
         // One back button (pinned top-left): steps up through exercise → game →
         // menu depending on how deep we are.
@@ -6204,6 +6329,9 @@ document.addEventListener("DOMContentLoaded", App.init);
       }
 
       render();
+      // Hand the teardown back so app.js can release the editor on EVERY exit
+      // path (browser Back, the logo) — not just the in-editor ← Menu button.
+      return { teardown: releaseAndReconcile };
     }
   };
 })();
@@ -6550,9 +6678,22 @@ document.addEventListener("DOMContentLoaded", App.init);
         return d.exists ? d.data() : null;
       });
     },
+    // FULL write — seeds an empty cloud, and Reset/Restore (a deliberate
+    // wholesale replace). Stamps a SERVER timestamp so ordering never depends
+    // on a device's (possibly wrong) clock.
     setContent: function (payload) {
-      // Full overwrite — the whole content bank is written each time.
-      return db.collection("content").doc("bank").set(payload);
+      var body = Object.assign({}, payload, { updatedAt: serverTs() });
+      return db.collection("content").doc("bank").set(body);
+    },
+    // INCREMENTAL write — merges ONLY the changed game sections, so two
+    // teachers editing DIFFERENT games can't clobber each other (Firestore
+    // deep-merges the nested `data.exercises` map; each game's array is
+    // replaced independently). `sections` = { gameKey: [exercises…] }.
+    mergeContent: function (sections, clientId) {
+      return db.collection("content").doc("bank").set(
+        { data: { exercises: sections }, clientId: clientId, updatedAt: serverTs() },
+        { merge: true }
+      );
     },
     listenContent: function (cb) {
       return db.collection("content").doc("bank").onSnapshot(
@@ -6561,12 +6702,30 @@ document.addEventListener("DOMContentLoaded", App.init);
       );
     },
 
-    /* ---------------- cumulative leaderboards ---------------- */
+    /* ---------------- cumulative (term) leaderboards ---------------- */
     getLeaderboard: function (rosterId) {
       return db.collection("leaderboards").doc(rosterId).get().then(function (d) {
         return d.exists ? d.data() : { scores: {} };
       });
     },
+    // Term leaderboards are ONLY EVER ADDED TO — never overwritten. Each call
+    // atomically increments the given students' totals by the points they just
+    // earned (a per-round delta), so an interrupted class keeps everything
+    // earned so far and two rooms can't clobber the running totals.
+    addToLeaderboard: function (rosterId, deltas) {
+      var FV = firebase.firestore.FieldValue;
+      var inc = {};
+      Object.keys(deltas || {}).forEach(function (k) {
+        var v = Number(deltas[k]) || 0;
+        if (v) inc[k] = FV.increment(v);
+      });
+      if (!Object.keys(inc).length) return Promise.resolve();
+      return db.collection("leaderboards").doc(rosterId).set(
+        { scores: inc, updatedAt: serverTs() },
+        { merge: true }
+      );
+    },
+    // Kept for backup/compat; the game flow uses addToLeaderboard (additive).
     saveLeaderboard: function (rosterId, scores) {
       return db.collection("leaderboards").doc(rosterId).set(
         { scores: scores, updatedAt: serverTs() },
@@ -8258,7 +8417,12 @@ window.LiveMode = (function () {
       startLabel: "Start room ▶",
       back: hostRosters,
       onStart: function (sel) {
-        // Host keeps the full rounds (with answers) in memory only.
+        // "Continue" here means: this room CONTRIBUTES to the class's term-long
+        // leaderboard. Its display is seeded from the stored term totals so the
+        // podium shows cumulative standings; each round then ADDS its points to
+        // the term board (incrementally — see commitTerm). "Start fresh" rooms
+        // never touch the term board.
+        var term = (sel.persistMode === "continue");
         var seed = { scores: {} };
         var afterSeed = function () {
           window.LiveDB.createSession({
@@ -8266,14 +8430,20 @@ window.LiveMode = (function () {
             gameId: sel.gameId, gameName: sel.adapter.meta.name, topicName: sel.topic.name,
             status: "lobby", questionIndex: -1, totalQuestions: sel.rounds.length,
             round: null, reveal: null, scores: seed.scores, persistMode: sel.persistMode,
+            termLeaderboard: term,
             answerMode: sel.answerMode, gameSeq: 0,
             timerMode: sel.timerMode, perQuestionSecs: sel.perQuestionSecs, speedSecs: sel.speedSecs
           }).then(function (code) {
             hostRun(code, sel.adapter, sel.rounds, roster);
           }).catch(function (e) { alert("Could not start: " + e.message); });
         };
-        if (sel.persistMode === "continue") {
-          window.LiveDB.getLeaderboard(roster.id).then(function (lb) { seed.scores = lb.scores || {}; afterSeed(); });
+        if (term) {
+          // Seed the display from the term board. A FAILED read must surface a
+          // real error, not leave "Start room" silently dead (the teacher can
+          // fix their connection and tap Start again).
+          window.LiveDB.getLeaderboard(roster.id)
+            .then(function (lb) { seed.scores = (lb && lb.scores) || {}; afterSeed(); })
+            .catch(function () { alert("Couldn't load this class's saved scores — check your internet connection and tap Start again."); });
         } else afterSeed();
       }
     });
@@ -8329,6 +8499,24 @@ window.LiveMode = (function () {
         var p = window.LiveDB.updateSession(code, data);
         if (p && p.catch) p.catch(function () {});
       } catch (e) {}
+    }
+
+    // Term-leaderboard commits are ADDITIVE and INCREMENTAL: as each round is
+    // scored we add that round's per-student points to the class's long-term
+    // board (via FieldValue.increment). This (a) never overwrites the term
+    // totals — the M2 corruption where "Keep scores" wrote a room total over the
+    // term board — and (b) means an interrupted class keeps everything earned so
+    // far (no more "lost if the room closes before the podium"). `key`
+    // (gameSeq:index) guards against committing the same round twice.
+    var termCommitted = {};
+    function commitTerm(deltas, key) {
+      if (!sess || !sess.termLeaderboard || !sess.rosterId) return;
+      if (termCommitted[key]) return;
+      termCommitted[key] = true;
+      var any = false, d = {};
+      Object.keys(deltas || {}).forEach(function (id) { var v = Number(deltas[id]) || 0; if (v) { d[id] = v; any = true; } });
+      if (!any) return;
+      try { if (window.LiveDB.addToLeaderboard) window.LiveDB.addToLeaderboard(sess.rosterId, d).catch(function () {}); } catch (e) {}
     }
 
     // The Passage game sequences DIFFERENT formats — each round carries `fmt` (the
@@ -8870,6 +9058,7 @@ window.LiveMode = (function () {
       if (hostSpeedCountdown) { hostSpeedCountdown.stop(); }
       if (speedAnswersUnsub) { speedAnswersUnsub(); speedAnswersUnsub = null; }
       var scores = Object.assign({}, sess.scores || {});
+      var deltas = {};   // per-student points earned this whole Speed set → term board
       var counted = {};
       (latestAnswers || []).forEach(function (a) {
         if (a.studentId == null) return;
@@ -8881,9 +9070,11 @@ window.LiveMode = (function () {
         var ra = adapterForRound(r);
         var sc; try { sc = ra.score(r, a, 0, TL) || {}; } catch (e) { sc = { points: 0 }; }
         scores[a.studentId] = (scores[a.studentId] || 0) + (sc.points || 0);
+        deltas[a.studentId] = (deltas[a.studentId] || 0) + (sc.points || 0);
       });
       sess.scores = scores;       // so podium()/renderPodium read the final tally
       safeUpdate({ scores: scores });
+      commitTerm(deltas, (sess.gameSeq || 0) + ":speed");
       podium();
     }
 
@@ -8925,6 +9116,7 @@ window.LiveMode = (function () {
         var byStudent = {};
         arr.forEach(function (a) { byStudent[a.studentId] = a; });
         var scores = Object.assign({}, sess.scores || {});
+        var deltas = {};   // per-student points earned THIS round → term board
         var results = [];
         (sess.students || []).forEach(function (stu) {
           var a = byStudent[stu.id];
@@ -8934,6 +9126,7 @@ window.LiveMode = (function () {
           // A bad answer payload must never brick the reveal — score defensively.
           var sc; try { sc = ra.score(r, a, elapsed, TL) || {}; } catch (e) { sc = { correct: false, points: 0 }; }
           scores[stu.id] = (scores[stu.id] || 0) + (sc.points || 0);
+          deltas[stu.id] = (sc.points || 0);
           var row = { studentId: stu.id, name: stu.name, correct: !!sc.correct, points: sc.points || 0, answered: true };
           // Only the partial-credit scorers (Lücken-Text, type mode) return
           // matched/total. Writing them as `undefined` for every other game
@@ -8956,6 +9149,7 @@ window.LiveMode = (function () {
         // be rendered at reveal, not just its text value.
         if (ra.mcq) { revealDoc.correctOption = (r.options || []).filter(function (o) { return o.correct; })[0] || null; }
         safeUpdate({ status: "reveal", scores: scores, reveal: revealDoc });
+        commitTerm(deltas, (sess.gameSeq || 0) + ":" + i);
         var german; try { german = ra.speakOnReveal(r); } catch (e) { german = null; }
         // Pronunciation is a nice-to-have — it must never stop the reveal screen.
         if (german) { try { kit.speak(german); } catch (e) {} }
@@ -8979,6 +9173,7 @@ window.LiveMode = (function () {
         if (!cur || a.done || (a.matched || 0) > (cur.matched || 0)) best[a.studentId] = a;
       });
       var scores = Object.assign({}, sess.scores || {});
+      var deltas = {};   // per-student points earned THIS round → term board
       var results = [];
       (sess.students || []).forEach(function (stu) {
         var a = best[stu.id];
@@ -9005,6 +9200,7 @@ window.LiveMode = (function () {
         var pts = accPts + compPts + speedPts;
         if (pts < 0) pts = 0;
         scores[stu.id] = (scores[stu.id] || 0) + pts;
+        deltas[stu.id] = pts;
         results.push({ studentId: stu.id, name: stu.name, correct: done, points: pts, answered: matched > 0, matched: matched, total: total, firstTry: firstTry, wrong: wrong, secs: secs });
       });
       results.sort(function (x, y) { return y.points - x.points; });
@@ -9014,6 +9210,7 @@ window.LiveMode = (function () {
         status: "reveal", scores: scores,
         reveal: { index: i, correct: mCorrect, explanation: null, results: results, match: true }
       });
+      commitTerm(deltas, (sess.gameSeq || 0) + ":" + i);
       safeReveal(i, r, results, scores);
     }
 
@@ -9110,9 +9307,11 @@ window.LiveMode = (function () {
 
     function podium() {
       hostPhase = "podium";
-      // Transition into the final screen (once), then render it.
+      // Transition into the final screen (once), then render it. The term
+      // leaderboard is NOT written here any more — it's committed additively,
+      // round by round, in commitTerm() (so an interrupted class keeps its
+      // points and "Keep scores" can never overwrite the term totals). M2.
       safeUpdate({ status: "podium", speedActive: false });
-      try { if (sess.persistMode === "continue") window.LiveDB.saveLeaderboard(sess.rosterId, sess.scores || {}).catch(function () {}); } catch (e) {}
       try { kit.confetti(); kit.beep("win"); } catch (e) {}
       renderPodium();
     }
@@ -9177,6 +9376,12 @@ window.LiveMode = (function () {
         freshSub: "Everyone starts this game at zero",
         back: renderPodium,
         onStart: function (sel) {
+          // "Keep scores" here means carry THIS ROOM's running totals into the
+          // next game — an in-room display choice ONLY. It deliberately does NOT
+          // touch `termLeaderboard`: whether this room feeds the class's term
+          // board was decided once, at room creation, and is preserved across
+          // every game (the updateSession merge leaves it untouched). This is
+          // the M2 fix — "Keep scores" can no longer overwrite the term board.
           var seedScores = sel.persistMode === "continue" ? carried : {};
           window.LiveDB.updateSession(code, {
             gameId: sel.gameId, gameName: sel.adapter.meta.name, topicName: sel.topic.name,
