@@ -350,10 +350,14 @@
       });
     },
     // FULL write — seeds an empty cloud, and Reset/Restore (a deliberate
-    // wholesale replace). Stamps a SERVER timestamp so ordering never depends
-    // on a device's (possibly wrong) clock.
+    // wholesale replace). `updatedAt` is a plain millisecond NUMBER, not a
+    // serverTimestamp(): the content security rule requires `updatedAt is number`,
+    // and a serverTimestamp is type `timestamp` in rules, so it was REJECTING
+    // every content write — content silently never synced (the "This device"
+    // chip that never turned into "Synced"). A client number is fine here:
+    // content merges are last-write-wins per section, not ordered by this field.
     setContent: function (payload) {
-      var body = Object.assign({}, payload, { updatedAt: serverTs() });
+      var body = Object.assign({}, payload, { updatedAt: Date.now() });
       return db.collection("content").doc("bank").set(body);
     },
     // INCREMENTAL write — merges ONLY the changed game sections, so two
@@ -362,7 +366,7 @@
     // replaced independently). `sections` = { gameKey: [exercises…] }.
     mergeContent: function (sections, clientId) {
       return db.collection("content").doc("bank").set(
-        { data: { exercises: sections }, clientId: clientId, updatedAt: serverTs() },
+        { data: { exercises: sections }, clientId: clientId, updatedAt: Date.now() }, // number, not serverTs — see setContent
         { merge: true }
       );
     },
