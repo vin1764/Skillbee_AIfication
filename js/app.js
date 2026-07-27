@@ -91,6 +91,13 @@ window.AppNav = (function () {
 const App = (function () {
   const games = [];
   let root = null;
+  // The content editor's teardown, set while it's open. Run on EVERY exit path
+  // (Back, the logo, navigating elsewhere) so its edit-lock / cloud-sync state
+  // is always released — never left frozen while the chip still says "Synced".
+  let adminTeardown = null;
+  function endAdminIfOpen() {
+    if (adminTeardown) { try { adminTeardown(); } catch (e) {} adminTeardown = null; }
+  }
 
   /* ---- tiny helpers to build HTML elements ------------------------- */
   function el(tag, opts = {}, children = []) {
@@ -319,6 +326,7 @@ const App = (function () {
   }
 
   function showModeSelect() {
+    endAdminIfOpen();
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(false);
     kit.hush();
@@ -343,13 +351,14 @@ const App = (function () {
       el("button", { class: "mode-card live", on: { click: () => showLive() } }, [
         el("div", { class: "mode-emoji", text: "📡" }),
         el("div", { class: "mode-name", text: "Live Class Mode" }),
-        el("div", { class: "mode-desc", text: "Teacher hosts on the smartboard, students play on their phones — room code, live scoring, leaderboard." })
+        el("div", { class: "mode-desc", text: "Teacher hosts on the smartboard, students play on their phones — room code, live scoring, a podium." })
       ])
     );
     main.appendChild(modeGrid);
   }
 
   function showLive() {
+    endAdminIfOpen();
     kit.hush();
     setAdminVisible(false);
     window.AppNav.set(function () { showModeSelect(); }, null); // Live sub-screens override this
@@ -361,6 +370,7 @@ const App = (function () {
   }
 
   function showHome() {
+    endAdminIfOpen();
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(true);
     kit.hush();
@@ -507,16 +517,18 @@ const App = (function () {
   }
 
   function openAdmin(onExit) {
+    endAdminIfOpen();
     if (window.LiveMode) window.LiveMode.stop();
     setAdminVisible(false);
     kit.hush();
-    window.AppNav.set(function () { (typeof onExit === "function" ? onExit : showHome)(); }, null);
+    // Browser Back / the trapped hardware Back must tear the editor down too.
+    window.AppNav.set(function () { endAdminIfOpen(); (typeof onExit === "function" ? onExit : showHome)(); }, null);
     const main = document.getElementById("screen");
     main.innerHTML = "";
     const container = el("div", { class: "admin" });
     main.appendChild(container);
     if (window.AdminUI) {
-      window.AdminUI.mount(container, {
+      const mounted = window.AdminUI.mount(container, {
         el,
         kit,
         store: window.ContentStore,
@@ -525,6 +537,7 @@ const App = (function () {
         games: games.filter((g) => !g.liveWrapped).map((g) => ({ id: g.id, name: g.name, emoji: g.emoji, color: g.color, contentType: g.contentType })),
         onExit: typeof onExit === "function" ? onExit : () => showHome()
       });
+      adminTeardown = (mounted && mounted.teardown) || null;
     }
   }
 

@@ -382,12 +382,19 @@ window.LiveMode = (function () {
           ]));
           n++;
         }
-        step.appendChild(el("div", { class: "live-label", text: n + " · Scoreboard" }));
-        var modeRow = el("div", { class: "setup-modes" }, [
-          modeBtn("fresh", "Start fresh", opts.freshSub || "Leaderboard resets to zero"),
-          modeBtn("continue", opts.continueLabel || "Continue", opts.continueSub || "Add to this class's running scores")
-        ]);
-        step.appendChild(modeRow);
+        // Scoreboard choice is only meaningful for "Play another game" in an
+        // existing room (carry this room's running total, or reset it for the
+        // next game). The FIRST game of a room is always a clean start, and
+        // there is no cross-session leaderboard, so the first-game picker hides
+        // this step entirely. opts.showScoreboard is set only by playAnother.
+        if (opts.showScoreboard) {
+          step.appendChild(el("div", { class: "live-label", text: n + " · Scoreboard" }));
+          var modeRow = el("div", { class: "setup-modes" }, [
+            modeBtn("fresh", "Start fresh", opts.freshSub || "Everyone starts this game at zero"),
+            modeBtn("continue", opts.continueLabel || "Keep scores", opts.continueSub || "Add to this room's running totals")
+          ]);
+          step.appendChild(modeRow);
+        }
         step.appendChild(el("button", { class: "btn primary big", text: opts.startLabel || "Start room ▶", on: { click: doStart } }));
       }
 
@@ -516,23 +523,18 @@ window.LiveMode = (function () {
       startLabel: "Start room ▶",
       back: hostRosters,
       onStart: function (sel) {
-        // Host keeps the full rounds (with answers) in memory only.
-        var seed = { scores: {} };
-        var afterSeed = function () {
-          window.LiveDB.createSession({
-            rosterId: roster.id, rosterName: roster.name, students: roster.students,
-            gameId: sel.gameId, gameName: sel.adapter.meta.name, topicName: sel.topic.name,
-            status: "lobby", questionIndex: -1, totalQuestions: sel.rounds.length,
-            round: null, reveal: null, scores: seed.scores, persistMode: sel.persistMode,
-            answerMode: sel.answerMode, gameSeq: 0,
-            timerMode: sel.timerMode, perQuestionSecs: sel.perQuestionSecs, speedSecs: sel.speedSecs
-          }).then(function (code) {
-            hostRun(code, sel.adapter, sel.rounds, roster);
-          }).catch(function (e) { alert("Could not start: " + e.message); });
-        };
-        if (sel.persistMode === "continue") {
-          window.LiveDB.getLeaderboard(roster.id).then(function (lb) { seed.scores = lb.scores || {}; afterSeed(); });
-        } else afterSeed();
+        // Every room starts fresh — no cross-session leaderboard. Nothing about a
+        // student's performance is carried over from any previous session.
+        window.LiveDB.createSession({
+          rosterId: roster.id, rosterName: roster.name, students: roster.students,
+          gameId: sel.gameId, gameName: sel.adapter.meta.name, topicName: sel.topic.name,
+          status: "lobby", questionIndex: -1, totalQuestions: sel.rounds.length,
+          round: null, reveal: null, scores: {}, persistMode: "fresh",
+          answerMode: sel.answerMode, gameSeq: 0,
+          timerMode: sel.timerMode, perQuestionSecs: sel.perQuestionSecs, speedSecs: sel.speedSecs
+        }).then(function (code) {
+          hostRun(code, sel.adapter, sel.rounds, roster);
+        }).catch(function (e) { alert("Could not start: " + e.message); });
       }
     });
   }
@@ -588,6 +590,7 @@ window.LiveMode = (function () {
         if (p && p.catch) p.catch(function () {});
       } catch (e) {}
     }
+
 
     // The Passage game sequences DIFFERENT formats — each round carries `fmt` (the
     // format's LiveGames key). Every per-round render/score call resolves the
@@ -1368,9 +1371,10 @@ window.LiveMode = (function () {
 
     function podium() {
       hostPhase = "podium";
-      // Transition into the final screen (once), then render it.
+      // Transition into the final screen (once), then render it. Nothing is
+      // persisted anywhere — the podium shows THIS room's results only; there is
+      // no cross-session leaderboard.
       safeUpdate({ status: "podium", speedActive: false });
-      try { if (sess.persistMode === "continue") window.LiveDB.saveLeaderboard(sess.rosterId, sess.scores || {}).catch(function () {}); } catch (e) {}
       try { kit.confetti(); kit.beep("win"); } catch (e) {}
       renderPodium();
     }
@@ -1430,11 +1434,16 @@ window.LiveMode = (function () {
         title: "Play another game",
         sub: "Same room · code " + code + " · same players. Pick the next game.",
         startLabel: "Start game ▶",
+        showScoreboard: true, // the ONLY place the scoreboard choice appears
         continueLabel: "Keep scores",
         continueSub: "Add to this room's running totals",
         freshSub: "Everyone starts this game at zero",
         back: renderPodium,
         onStart: function (sel) {
+          // "Keep scores" carries THIS ROOM's running totals into the next game —
+          // an in-room, this-session display choice only. It is never saved
+          // anywhere and vanishes when the room ends. There is no cross-session
+          // leaderboard.
           var seedScores = sel.persistMode === "continue" ? carried : {};
           window.LiveDB.updateSession(code, {
             gameId: sel.gameId, gameName: sel.adapter.meta.name, topicName: sel.topic.name,
@@ -1451,7 +1460,14 @@ window.LiveMode = (function () {
     }
 
     function closeRoom() {
-      safeUpdate({ status: "ended" });
+      // Ending a room WIPES the student names and scores it held, so no
+      // performance data lingers in the database afterward. We clear every
+      // field of the session doc that carries a name or a score, and delete the
+      // per-student presence docs. (Answer docs are write-once by the security
+      // rules and can't be deleted client-side; they hold answer choices keyed
+      // by a name-slug id, never display names.)
+      safeUpdate({ status: "ended", scores: {}, students: [], joined: {}, round: null, reveal: null, speedRounds: null });
+      try { if (window.LiveDB.clearJoined) window.LiveDB.clearJoined(code); } catch (e) {}
       stop();
       landing();
     }

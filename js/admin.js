@@ -17,18 +17,31 @@
       var currentExercise = null; // exercise id when editing one exercise
       var syncChipEl = null;
 
+      var GAME_LABELS = {
+        quiz: "Quiz-Blitz", memory: "Memory", cases: "Lücken-Text", compounds: "Wortmonster",
+        listening: "Hör gut zu!", hoerpaare: "Match the Following", truefalse: "Wahr oder Falsch?",
+        scramble: "Sentence Scramble", hangman: "Hangman", passage: "Lese & Hör", "*": "content"
+      };
+      function labelFor(g) { return GAME_LABELS[g] || g; }
+
       /* ---- cloud sync hooks ---- */
-      // Mark the editor open so incoming cloud updates don't clobber active edits.
+      // Mark the editor open so incoming cloud updates don't clobber active edits,
+      // and start a fresh "edited this session" record for conflict detection.
       store.editing = true;
+      store._editedGames = {};
       store.onSyncState = function (s) { updateSyncChip(s); };
       store.onSync = function () { render(); };
       store.onRemotePending = function () { showRemoteBanner(); };
 
       function updateSyncChip(s) {
         if (!syncChipEl) return;
+        // Never claim "Synced" while a remote change is parked — sync is actually
+        // waiting on the teacher to resolve it.
+        if (store.pendingRemote && s === "synced") s = "pending";
         var map = {
           synced: ["☁️ Synced", "ok"],
           saving: ["☁️ Saving…", "busy"],
+          pending: ["📥 Needs review", "busy"],
           offline: ["💾 This device", "off"],
           local: ["💾 This device", "off"]
         };
@@ -37,27 +50,64 @@
         syncChipEl.className = "adm-sync " + m[1];
       }
 
+      function removeBanner() { var b = container.querySelector(".adm-remote-banner"); if (b) b.remove(); }
+
+      // A cloud change arrived mid-edit. If it touches a game the teacher has
+      // NOT edited this session, there's nothing to lose — offer a simple "Load
+      // it". If it collides with a game they DID edit, make them choose, and say
+      // which games differ. Nothing is ever adopted without an explicit tap.
       function showRemoteBanner() {
-        if (container.querySelector(".adm-remote-banner")) return;
+        removeBanner();
+        if (!store.pendingRemote) return;
+        var conflicts = store.pendingConflictGames ? store.pendingConflictGames() : [];
+        var names = conflicts.map(labelFor).join(", ");
+        var actions;
+        if (conflicts.length) {
+          actions = el("div", { class: "adm-remote-actions" }, [
+            el("button", { class: "btn small", text: "Keep mine", on: { click: function () { store.keepLocal(); removeBanner(); updateSyncChip(store.syncState); } } }),
+            el("button", { class: "btn small ghost", text: "Use theirs", on: { click: function () {
+              if (window.confirm("Replace this device's changes to " + names + " with the other device's version? This can't be undone.")) { store.adoptPending(); removeBanner(); render(); }
+            } } })
+          ]);
+        } else {
+          actions = el("div", { class: "adm-remote-actions" }, [
+            el("button", { class: "btn small", text: "Load it", on: { click: function () { store.adoptPending(); removeBanner(); render(); } } }),
+            el("button", { class: "btn small ghost", text: "Dismiss", on: { click: function () { removeBanner(); } } })
+          ]);
+        }
         container.insertBefore(
           el("div", { class: "adm-remote-banner" }, [
-            el("span", { text: "📥 Another device updated the content." }),
-            el("button", { class: "btn small", text: "Load it", on: { click: function () { store.applyPendingRemote(); render(); } } })
+            el("span", { text: conflicts.length
+              ? ("📥 Another device also changed: " + names + ". Keep which version?")
+              : "📥 Another device updated the content." }),
+            actions
           ]),
           container.firstChild
         );
+        updateSyncChip(store.syncState); // reflect "needs review", never a false "Synced"
       }
 
-      // Leaving the editor: release the edit lock and pick up anything that
-      // arrived while we were editing.
-      function exitAdmin() {
+      // Release the edit lock and reconcile any parked remote — WITHOUT ever
+      // silently discarding local edits. Runs on EVERY way out of the editor
+      // (the ← Menu button, browser Back, the logo — app.js calls teardown()).
+      var released = false;
+      function releaseAndReconcile() {
+        if (released) return;
+        released = true;
         store.editing = false;
         store.onSync = null;
         store.onSyncState = null;
         store.onRemotePending = null;
-        if (store.applyPendingRemote) store.applyPendingRemote();
-        api.onExit();
+        store._activeGame = null;
+        if (store.pendingRemote) {
+          var conflicts = store.pendingConflictGames ? store.pendingConflictGames() : [];
+          // Conflict → keep this device's edits (already pushed per-section, so
+          // the cloud has them). No conflict → take the newer cloud content.
+          if (conflicts.length) store.keepLocal(); else store.adoptPending();
+        }
+        store._editedGames = null;
       }
+      function exitAdmin() { releaseAndReconcile(); api.onExit(); }
 
       /* A text input bound two-way to obj[field]; saves on every keystroke. */
       function input(obj, field, placeholder, cls, maxlen) {
@@ -268,6 +318,9 @@
       /* ---------------- top-level render ---------------- */
       function render() {
         container.innerHTML = "";
+        // Tell the store which game is being edited, so save() merges just that
+        // section (and can't clobber another device's edits to a different game).
+        store._activeGame = currentGame;
 
         // One back button (pinned top-left): steps up through exercise → game →
         // menu depending on how deep we are.
@@ -1443,6 +1496,9 @@
       }
 
       render();
+      // Hand the teardown back so app.js can release the editor on EVERY exit
+      // path (browser Back, the logo) — not just the in-editor ← Menu button.
+      return { teardown: releaseAndReconcile };
     }
   };
 })();

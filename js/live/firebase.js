@@ -190,6 +190,17 @@
         .set({ heartbeat: serverTs() }, { merge: true })
         .catch(function (e) { if (LiveDB._isDenied(e)) LiveDB._joinLegacy = true; });
     },
+    // Delete EVERY claimed-slot doc for a room — used when a room ends, so no
+    // student names linger in the sessions/{code}/joined subcollection. (Rules
+    // allow deleting joined docs.)
+    clearJoined: function (code) {
+      if (LiveDB._joinLegacy) return Promise.resolve(); // legacy mode uses the session-doc map, wiped by the caller
+      return db.collection("sessions").doc(code).collection("joined").get().then(function (snap) {
+        var dels = [];
+        snap.forEach(function (d) { dels.push(d.ref.delete().catch(function () {})); });
+        return Promise.all(dels);
+      }).catch(function () {});
+    },
     // Explicitly give up a slot (tab close / leave) so the name frees instantly.
     leaveSession: function (code, studentId) {
       function legacyLeave() {
@@ -338,9 +349,22 @@
         return d.exists ? d.data() : null;
       });
     },
+    // FULL write — seeds an empty cloud, and Reset/Restore (a deliberate
+    // wholesale replace). Stamps a SERVER timestamp so ordering never depends
+    // on a device's (possibly wrong) clock.
     setContent: function (payload) {
-      // Full overwrite — the whole content bank is written each time.
-      return db.collection("content").doc("bank").set(payload);
+      var body = Object.assign({}, payload, { updatedAt: serverTs() });
+      return db.collection("content").doc("bank").set(body);
+    },
+    // INCREMENTAL write — merges ONLY the changed game sections, so two
+    // teachers editing DIFFERENT games can't clobber each other (Firestore
+    // deep-merges the nested `data.exercises` map; each game's array is
+    // replaced independently). `sections` = { gameKey: [exercises…] }.
+    mergeContent: function (sections, clientId) {
+      return db.collection("content").doc("bank").set(
+        { data: { exercises: sections }, clientId: clientId, updatedAt: serverTs() },
+        { merge: true }
+      );
     },
     listenContent: function (cb) {
       return db.collection("content").doc("bank").onSnapshot(
@@ -349,18 +373,11 @@
       );
     },
 
-    /* ---------------- cumulative leaderboards ---------------- */
-    getLeaderboard: function (rosterId) {
-      return db.collection("leaderboards").doc(rosterId).get().then(function (d) {
-        return d.exists ? d.data() : { scores: {} };
-      });
-    },
-    saveLeaderboard: function (rosterId, scores) {
-      return db.collection("leaderboards").doc(rosterId).set(
-        { scores: scores, updatedAt: serverTs() },
-        { merge: true }
-      );
-    }
+    // NOTE: there is deliberately NO cross-session / term leaderboard. Student
+    // performance is never persisted across rooms — a room shows its own live
+    // scores and podium, and those are wiped when the room ends (see
+    // clearJoined + the closeRoom wipe in live.js). The old getLeaderboard /
+    // saveLeaderboard / addToLeaderboard methods were removed with the feature.
   };
 
   window.LiveDB = LiveDB;

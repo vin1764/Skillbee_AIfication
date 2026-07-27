@@ -492,15 +492,19 @@
 
   var store = {
     data: null,
-    _ts: 0,                 // last-change timestamp (ms) used to order edits
+    _ts: 0,                 // last-change timestamp (ms), local bookkeeping only
+    _dirty: null,           // { gameKey: true } — sections changed since last push
+    _dirtyAll: false,       // true → next push writes the WHOLE bank (seed/reset/import)
+    _activeGame: null,      // the game the editor is currently editing (so save() knows the section)
+    _editedGames: null,     // { gameKey: true } — games edited since the editor opened (conflict detection)
     syncState: "local",     // local | saving | synced | offline
     editing: false,         // true while the content editor is open
-    pendingRemote: null,    // a newer cloud version that arrived mid-edit
+    pendingRemote: null,    // a cloud version that arrived mid-edit (resolved via banner/exit)
     cloudUnsub: null,
     _pushTimer: null,
     onSync: null,           // called after cloud content is adopted (re-render)
     onSyncState: null,      // called when syncState changes (update the chip)
-    onRemotePending: null,  // called when a newer cloud version arrives mid-edit
+    onRemotePending: null,  // called when a cloud version arrives mid-edit
 
     load: function () {
       try {
@@ -531,8 +535,18 @@
     },
 
     // Called on every edit: save on this device, then sync to the cloud.
-    save: function () {
+    // `gameKey` (or the editor's _activeGame) marks WHICH game changed, so the
+    // push merges only that section and can't clobber another device's edits to
+    // a different game. No key → a whole-bank change (fall back to a full push).
+    save: function (gameKey) {
       this._ts = Date.now();
+      var key = gameKey || this._activeGame;
+      if (!this._dirty) this._dirty = {};
+      if (key) this._dirty[key] = true; else this._dirtyAll = true;
+      if (this.editing) {
+        if (!this._editedGames) this._editedGames = {};
+        this._editedGames[key || "*"] = true;
+      }
       var ok = this._saveLocal();
       this._scheduleCloudPush();
       return ok;
@@ -541,6 +555,7 @@
     reset: function () {
       this.data = defaults();
       this._ts = Date.now();
+      this._dirtyAll = true;   // wholesale replace
       this._saveLocal();
       this._scheduleCloudPush();
     },
@@ -563,9 +578,19 @@
     _pushCloud: function () {
       if (!this._online()) { this._setState("offline"); return; }
       var self = this;
-      window.LiveDB.setContent({ data: this.data, updatedAt: this._ts, clientId: CLIENT_ID })
-        .then(function () { self._setState("synced"); })
-        .catch(function () { self._setState("offline"); });
+      var dirty = this._dirty ? Object.keys(this._dirty) : [];
+      var done = function () { self._dirty = {}; self._dirtyAll = false; self._setState("synced"); };
+      var fail = function () { self._setState("offline"); };
+      // Full write for a wholesale change (seed / reset / restore) or when we
+      // don't know which section changed; otherwise merge ONLY the changed
+      // sections so a different device's other-game edits survive.
+      if (this._dirtyAll || !dirty.length || !window.LiveDB.mergeContent) {
+        window.LiveDB.setContent({ data: this.data, clientId: CLIENT_ID }).then(done).catch(fail);
+      } else {
+        var sections = {};
+        dirty.forEach(function (g) { sections[g] = self.data.exercises[g]; });
+        window.LiveDB.mergeContent(sections, CLIENT_ID).then(done).catch(fail);
+      }
     },
     // Start listening once Firebase is ready (called from App.init).
     initCloud: function () {
@@ -573,10 +598,14 @@
       var self = this;
       this._setState("synced");
       this.cloudUnsub = window.LiveDB.listenContent(function (doc) {
-        if (!doc) { self._pushCloud(); return; }          // empty cloud → seed it
-        if (doc.clientId === CLIENT_ID) return;            // our own write, echoed
-        if (!doc.data || (doc.updatedAt || 0) <= self._ts) return; // not newer
-        if (self.editing) {                                // don't clobber active edits
+        if (!doc) { self._dirtyAll = true; self._pushCloud(); return; } // empty cloud → seed (full)
+        if (doc.clientId === CLIENT_ID) return;            // our own write, echoed back
+        if (!doc.data) return;
+        // Ordering is server-side: per-section merges make the cloud the union
+        // of every device's latest sections, so outside the editor the cloud is
+        // authoritative — adopt it. During editing, park it for the teacher to
+        // resolve (banner / exit) so we never silently overwrite their edits.
+        if (self.editing) {
           self.pendingRemote = doc;
           if (self.onRemotePending) self.onRemotePending();
           return;
@@ -586,15 +615,43 @@
     },
     _adoptRemote: function (doc) {
       this.data = ensureSections(doc.data);
-      this._ts = doc.updatedAt || Date.now();
+      this._ts = (doc.updatedAt && doc.updatedAt.toMillis) ? doc.updatedAt.toMillis() : Date.now();
       this._saveLocal();
       this.pendingRemote = null;
+      this._dirty = {}; this._dirtyAll = false;
       this._setState("synced");
       if (this.onSync) this.onSync();
     },
-    applyPendingRemote: function () {
-      if (this.pendingRemote) this._adoptRemote(this.pendingRemote);
+    // Games edited since the editor opened whose content now DIFFERS from the
+    // parked remote — the only genuine conflicts worth asking the teacher about.
+    pendingConflictGames: function () {
+      var pr = this.pendingRemote;
+      if (!pr || !pr.data || !pr.data.exercises) return [];
+      var mine = (this.data && this.data.exercises) || {};
+      var theirs = pr.data.exercises;
+      var edited = this._editedGames || {};
+      var out = [];
+      Object.keys(edited).forEach(function (g) {
+        if (g === "*") { out.push("*"); return; }
+        if (JSON.stringify(mine[g]) !== JSON.stringify(theirs[g])) out.push(g);
+      });
+      return out;
     },
+    // "Use the other device's version" — adopt the parked remote wholesale.
+    adoptPending: function () { if (this.pendingRemote) this._adoptRemote(this.pendingRemote); },
+    // "Keep this device's version" — discard the parked remote; local edits stay
+    // and are re-pushed per-section so the cloud keeps them.
+    keepLocal: function () {
+      this.pendingRemote = null;
+      var edited = this._editedGames || {};
+      if (!this._dirty) this._dirty = {};
+      var d = this._dirty;
+      Object.keys(edited).forEach(function (g) { if (g !== "*") d[g] = true; });
+      if (edited["*"]) this._dirtyAll = true;
+      this._scheduleCloudPush();
+    },
+    // Back-compat alias (old callers) → adopt the parked remote.
+    applyPendingRemote: function () { this.adoptPending(); },
 
     isCustomized: function () {
       try {
@@ -633,7 +690,7 @@
       var arr = this.exercisesFor(gameKey);
       var e = this._blankExercise(gameKey, name || "Exercise " + (arr.length + 1));
       arr.push(e);
-      this.save();
+      this.save(gameKey);
       return e;
     },
     duplicateExercise: function (gameKey, id) {
@@ -643,18 +700,18 @@
       copy.id = exId();
       copy.name = (src.name || "Exercise") + " (copy)";
       this.exercisesFor(gameKey).push(copy);
-      this.save();
+      this.save(gameKey);
       return copy;
     },
     renameExercise: function (gameKey, id, name) {
       var e = this.exercise(gameKey, id);
-      if (e) { e.name = String(name || "").trim() || e.name; this.save(); }
+      if (e) { e.name = String(name || "").trim() || e.name; this.save(gameKey); }
     },
     deleteExercise: function (gameKey, id) {
       var arr = this.exercisesFor(gameKey);
       for (var i = 0; i < arr.length; i++) if (arr[i].id === id) { arr.splice(i, 1); break; }
       if (!arr.length) arr.push(this._blankExercise(gameKey, "Exercise 1")); // keep at least one
-      this.save();
+      this.save(gameKey);
     },
     // Copy an exercise from another content-compatible game into this one.
     copyExerciseFrom: function (destKey, srcKey, srcId) {
@@ -664,7 +721,7 @@
       var copy = clone(src);
       copy.id = exId();
       this.exercisesFor(destKey).push(copy);
-      this.save();
+      this.save(destKey);
       return copy;
     },
 
@@ -699,6 +756,7 @@
       }
       this.data = ensureSections(parsed);
       this._ts = Date.now();
+      this._dirtyAll = true;   // wholesale replace
       this._saveLocal();
       this._scheduleCloudPush();
     }
