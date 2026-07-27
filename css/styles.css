@@ -1248,8 +1248,20 @@ input.ai-draft { border-style: dashed; border-color: #c8961a; background: #fffbf
 .name-btn.claiming { opacity: 0.7; }
 /* One-tap rejoin button on the Live landing screen (phone reloaded / next game). */
 .rejoin-live { margin: 2px auto 8px; display: block; }
-/* "Update ready" pill: a passive, fixed refresh offer when the served version
-   is newer than the one this tab is running. */
+/* Update popup: shown over whatever screen is up when a newer version of the
+   app goes live. "Later" collapses it to the corner pill below. */
+.update-overlay {
+  position: fixed; inset: 0; z-index: 9998; display: flex; align-items: center; justify-content: center;
+  background: rgba(31, 42, 68, 0.55); backdrop-filter: blur(4px); padding: 16px; animation: fadeIn 0.2s ease;
+}
+.update-card {
+  background: var(--card); border-radius: 22px; padding: 26px 22px; width: 100%; max-width: 380px;
+  text-align: center; box-shadow: var(--shadow-lg);
+}
+.update-big { font-size: 3rem; line-height: 1; margin-bottom: 6px; }
+.update-sub { color: var(--ink-soft); margin: 10px 0 18px; line-height: 1.45; }
+.update-actions { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+/* "Update ready" pill: the passive fallback after "Later". */
 .update-pill {
   position: fixed; right: 14px; bottom: 14px; z-index: 9999;
   background: var(--skb); color: #fff; font-weight: 800; font-size: 0.95rem;
