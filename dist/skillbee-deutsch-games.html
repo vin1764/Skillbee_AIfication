@@ -628,6 +628,15 @@ kbd {
 .adm-pairs-count.warn { color: var(--bad); }
 .adm-pairs-head .adm-del { margin-left: auto; }
 
+/* One cohesive card per authored question (MCQ / True-False / Scramble /
+   Hangman / Passage question). Everything for that question — its header, the
+   question block and the options — sits inside a single tinted, rounded card so
+   it reads as one unit instead of loose floating boxes. */
+.adm-cpair { background: var(--skb-tint); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px 16px; margin: 14px 0; box-shadow: var(--shadow); }
+.adm-cpair-topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.adm-cpair-n { font-weight: 800; font-size: 1.02rem; color: var(--ink); }
+.adm-cpair-topbar .adm-del { margin-left: auto; }
+
 /* Match the Following — custom-pair authoring (per-question types + entries) */
 .adm-cpair-sep { margin: 14px 0 8px; font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-soft); border-top: 1px dashed var(--line); padding-top: 10px; }
 .adm-custom { background: #f7f9ff; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
@@ -5201,7 +5210,7 @@ document.addEventListener("DOMContentLoaded", App.init);
               } }
             }, [
               el("span", { class: "adm-copy-name", text: (e.emoji ? e.emoji + " " : "") + e.name }),
-              el("span", { class: "adm-copy-count", text: count + " words" })
+              el("span", { class: "adm-copy-count", text: unitLabel(count, srcId, srcGame.kind) })
             ]));
           });
         });
@@ -5224,16 +5233,23 @@ document.addEventListener("DOMContentLoaded", App.init);
         if (kind === "pairs" || kind === "truefalse" || kind === "passage" || kind === "scramble") return (ex.questions || []).length;
         return (ex.items || []).length;
       }
+      // The content unit for a game, as a SINGULAR base word — kept in sync with
+      // each game's picker label so the admin list and the game menu always agree.
       function unitFor(id, kind) {
-        if (id === "quiz") return " questions";  // Quiz-Blitz counts MCQ questions
-        if (kind === "words") return " words";
-        if (kind === "sentences" || kind === "scramble") return " sentences";
-        if (kind === "hangman") return " words";
-        if (kind === "pairs") return " questions";
-        if (kind === "truefalse") return " statements";
-        if (kind === "passage") return " questions";
-        if (id === "listening") return " prompts";
-        return " words";
+        if (id === "quiz") return "question";        // Quiz-Blitz: MCQ questions
+        if (id === "listening") return "prompt";     // Hör gut zu!: listening prompts
+        if (kind === "cases") return "sentence";     // Lücken-Text: sentences with blanks
+        if (kind === "sentences" || kind === "scramble") return "sentence"; // Sentence Scramble
+        if (kind === "hangman" || kind === "words") return "word"; // Hangman / Memory: words
+        if (kind === "pairs") return "round";        // Match the Following: matching rounds
+        if (kind === "truefalse") return "statement"; // Wahr oder Falsch?
+        if (kind === "passage") return "question";   // Lese & Hör: comprehension questions
+        return "word"; // Wortmonster (compound words) + safe fallback
+      }
+      // "3 sentences" / "1 sentence" — count + unit, pluralised only when != 1.
+      function unitLabel(count, id, kind) {
+        var u = unitFor(id, kind);
+        return count + " " + u + (count === 1 ? "" : "s");
       }
 
       /* ---- The list of exercises for one game (create / rename / copy / delete) ---- */
@@ -5257,7 +5273,7 @@ document.addEventListener("DOMContentLoaded", App.init);
             on: { click: function () { currentExercise = e.id; render(); } }
           }, [
             el("div", { class: "adm-ex-name", text: (e.emoji ? e.emoji + " " : "") + e.name }),
-            el("div", { class: "adm-ex-count", text: count + unitFor(game.id, game.kind) })
+            el("div", { class: "adm-ex-count", text: unitLabel(count, game.id, game.kind) })
           ]));
           card.appendChild(el("div", { class: "adm-ex-actions" }, [
             el("button", {

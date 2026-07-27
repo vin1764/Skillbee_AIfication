@@ -580,7 +580,7 @@
               } }
             }, [
               el("span", { class: "adm-copy-name", text: (e.emoji ? e.emoji + " " : "") + e.name }),
-              el("span", { class: "adm-copy-count", text: count + " words" })
+              el("span", { class: "adm-copy-count", text: unitLabel(count, srcId, srcGame.kind) })
             ]));
           });
         });
@@ -603,16 +603,23 @@
         if (kind === "pairs" || kind === "truefalse" || kind === "passage" || kind === "scramble") return (ex.questions || []).length;
         return (ex.items || []).length;
       }
+      // The content unit for a game, as a SINGULAR base word — kept in sync with
+      // each game's picker label so the admin list and the game menu always agree.
       function unitFor(id, kind) {
-        if (id === "quiz") return " questions";  // Quiz-Blitz counts MCQ questions
-        if (kind === "words") return " words";
-        if (kind === "sentences" || kind === "scramble") return " sentences";
-        if (kind === "hangman") return " words";
-        if (kind === "pairs") return " questions";
-        if (kind === "truefalse") return " statements";
-        if (kind === "passage") return " questions";
-        if (id === "listening") return " prompts";
-        return " words";
+        if (id === "quiz") return "question";        // Quiz-Blitz: MCQ questions
+        if (id === "listening") return "prompt";     // Hör gut zu!: listening prompts
+        if (kind === "cases") return "sentence";     // Lücken-Text: sentences with blanks
+        if (kind === "sentences" || kind === "scramble") return "sentence"; // Sentence Scramble
+        if (kind === "hangman" || kind === "words") return "word"; // Hangman / Memory: words
+        if (kind === "pairs") return "round";        // Match the Following: matching rounds
+        if (kind === "truefalse") return "statement"; // Wahr oder Falsch?
+        if (kind === "passage") return "question";   // Lese & Hör: comprehension questions
+        return "word"; // Wortmonster (compound words) + safe fallback
+      }
+      // "3 sentences" / "1 sentence" — count + unit, pluralised only when != 1.
+      function unitLabel(count, id, kind) {
+        var u = unitFor(id, kind);
+        return count + " " + u + (count === 1 ? "" : "s");
       }
 
       /* ---- The list of exercises for one game (create / rename / copy / delete) ---- */
@@ -636,7 +643,7 @@
             on: { click: function () { currentExercise = e.id; render(); } }
           }, [
             el("div", { class: "adm-ex-name", text: (e.emoji ? e.emoji + " " : "") + e.name }),
-            el("div", { class: "adm-ex-count", text: count + unitFor(game.id, game.kind) })
+            el("div", { class: "adm-ex-count", text: unitLabel(count, game.id, game.kind) })
           ]));
           card.appendChild(el("div", { class: "adm-ex-actions" }, [
             el("button", {
