@@ -291,6 +291,19 @@
           return arr;
         });
     },
+    // Speed Challenge answers. The deployed security rules only accept an
+    // answer while the session has status "question" AND the answer's
+    // questionIndex equals round.index — so Speed runs under status "question"
+    // with this sentinel round index, which every speed answer carries; the
+    // student's REAL position rides in `pos` (the doc id keeps one write-once
+    // doc per position per student per game).
+    SPEED_ROUND_INDEX: -9,
+    submitSpeedAnswer: function (code, pos, studentId, payload, seq) {
+      seq = seq || 0;
+      var id = seq + "_s" + pos + "_" + studentId;
+      var ref = db.collection("sessions").doc(code).collection("answers").doc(id);
+      return ref.set(Object.assign({ questionIndex: LiveDB.SPEED_ROUND_INDEX, pos: pos, gameSeq: seq, studentId: studentId, ts: serverTs() }, payload));
+    },
     // Speed Challenge is student-paced: every phone is on its own question, so the
     // host can't watch "the current question" — it watches every answer OF THIS
     // GAME (gameSeq-filtered, like listenAnswers: a room hosts many games) and

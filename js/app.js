@@ -585,7 +585,70 @@ const App = (function () {
     // Start cloud content sync now that Firebase (if present) has loaded.
     if (window.ContentStore && window.ContentStore.initCloud) window.ContentStore.initCloud();
     window.AppNav.init(); // capture the browser Back button (keeps students in the app)
+    watchForUpdates();
     showModeSelect();
+  }
+
+  /* ---- Update watcher -------------------------------------------------
+     Open tabs (the smartboard, phones parked in a room) never pick up a
+     deploy on their own — they run stale code until someone reloads, which
+     has repeatedly looked like "the fix didn't work". Compare this tab's
+     own asset stamp (?v=…) with the one the server currently puts in
+     index.html, and offer a one-tap refresh when they differ. Passive: the
+     teacher taps between games; students any time (rejoin recovers them). */
+  function watchForUpdates() {
+    let current = null;
+    try {
+      const s = document.querySelector('script[src*="js/app.js"]');
+      const m = s && /[?&]v=([a-f0-9]+)/.exec(s.getAttribute("src"));
+      current = m ? m[1] : null;
+    } catch (e) {}
+    if (!current) return; // offline bundle (no stamps) — nothing to compare
+    let shown = false;
+    // The popup appears over WHATEVER screen is showing (lobby, a live
+    // question, the podium…). "Later" swaps it for a small corner pill so a
+    // mid-round class is never forced to reload on the spot.
+    function showUpdatePopup() {
+      const pill = () =>
+        document.body.appendChild(
+          el("button", {
+            class: "update-pill",
+            html: "🔄 Update ready — tap to refresh",
+            attrs: { title: "A newer version of the games is live. Finish the current round, then tap to reload." },
+            on: { click: () => window.location.reload() }
+          })
+        );
+      const overlay = el("div", { class: "update-overlay" }, [
+        el("div", { class: "update-card" }, [
+          el("div", { class: "update-big", text: "🔄" }),
+          el("h2", { text: "Update ready" }),
+          el("p", { class: "update-sub", text: "A newer version of the games just went live. Refresh to get the latest fixes — you can rejoin your room with one tap afterwards." }),
+          el("div", { class: "update-actions" }, [
+            el("button", { class: "btn primary big", text: "Refresh now", on: { click: () => window.location.reload() } }),
+            el("button", { class: "btn ghost", text: "Later", on: { click: () => { overlay.remove(); pill(); } } })
+          ])
+        ])
+      ]);
+      document.body.appendChild(overlay);
+    }
+    let checking = false; // two ticks can overlap (async fetch) — never stack popups
+    async function check() {
+      if (shown || checking) return;
+      checking = true;
+      try {
+        const res = await fetch(window.location.pathname, { cache: "no-store" });
+        if (!res.ok) return;
+        const m = /js\/app\.js\?v=([a-f0-9]+)/.exec(await res.text());
+        if (m && m[1] !== current && !shown) {
+          shown = true;
+          showUpdatePopup();
+        }
+      } catch (e) { /* offline / transient — try again next tick */ }
+      finally { checking = false; }
+    }
+    const every = window.__UPDATE_CHECK_MS__ || 4 * 60 * 1000; // test hook
+    setInterval(check, every);
+    setTimeout(check, Math.min(every, 15000)); // first look shortly after load
   }
 
   return { register, init, kit, state, addScore, showHome, showAdmin, showModeSelect, showLive, setAdminVisible };
